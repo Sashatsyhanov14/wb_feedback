@@ -6,10 +6,10 @@ const wbService = require('../services/wbService');
 // Register or update seller (Onboarding)
 router.post('/register', async (req, res) => {
   try {
-    const { maxUserId, wbToken, brandName, sellerDescription, customInstructions } = req.body;
+    const { telegramChatId, wbToken, brandName, sellerDescription, customInstructions } = req.body;
 
-    if (!maxUserId || !wbToken) {
-      return res.status(400).json({ error: 'maxUserId and wbToken are required' });
+    if (!telegramChatId || !wbToken) {
+      return res.status(400).json({ error: 'telegramChatId and wbToken are required' });
     }
 
     // 1. Validate WB Token
@@ -22,12 +22,12 @@ router.post('/register', async (req, res) => {
     const { data, error } = await supabase
       .from('sellers')
       .upsert({
-        max_user_id: maxUserId,
+        telegram_chat_id: telegramChatId,
         wb_token: wbToken,
         brand_name: brandName,
         seller_description: sellerDescription,
         custom_instructions: customInstructions
-      }, { onConflict: 'max_user_id' })
+      }, { onConflict: 'telegram_chat_id' })
       .select()
       .single();
 
@@ -91,12 +91,12 @@ router.post('/reviews/:id/approve', async (req, res) => {
 });
 
 // GET seller settings
-router.get('/settings/:maxUserId', async (req, res) => {
+router.get('/settings/:telegramChatId', async (req, res) => {
   try {
     const { data, error } = await supabase
       .from('sellers')
-      .select('is_auto_reply_enabled, auto_reply_min_rating')
-      .eq('max_user_id', req.params.maxUserId)
+      .select('is_auto_reply_enabled, auto_reply_min_rating, brand_name, seller_description, custom_instructions')
+      .eq('telegram_chat_id', req.params.telegramChatId)
       .single();
     
     if (error) throw error;
@@ -107,13 +107,13 @@ router.get('/settings/:maxUserId', async (req, res) => {
 });
 
 // UPDATE seller settings
-router.post('/settings/:maxUserId', async (req, res) => {
+router.post('/settings/:telegramChatId', async (req, res) => {
   try {
-    const { is_auto_reply_enabled, auto_reply_min_rating } = req.body;
+    const { is_auto_reply_enabled, auto_reply_min_rating, brand_name, seller_description, custom_instructions } = req.body;
     const { error } = await supabase
       .from('sellers')
-      .update({ is_auto_reply_enabled, auto_reply_min_rating })
-      .eq('max_user_id', req.params.maxUserId);
+      .update({ is_auto_reply_enabled, auto_reply_min_rating, brand_name, seller_description, custom_instructions })
+      .eq('telegram_chat_id', req.params.telegramChatId);
     
     if (error) throw error;
     res.json({ success: true });

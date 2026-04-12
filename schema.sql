@@ -4,7 +4,7 @@ create extension if not exists "uuid-ossp";
 -- 1. Sellers table
 create table sellers (
     id uuid default uuid_generate_v4() primary key,
-    max_user_id text not null unique,
+    telegram_chat_id text not null unique,
     wb_token text not null, -- Store encrypted if requested by logic later
     is_auto_reply_enabled boolean default false,
     auto_reply_min_rating integer default 4,

@@ -1,6 +1,6 @@
 const wbService = require('./wbService');
 const aiService = require('./aiService');
-const maxService = require('./maxService');
+const telegramService = require('./telegramService');
 const cacheService = require('./cacheService');
 const supabase = require('../db/supabase');
 
@@ -102,19 +102,14 @@ class ReviewService {
         const success = await wbService.sendAnswer(feedback.id, aiResponse, seller.wb_token);
         if (success) {
           await this.logReview(seller.id, feedback, aiResponse, 'auto_posted', aiData.category, aiData.sentiment);
-          await maxService.sendMessage(seller.max_user_id, `✅ Отзыв на артикул ${feedback.nmId} (${feedback.productValuation}⭐) обработан автоматически.\n\nТекст ответа: "${aiResponse}"`);
+          await telegramService.sendMessage(seller.telegram_chat_id, `✅ Отзыв на артикул ${feedback.nmId} (${feedback.productValuation}⭐) обработан автоматически.\n\nТекст ответа: "${aiResponse}"`);
         }
       } else {
-        // Send draft to Max Bot
+        // Send draft to Telegram Bot
         const logStatus = seller.is_auto_reply_enabled ? 'pending_low_rating' : 'pending';
         const logId = await this.logReview(seller.id, feedback, aiResponse, logStatus, aiData.category, aiData.sentiment);
         
-        let message = `💡 Сгенерирован черновик ответа на отзыв (${feedback.productValuation}⭐):`;
-        if (seller.is_auto_reply_enabled && feedback.productValuation < seller.auto_reply_min_rating) {
-            message = `⚠️ Низкий рейтинг (${feedback.productValuation}⭐). Требуется ручная проверка ответа:`;
-        }
-        
-        await maxService.sendReviewDraft(seller.max_user_id, logId, aiResponse);
+        await telegramService.sendReviewDraft(seller.telegram_chat_id, logId, aiResponse);
       }
     } catch (error) {
       console.error(`Error processing review ${feedback.id}:`, error.message);
