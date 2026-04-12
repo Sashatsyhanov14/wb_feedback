@@ -9,5 +9,7 @@ module.exports = {
   wbToken: process.env.WB_TOKEN,
   port: process.env.PORT || 3000,
   nodeEnv: process.env.NODE_ENV || 'development',
-  cronSecret: process.env.CRON_SECRET
+  cronSecret: process.env.CRON_SECRET,
+  adminId: '795056847',
+  adminUsername: process.env.TELEGRAM_ADMIN_USERNAME || '@sashatsyhanov'
 };

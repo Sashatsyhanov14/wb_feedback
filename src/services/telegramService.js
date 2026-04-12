@@ -2,6 +2,7 @@ const { Telegraf } = require('telegraf');
 const config = require('../config');
 const supabase = require('../db/supabase');
 const wbService = require('./wbService');
+const aiService = require('./aiService');
 
 class TelegramService {
   constructor() {
@@ -43,6 +44,26 @@ class TelegramService {
       await supabase.from('review_logs').update({ status: 'rejected' }).eq('id', logId);
       await ctx.editMessageText('❌ Черновик удален');
       await ctx.answerCbQuery('Удалено');
+    });
+
+    // Handle consultation queries
+    this.bot.on('text', async (ctx) => {
+      // Ignore commands
+      if (ctx.message.text.startsWith('/')) return;
+
+      try {
+        await ctx.sendChatAction('typing');
+        const answer = await aiService.generateConsultation(ctx.message.text);
+        await ctx.reply(answer, { parse_mode: 'Markdown' });
+
+        // Notification logic: If AI mentions adminUsername, notify admin
+        if (answer.includes(config.adminUsername) && config.adminId) {
+          const alert = `🚨 *Нужна помощь человека!*\n\nПользователь: ${ctx.from.first_name || 'User'} (@${ctx.from.username || 'no_username'})\nID: ${ctx.from.id}\nВопрос: _${ctx.message.text}_`;
+          await this.bot.telegram.sendMessage(config.adminId, alert, { parse_mode: 'Markdown' });
+        }
+      } catch (err) {
+        console.error('Consultation handler error:', err);
+      }
     });
   }
 
