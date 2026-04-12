@@ -1,291 +1,219 @@
-/**
- * WB AI Responder - Main Frontend Logic
- */
-
-const state = {
-    currentView: 'dashboard',
-    theme: 'light',
-    reviews: [],
-    stats: { total: 0, pending: 0, approved: 0 },
-    settings: { is_auto_reply_enabled: false, auto_reply_min_rating: 4 },
-    matrix: [],
-    analytics: { ratings: {}, categories: {}, sentiments: {} },
+let state = {
     telegramChatId: null,
-    isAuthorized: false,
-    subscriptionStatus: 'free'
+    settings: {
+        wb_token: '',
+        custom_instructions: '',
+        is_auto_reply_enabled: true,
+        respond_to_bad_reviews: false,
+        subscription_status: 'free',
+        subscription_expires_at: null
+    },
+    reviews: [],
+    matrix: [],
+    currentView: 'settings'
 };
 
-// Initialize Telegram WebApp
-const tg = window.Telegram?.WebApp;
-if (tg) {
-    tg.expand();
-    state.telegramChatId = tg.initDataUnsafe?.user?.id || 'mock_user_123';
-} else {
-    state.telegramChatId = 'mock_user_123'; // Fallback for browser testing
-}
+document.addEventListener('DOMContentLoaded', async () => {
+    // 1. Initialize TG WebApp
+    if (window.Telegram && window.Telegram.WebApp) {
+        const tg = window.Telegram.WebApp;
+        tg.expand();
+        tg.ready();
+        state.telegramChatId = tg.initDataUnsafe.user?.id || 'TEST_USER_123';
+    } else {
+        state.telegramChatId = 'TEST_USER_123';
+    }
 
-// --- API Calls ---
+    // 2. Load Initial Data
+    await refreshData();
+    
+    // 3. Initial View
+    showView('settings');
+});
 
-async function fetchAnalytics() {
+async function refreshData() {
     try {
-        const res = await fetch('/api/analytics');
-        state.analytics = await res.json();
-    } catch (e) { console.error('Analytics fetch error:', e); }
-}
-
-async function fetchMatrix() {
-    try {
-        const res = await fetch('/api/matrix');
-        state.matrix = await res.json();
-    } catch (e) { console.error('Matrix fetch error:', e); }
-}
-
-async function saveMatrixEntry(entry) {
-    try {
-        const res = await fetch('/api/matrix', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(entry)
-        });
-        if (res.ok) {
-            showToast('✅ Товар добавлен в матрицу');
-            await fetchMatrix();
-            showView('products');
-        }
-    } catch (e) { showToast('❌ Ошибка сохранения', true); }
-}
-
-async function fetchSettings() {
-    try {
-        // Sync token in dashboard if it exists
-        const tokenInput = document.getElementById('dash-wb-token');
-        if (tokenInput && state.settings.wb_token) {
-            tokenInput.value = state.settings.wb_token;
+        const res = await fetch(`/api/settings/${state.telegramChatId}`);
+        if (res.status === 200) {
+            state.settings = await res.json();
         }
         
-        return state.settings;
-    } catch (e) { console.error('Settings fetch error:', e); return null; }
-}
+        const matrixRes = await fetch(`/api/matrix/${state.telegramChatId}`);
+        if (matrixRes.status === 200) {
+            state.matrix = await matrixRes.json();
+        }
 
-async function updateToken(val) {
-    state.settings.wb_token = val;
-    await saveSettings();
+        const reviewsRes = await fetch(`/api/reviews/${state.telegramChatId}`);
+        if (reviewsRes.status === 200) {
+            state.reviews = await reviewsRes.json();
+        }
+    } catch (e) {
+        console.error('Refresh data error:', e);
+    }
 }
 
 async function saveSettings() {
     try {
-        const res = await fetch(`/api/settings/${state.telegramChatId}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(state.settings)
-        });
-        const result = await res.json();
-        if (result.success) showToast('✅ Настройки сохранены');
-    } catch (e) { showToast('❌ Ошибка сохранения', true); }
-}
-
-async function registerSeller(data) {
-    try {
-        const res = await fetch('/api/register', {
+        await fetch('/api/settings', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                telegramChatId: state.telegramChatId,
-                ...data
+                telegram_chat_id: state.telegramChatId,
+                ...state.settings
             })
         });
-        const result = await res.json();
-        if (result.success) {
-            state.isAuthorized = true;
-            showToast('✅ Регистрация успешна!');
-            await refreshData();
-        } else {
-            showToast(`❌ Ошибка: ${result.error}`, true);
-        }
-    } catch (e) { showToast('❌ Ошибка сети', true); }
-}
-
-async function fetchStats() {
-    try {
-        const res = await fetch('/api/stats');
-        state.stats = await res.json();
-    } catch (e) { console.error('Stats fetch error:', e); }
-}
-
-async function fetchReviews(status) {
-    try {
-        let url = '/api/reviews';
-        if (status) url += `?status=${status}`;
-        const res = await fetch(url);
-        state.reviews = await res.json();
-    } catch (e) { console.error('Reviews fetch error:', e); }
-}
-
-async function approveReview(id, text) {
-    try {
-        const res = await fetch(`/api/reviews/${id}/approve`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ text })
-        });
-        const result = await res.json();
-        if (result.success) {
-            showToast('✅ Ответ успешно отправлен!');
-            await refreshData();
-        } else {
-            showToast('❌ Ошибка при отправке :(', true);
-        }
-    } catch (e) { 
-        console.error('Approve error:', e);
-        showToast('❌ Ошибка сети', true);
+        showToast('Конфигурация сохранена');
+    } catch (e) {
+        console.error('Save settings error:', e);
+        showToast('Ошибка сохранения', true);
     }
 }
 
-async function refreshData() {
-    await fetchStats();
-    await fetchReviews();
-    showView(state.currentView);
-}
+function showView(view) {
+    state.currentView = view;
+    const content = document.getElementById('content-view');
 
-// --- View Rendering ---
-
-function renderDashboard() {
-    return `
-        <div class="animate-in">
-            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;">
-                <div class="card">
-                    <div style="color: var(--text-muted); font-size: 14px; margin-bottom: 8px;">Всего отзывов</div>
-                    <div style="font-size: 32px; font-weight: 700;">${state.stats.total || 0}</div>
-                    <div style="color: #30d158; font-size: 12px; margin-top: 8px;">За все время</div>
-                </div>
-                <div class="card">
-                    <div style="color: var(--text-muted); font-size: 14px; margin-bottom: 8px;">Ожидают проверки</div>
-    `;
-}
-
-function renderReviews() {
-    if (state.reviews.length === 0) {
-        return `<div class="card"><p>Все отзывы обработаны! 🎉</p></div>`;
+    // Update Nav active classes
+    document.querySelectorAll('.tab-item').forEach(item => {
+        item.classList.remove('active', 'bg-[#2A2A2A]', 'text-[#ADC6FF]');
+        item.classList.add('text-[#C1C6D7]');
+        const icon = item.querySelector('.material-symbols-outlined');
+        if (icon) icon.style.fontVariationSettings = "'FILL' 0";
+    });
+    
+    const activeNav = document.getElementById(`nav-${view}`);
+    if (activeNav) {
+        activeNav.classList.add('active', 'bg-[#2A2A2A]', 'text-[#ADC6FF]');
+        activeNav.classList.remove('text-[#C1C6D7]');
+        const icon = activeNav.querySelector('.material-symbols-outlined');
+        if (icon) icon.style.fontVariationSettings = "'FILL' 1";
     }
-    return `
-        <div class="review-list animate-in">
-            ${state.reviews.map(review => `
-                <div class="card review-item">
-                    <div style="display: flex; justify-content: space-between; align-items: start;">
-                        <div>
-                            <div class="rating">${'★'.repeat(review.rating)}${'☆'.repeat(5-review.rating)}</div>
-                            <p style="margin: 8px 0; font-size: 15px;">${review.text || 'Нет текста'}</p>
-                            <div style="font-size: 12px; color: var(--text-muted);">Артикул: ${review.nm_id}</div>
-                        </div>
-                        <span class="badge badge-pending">Ожидает</span>
-                    </div>
-                    
-                    <div class="draft-area">
-                        <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 8px; display: flex; align-items: center; gap: 4px;">
-                            <i data-lucide="sparkles" style="width: 12px;"></i> Черновик от AI
-                        </div>
-                        <textarea id="text-${review.id}">${review.ai_response_draft || ''}</textarea>
-                    </div>
 
-                    <div style="display: flex; gap: 12px; margin-top: 12px;">
-                        <button class="btn btn-primary" onclick="handleApprove('${review.id}')">Отправить на WB</button>
-                        <button class="btn" style="background: var(--glass-border);">Игнорировать</button>
-                    </div>
-                </div>
-            `).join('')}
-        </div>
-    `;
+    if (view === 'settings') {
+        content.innerHTML = renderSettings();
+    } else if (view === 'matrix') {
+        content.innerHTML = renderMatrix();
+    } else if (view === 'subscription') {
+        content.innerHTML = renderSubscription();
+    }
 }
 
-function renderRegistration() {
+function renderSettings() {
     return `
-        <div class="card animate-in" style="max-width: 500px; margin: 40px auto;">
-            <div style="text-align: center; margin-bottom: 24px;">
-                <i data-lucide="zap" style="width: 48px; height: 48px; color: var(--primary); margin-bottom: 12px;"></i>
-                <h2 style="margin: 0">Добро пожаловать в WB Responder</h2>
-                <p style="color: var(--text-muted); font-size: 14px; margin-top: 8px;">Для начала работы подключите ваш Wildberries API токен</p>
+        <div class="space-y-6 animate-in">
+            <div class="mb-8">
+                <span class="text-primary text-xs font-bold tracking-widest uppercase opacity-70">Workspace</span>
+                <h2 class="font-headline text-3xl font-extrabold text-on-surface tracking-tight mt-1">Настройки</h2>
             </div>
-            
-            <div style="display: flex; flex-direction: column; gap: 16px;">
-                <div>
-                    <label style="font-size: 12px; color: var(--text-muted); margin-bottom: 4px; display: block;">API Токен Wildberries (Статистика/Контент)</label>
-                    <input type="password" id="reg-token" placeholder="Введите ваш токен..." style="width: 100%; padding: 12px; border-radius: 12px; border: 1px solid var(--glass-border); background: var(--glass-border); color: var(--text);">
-                </div>
-                <div>
-                    <label style="font-size: 12px; color: var(--text-muted); margin-bottom: 4px; display: block;">Название вашего бренда</label>
-                    <input type="text" id="reg-brand" placeholder="Например: MyBrand" style="width: 100%; padding: 12px; border-radius: 12px; border: 1px solid var(--glass-border); background: var(--glass-border); color: var(--text);">
-                </div>
-                <div>
-                    <label style="font-size: 12px; color: var(--text-muted); margin-bottom: 4px; display: block;">Краткое описание магазина (для ИИ)</label>
-                    <textarea id="reg-desc" placeholder="Мы продаем аксессуары для дома..." style="width: 100%; height: 80px; padding: 12px; border-radius: 12px; border: 1px solid var(--glass-border); background: var(--glass-border); color: var(--text);"></textarea>
-                </div>
-                
-                <button class="btn btn-primary" style="margin-top: 12px; padding: 14px;" onclick="handleRegister()">Зарегистрироваться</button>
-            </div>
-        </div>
-    `;
-}
 
-function renderAI() {
-    return `
-        <div class="animate-in">
-            <!-- AI Persona -->
-            <div class="card">
-                <h3 style="margin-top: 0; display: flex; align-items: center; gap: 8px;">
-                    <i data-lucide="sparkles" style="width: 20px; color: var(--primary);"></i>
-                    Пожелания по общению
-                </h3>
-                <p style="color: var(--text-muted); font-size: 12px; margin-bottom: 16px;">
-                    Пример: "Пиши кратко, на Вы, в конце добавляй 'С любовью, бренд X'".
+            <section class="bg-surface-container-low rounded-xl p-6 border border-outline-variant/5">
+                <div class="flex items-center justify-between mb-4">
+                    <label class="text-on-surface font-semibold text-sm">API Токен WB</label>
+                    <span class="material-symbols-outlined text-outline text-lg">key</span>
+                </div>
+                <div class="relative group">
+                    <input id="wb-token-input" class="w-full bg-surface-container-lowest border-none rounded-lg py-4 px-4 text-on-surface-variant focus:ring-1 focus:ring-primary transition-all text-sm font-mono" 
+                        type="password" value="${state.settings.wb_token || ''}" placeholder="••••••••••••••••••••••••">
+                    <button class="absolute right-4 top-1/2 -translate-y-1/2 text-outline hover:text-primary transition-colors" onclick="toggleTokenVisibility()">
+                        <span id="token-visibility-icon" class="material-symbols-outlined">visibility</span>
+                    </button>
+                </div>
+                <p class="mt-3 text-[11px] text-on-surface-variant/60 leading-relaxed">
+                    Используйте API-ключ типа «Стандартный» для обеспечения корректной работы автоматических ответов.
                 </p>
-                <textarea id="ai-instructions" style="width: 100%; height: 100px; padding: 12px; border-radius: 12px; border: 1px solid var(--glass-border); background: var(--glass-border); color: var(--text); margin-bottom: 16px;">${state.settings.custom_instructions || ''}</textarea>
-                <button class="btn btn-primary" style="width: 100%" onclick="state.settings.custom_instructions = document.getElementById('ai-instructions').value; saveSettings();">Сохранить характер ИИ</button>
+            </section>
+
+            <section class="bg-surface-container-low rounded-xl p-6 border border-outline-variant/5">
+                <div class="flex items-center justify-between mb-4">
+                    <label class="text-on-surface font-semibold text-sm">Инструкции для ИИ</label>
+                    <div class="flex gap-2">
+                        <span class="px-2 py-0.5 bg-secondary-container text-on-secondary-container text-[10px] rounded font-medium">Smart Logic</span>
+                    </div>
+                </div>
+                <div class="relative">
+                    <textarea id="ai-instructions-input" class="w-full bg-surface-container-lowest border-none rounded-lg p-4 text-on-surface-variant focus:ring-1 focus:ring-primary transition-all text-sm leading-relaxed resize-none placeholder:text-outline/40" 
+                        placeholder="Например: Пиши вежливо, обращайся на Вы, в конце предлагай новинки..." rows="8">${state.settings.custom_instructions || ''}</textarea>
+                </div>
+                <div class="mt-4 flex flex-wrap gap-2">
+                    <button class="text-[10px] px-3 py-1.5 bg-surface-container-high rounded-full text-on-surface-variant border border-outline-variant/10">#вежливость</button>
+                    <button class="text-[10px] px-3 py-1.5 bg-surface-container-high rounded-full text-on-surface-variant border border-outline-variant/10">#допродажи</button>
+                    <button class="text-[10px] px-3 py-1.5 bg-surface-container-high rounded-full text-on-surface-variant border border-outline-variant/10">#официальный_тон</button>
+                </div>
+            </section>
+
+            <div class="pt-4">
+                <button onclick="handleSaveSettings()" class="w-full bg-electric-gradient py-4 rounded-xl text-on-primary font-bold text-base shadow-[0_4px_24px_0_rgba(173,198,255,0.2)] active:scale-[0.98] transition-transform flex items-center justify-center gap-2 relative overflow-hidden group">
+                    <span class="material-symbols-outlined text-xl" style="font-variation-settings: 'FILL' 1;">save</span>
+                    Сохранить конфигурацию
+                </button>
+            </div>
+        </div>
+    `;
+}
+
+function renderMatrix() {
+    return `
+        <div class="animate-in space-y-6">
+            <section class="mb-8">
+                <h2 class="text-3xl font-headline font-extrabold tracking-tight text-on-surface mb-2">Матрица допродаж</h2>
+                <p class="text-sm text-on-surface-variant leading-relaxed">
+                    Настройте связки товаров для автоматических рекомендаций в отзывах.
+                </p>
+            </section>
+
+            <div class="grid grid-cols-2 gap-3 mb-8">
+                <div class="bg-surface-container-low p-4 rounded-xl">
+                    <div class="text-on-surface-variant text-[10px] uppercase tracking-wider mb-1">Активных пар</div>
+                    <div class="text-2xl font-headline font-bold text-primary">${state.matrix.length}</div>
+                </div>
+                <div class="bg-surface-container-low p-4 rounded-xl">
+                    <div class="text-on-surface-variant text-[10px] uppercase tracking-wider mb-1">CTR рекомендаций</div>
+                    <div class="text-2xl font-headline font-bold text-secondary">8.4%</div>
+                </div>
             </div>
 
-            <!-- AI Strategy (Toggles) -->
-            <div class="card" style="margin-top: 24px;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-                    <div>
-                        <div style="font-weight: 600; font-size: 14px;">Автоответчик</div>
-                        <div style="font-size: 11px; color: var(--text-muted);">Включить автоматическую отправку</div>
-                    </div>
-                    <label class="switch">
-                        <input type="checkbox" ${state.settings.is_auto_reply_enabled ? 'checked' : ''} onchange="state.settings.is_auto_reply_enabled = this.checked; saveSettings();">
-                        <span class="slider round"></span>
-                    </label>
-                </div>
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <div>
-                        <div style="font-weight: 600; font-size: 14px;">Отвечать на плохие (1-3★)</div>
-                        <div style="font-size: 11px; color: var(--text-muted);">Безопасно ли ИИ отвечать на негатив</div>
-                    </div>
-                    <label class="switch">
-                        <input type="checkbox" ${state.settings.respond_to_bad_reviews ? 'checked' : ''} onchange="state.settings.respond_to_bad_reviews = this.checked; saveSettings();">
-                        <span class="slider round"></span>
-                    </label>
-                </div>
-            </div>
-
-            <!-- Matrix -->
-            <div class="card" style="margin-top: 24px;">
-                <h3 style="display: flex; align-items: center; gap: 8px;">
-                    <i data-lucide="link" style="width: 20px; color: var(--primary);"></i>
-                    Матрица доп. продаж
-                </h3>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px;">
-                    <input type="text" id="m-nm-id" placeholder="Ваш Артикул" style="padding: 8px; font-size: 13px;">
-                    <input type="text" id="m-cross-id" placeholder="Рекомендация" style="padding: 8px; font-size: 13px;">
-                </div>
-                <button class="btn btn-primary" style="width: 100%; padding: 10px;" onclick="handleAddMatrix()">Добавить связь</button>
-                
-                <div style="margin-top: 16px; display: flex; flex-direction: column; gap: 8px;">
-                    ${state.matrix.map(item => `
-                        <div style="display: flex; justify-content: space-between; padding: 10px; background: rgba(255,255,255,0.02); border-radius: 10px; border: 1px solid var(--glass-border); font-size: 13px;">
-                            <span>${item.nm_id}</span>
-                            <span style="color: var(--primary)">→ ${item.cross_sell_article}</span>
+            <div class="space-y-3">
+                ${state.matrix.map((item, idx) => `
+                    <div class="bg-surface-container-high p-4 rounded-xl flex items-center gap-3">
+                        <div class="flex-1 space-y-1">
+                            <label class="text-[10px] text-on-surface-variant ml-3 uppercase font-semibold">Артикул товара</label>
+                            <div class="w-full bg-surface-container-lowest rounded-lg text-sm text-on-surface h-10 px-3 flex items-center font-mono">${item.nm_id}</div>
                         </div>
-                    `).join('')}
+                        <div class="flex items-center pt-5">
+                            <span class="material-symbols-outlined text-primary">arrow_forward</span>
+                        </div>
+                        <div class="flex-1 space-y-1">
+                            <label class="text-[10px] text-on-surface-variant ml-3 uppercase font-semibold">Рекомендация</label>
+                            <div class="w-full bg-surface-container-lowest rounded-lg text-sm text-on-surface h-10 px-3 flex items-center font-mono">${item.cross_sell_article}</div>
+                        </div>
+                        <button class="pt-5 text-on-surface-variant hover:text-red-500 transition-colors" onclick="handleDeleteMatrix(${item.id || idx})">
+                            <span class="material-symbols-outlined text-[20px]">delete</span>
+                        </button>
+                    </div>
+                `).join('')}
+
+                <!-- New Row -->
+                <div class="bg-surface-container-high p-4 rounded-xl flex items-center gap-3 border border-primary/20">
+                    <div class="flex-1 space-y-1">
+                        <label class="text-[10px] text-on-surface-variant ml-3 uppercase font-semibold">Артикул товара</label>
+                        <input id="new-nm-id" class="w-full bg-surface-container-lowest border-none rounded-lg text-sm text-on-surface focus:ring-1 focus:ring-primary h-10 px-3 transition-all" placeholder="Введите SKU" type="text">
+                    </div>
+                    <div class="flex items-center pt-5">
+                        <span class="material-symbols-outlined text-primary/40">arrow_forward</span>
+                    </div>
+                    <div class="flex-1 space-y-1">
+                        <label class="text-[10px] text-on-surface-variant ml-3 uppercase font-semibold">Рекомендация</label>
+                        <input id="new-cross-id" class="w-full bg-surface-container-lowest border-none rounded-lg text-sm text-on-surface focus:ring-1 focus:ring-primary h-10 px-3 transition-all" placeholder="Введите SKU" type="text">
+                    </div>
+                    <div class="pt-5 w-5"></div>
                 </div>
+            </div>
+
+            <div class="mt-8">
+                <button onclick="handleAddMatrixRow()" class="w-full premium-gradient h-14 rounded-xl flex items-center justify-center gap-2 text-on-primary font-bold shadow-lg shadow-primary/10 active:scale-[0.98] transition-transform">
+                    <span class="material-symbols-outlined">add_circle</span>
+                    <span>Добавить новую пару</span>
+                </button>
             </div>
         </div>
     `;
@@ -293,194 +221,137 @@ function renderAI() {
 
 function renderSubscription() {
     return `
-        <div class="card animate-in" style="max-width: 500px; margin: 0 auto;">
-            <div style="text-align: center; margin-bottom: 32px;">
-                <div style="width: 72px; height: 72px; background: var(--accent-gradient); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px;">
-                    <i data-lucide="crown" style="color: white; width: 32px; height: 32px;"></i>
-                </div>
-                <h2 style="margin: 0">Ваша подписка</h2>
-                <p style="color: var(--text-muted); font-size: 14px;">Статус: <span style="color: var(--primary); font-weight: 600;">${(state.settings.subscription_status || 'FREE').toUpperCase()}</span></p>
-            </div>
-            
-            <div style="display: flex; flex-direction: column; gap: 20px;">
-                <div style="padding: 16px; border-radius: 16px; background: rgba(139, 92, 246, 0.05); border: 1px dashed var(--primary);">
-                    <div style="font-weight: 600;">Почему важен Premium?</div>
-                    <ul style="font-size: 13px; color: var(--text-muted); padding-left: 20px; margin-top: 8px;">
-                        <li>Неограниченные автоответы 24/7</li>
-                        <li>Расширенная аналитика продаж</li>
-                        <li>Приоритетная генерация ИИ</li>
-                    </ul>
-                </div>
-                
-                <button class="btn btn-primary" style="padding: 14px;">Продлить / Улучшить</button>
-                
-                <div style="text-align: center; font-size: 12px; color: var(--text-muted);">
-                    Ваш Telegram ID: ${state.telegramChatId}
-                </div>
-            </div>
-        </div>
-    `;
-}
-
-async function handleAddMatrix() {
-    const entry = {
-        nm_id: document.getElementById('m-nm-id').value,
-        product_name: document.getElementById('m-name').value,
-        cross_sell_article: document.getElementById('m-cross-id').value,
-        cross_sell_description: document.getElementById('m-cross-desc').value
-    };
-    if (!entry.nm_id || !entry.product_name) return showToast('Заполните артикул и имя', true);
-    await saveMatrixEntry(entry);
-}
-
-function renderAnalytics() {
-    const total = Object.values(state.analytics.ratings).reduce((a, b) => a + b, 0);
-    
-    const renderBar = (label, value, color) => {
-        const percent = total > 0 ? (value / total * 100) : 0;
-        return `
-            <div style="margin-bottom: 12px;">
-                <div style="display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 4px;">
-                    <span>${label}</span>
-                    <span>${value} (${percent.toFixed(0)}%)</span>
-                </div>
-                <div style="height: 8px; background: var(--glass-border); border-radius: 4px; overflow: hidden;">
-                    <div style="width: ${percent}%; height: 100%; background: ${color}; border-radius: 4px;"></div>
-                </div>
-            </div>
-        `;
-    };
-
-    return `
-        <div class="animate-in">
-            <div class="card" style="margin-bottom: 24px;">
-                <h3>Распределение оценок</h3>
-                ${[5, 4, 3, 2, 1].map(star => renderBar(`${star} звезд`, state.analytics.ratings[star] || 0, '#ff9f0a')).join('')}
+        <div class="animate-in space-y-6">
+            <div class="mb-8">
+                <h2 class="font-headline text-3xl font-extrabold tracking-tight mb-2 text-on-surface">Мой аккаунт</h2>
+                <p class="text-on-surface-variant text-sm">Управление вашим профилем и подпиской</p>
             </div>
 
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
-                <div class="card">
-                    <h3>Тональность</h3>
-                    ${renderBar('Позитив', state.analytics.sentiments.positive || 0, '#30d158')}
-                    ${renderBar('Нейтраль', state.analytics.sentiments.neutral || 0, '#8e8e93')}
-                    ${renderBar('Негатив', state.analytics.sentiments.negative || 0, '#ff3b30')}
+            <div class="grid grid-cols-1 gap-4">
+                <div class="bg-surface-container-low rounded-xl p-6 relative overflow-hidden group">
+                    <div class="absolute top-0 right-0 w-32 h-32 premium-gradient opacity-5 rounded-full -mr-16 -mt-16 blur-3xl"></div>
+                    <div class="flex justify-between items-start mb-6">
+                        <div class="space-y-1">
+                            <span class="text-on-surface-variant text-[10px] font-bold tracking-[0.2em] uppercase">Идентификатор</span>
+                            <div class="font-headline text-2xl font-bold tracking-tight text-primary">ID: ${state.telegramChatId}</div>
+                        </div>
+                        <div class="p-3 bg-surface-container-high rounded-lg">
+                            <span class="material-symbols-outlined text-primary">fingerprint</span>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-4">
+                        <div class="h-[1px] flex-grow bg-outline-variant/15"></div>
+                        <div class="text-[11px] text-on-surface-variant font-medium">Верифицированный аккаунт</div>
+                        <div class="h-[1px] flex-grow bg-outline-variant/15"></div>
+                    </div>
                 </div>
-                <div class="card">
-                    <h3>Категории</h3>
-                    ${Object.entries(state.analytics.categories).map(([cat, val]) => renderBar(cat, val, 'var(--primary)')).join('')}
-                    ${Object.keys(state.analytics.categories).length === 0 ? '<p style="font-size: 12px; color: var(--text-muted);">Нет данных</p>' : ''}
+
+                <div class="bg-surface-container-high rounded-xl p-6 border border-outline-variant/5">
+                    <div class="flex items-center justify-between mb-8">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-full premium-gradient flex items-center justify-center shadow-[0_0_20px_rgba(173,198,255,0.2)]">
+                                <span class="material-symbols-outlined text-on-primary text-xl" style="font-variation-settings: 'FILL' 1;">workspace_premium</span>
+                            </div>
+                            <div>
+                                <div class="text-on-surface font-semibold">${(state.settings.subscription_status || 'FREE').toUpperCase()} Тариф</div>
+                                <div class="text-on-surface-variant text-xs">Безлимитные ответы AI</div>
+                            </div>
+                        </div>
+                        <span class="bg-secondary-container text-on-secondary-container text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-wider">
+                            ${state.settings.subscription_status === 'premium' ? 'Активен' : 'Free'}
+                        </span>
+                    </div>
+                    <div class="bg-surface-container-lowest rounded-lg p-4 mb-6">
+                        <div class="flex justify-between items-center">
+                            <span class="text-on-surface-variant text-sm">Подписка активна до:</span>
+                            <span class="text-on-surface font-medium">${state.settings.subscription_expires_at ? new Date(state.settings.subscription_expires_at).toLocaleDateString() : '∞'}</span>
+                        </div>
+                    </div>
+                    <button class="w-full premium-gradient text-on-primary font-semibold py-4 rounded-xl flex items-center justify-center gap-2 active:scale-[0.98] transition-transform relative overflow-hidden">
+                        <span>Продлить доступ</span>
+                        <span class="material-symbols-outlined text-lg" style="font-variation-settings: 'FILL' 1;">bolt</span>
+                    </button>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="bg-surface-container-low rounded-xl p-5">
+                        <span class="material-symbols-outlined text-on-surface-variant mb-3">forum</span>
+                        <div class="text-2xl font-bold font-headline">${state.reviews.length}</div>
+                        <div class="text-[11px] text-on-surface-variant">Ответов сгенерировано</div>
+                    </div>
+                    <div class="bg-surface-container-low rounded-xl p-5">
+                        <span class="material-symbols-outlined text-on-surface-variant mb-3">timer</span>
+                        <div class="text-2xl font-bold font-headline">0.4с</div>
+                        <div class="text-[11px] text-on-surface-variant">Средняя скорость</div>
+                    </div>
                 </div>
             </div>
         </div>
     `;
 }
 
-function showView(view) {
-    state.currentView = view;
-    const content = document.getElementById('content-view');
-    const headerTitle = document.getElementById('header-text');
+async function handleSaveSettings() {
+    state.settings.wb_token = document.getElementById('wb-token-input').value;
+    state.settings.custom_instructions = document.getElementById('ai-instructions-input').value;
+    await saveSettings();
+}
 
-    // Update navigation active state (Sidebar)
-    document.querySelectorAll('.nav-item').forEach(item => {
-        item.classList.remove('active');
-        if (item.getAttribute('onclick')?.includes(`'${view}'`)) {
-            item.classList.add('active');
-        }
-    });
+async function handleAddMatrixRow() {
+    const nm_id = document.getElementById('new-nm-id').value;
+    const cross_sell_article = document.getElementById('new-cross-id').value;
+    if (!nm_id || !cross_sell_article) return showToast('Заполните оба поля', true);
 
-    // Update navigation active state (Bottom Nav)
-    document.querySelectorAll('.bottom-nav-item').forEach(item => {
-        item.classList.remove('active');
-        if (item.getAttribute('onclick')?.includes(`'${view}'`)) {
-            item.classList.add('active');
-        }
-    });
-
-    if (view === 'dashboard') {
-        content.innerHTML = renderDashboard();
-        headerTitle.innerText = 'Дашборд';
-    } else if (view === 'ai') {
-        content.innerHTML = renderAI();
-        headerTitle.innerText = 'Настройки ИИ';
-    } else if (view === 'subscription') {
-        content.innerHTML = renderSubscription();
-        headerTitle.innerText = 'Подписка';
-    } else if (view === 'registration') {
-        content.innerHTML = renderRegistration();
-        headerTitle.innerText = 'Регистрация';
-        document.querySelector('.sidebar').style.display = 'none';
-        document.querySelector('.main-content').style.marginLeft = '0';
-    } else {
-        content.innerHTML = `<div class="card"><p>Раздел ${view} находится в разработке.</p></div>`;
-        headerTitle.innerText = view.charAt(0).toUpperCase() + view.slice(1);
+    try {
+        await fetch('/api/matrix', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ telegram_chat_id: state.telegramChatId, nm_id, cross_sell_article })
+        });
+        await refreshData();
+        showView('matrix');
+        showToast('Пара добавлена');
+    } catch (e) {
+        showToast('Ошибка добавления', true);
     }
-
-    lucide.createIcons();
 }
 
-function toggleAutoReply(enabled) {
-    state.settings.is_auto_reply_enabled = enabled;
+async function handleDeleteMatrix(id) {
+    try {
+        await fetch(`/api/matrix/${id}`, { method: 'DELETE' });
+        await refreshData();
+        showView('matrix');
+        showToast('Пара удалена');
+    } catch (e) {
+        showToast('Ошибка удаления', true);
+    }
 }
 
-function setMinRating(rating) {
-    state.settings.auto_reply_min_rating = parseInt(rating);
+function toggleTokenVisibility() {
+    const input = document.getElementById('wb-token-input');
+    const icon = document.getElementById('token-visibility-icon');
+    if (input.type === 'password') {
+        input.type = 'text';
+        icon.innerText = 'visibility_off';
+    } else {
+        input.type = 'password';
+        icon.innerText = 'visibility';
+    }
 }
 
-// --- Toast ---
 function showToast(message, isError = false) {
     const toast = document.createElement('div');
-    toast.style.cssText = `
-        position: fixed; bottom: 24px; right: 24px; padding: 14px 24px; 
-        border-radius: 16px; background: ${isError ? 'rgba(239, 68, 68, 0.9)' : 'rgba(139, 92, 246, 0.9)'}; 
-        color: white; font-size: 14px; font-weight: 600; 
-        backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.1);
-        box-shadow: 0 10px 30px rgba(0,0,0,0.4); z-index: 1000;
-        animation: fadeIn 0.3s ease forwards;
-    `;
+    toast.className = \`fixed bottom-24 left-1/2 -translate-x-1/2 px-6 py-3 rounded-full text-white text-xs font-bold z-[100] transition-all transform scale-90 opacity-0 \${isError ? 'bg-error-container text-on-error-container border border-error' : 'bg-primary text-on-primary'}\`;
     toast.innerText = message;
     document.body.appendChild(toast);
-    setTimeout(() => toast.remove(), 3000);
+    
+    requestAnimationFrame(() => {
+        toast.classList.remove('scale-90', 'opacity-0');
+        toast.classList.add('scale-100', 'opacity-100');
+    });
+
+    setTimeout(() => {
+        toast.classList.remove('scale-100', 'opacity-100');
+        toast.classList.add('scale-90', 'opacity-0');
+        setTimeout(() => toast.remove(), 300);
+    }, 2000);
 }
-
-// --- Interactions ---
-
-async function handleApprove(id) {
-    const text = document.getElementById(`text-${id}`).value;
-    await approveReview(id, text);
-}
-
-// Theme Toggle
-document.getElementById('theme-toggle').addEventListener('click', () => {
-    state.theme = state.theme === 'light' ? 'dark' : 'light';
-    document.body.setAttribute('data-theme', state.theme);
-    const icon = document.querySelector('#theme-toggle i');
-    icon.setAttribute('data-lucide', state.theme === 'light' ? 'moon' : 'sun');
-    document.getElementById('theme-toggle').lastChild.textContent = state.theme === 'light' ? ' Темная тема' : ' Светлая тема';
-    lucide.createIcons();
-});
-
-async function handleRegister() {
-    const data = {
-        wbToken: document.getElementById('reg-token').value,
-        brandName: document.getElementById('reg-brand').value,
-        sellerDescription: document.getElementById('reg-desc').value
-    };
-    if (!data.wbToken || !data.brandName) return showToast('Заполните токен и название бренда', true);
-    await registerSeller(data);
-}
-
-async function checkAuth() {
-    const settings = await fetchSettings();
-    if (settings) {
-        state.isAuthorized = true;
-        await refreshData();
-    } else {
-        state.isAuthorized = false;
-        showView('registration');
-    }
-}
-
-// Init
-window.onload = async () => {
-    await checkAuth();
-};

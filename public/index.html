@@ -1,98 +1,142 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="ru" class="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>WB AI Responder | Dashboard</title>
+    <title>WBReply AI | Dashboard</title>
+    
+    <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="app.css">
-    <script src="https://unpkg.com/lucide@latest"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Manrope:wght@700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+    
+    <!-- Scripts -->
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    
+    <script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "surface": "#131313",
+                        "tertiary-fixed": "#ffdbcc",
+                        "primary-fixed": "#d8e2ff",
+                        "secondary": "#adc6ff",
+                        "surface-container": "#201f1f",
+                        "on-background": "#e5e2e1",
+                        "error-container": "#93000a",
+                        "on-tertiary": "#571e00",
+                        "on-secondary": "#082f65",
+                        "background": "#131313",
+                        "surface-container-low": "#1c1b1b",
+                        "on-primary": "#002e69",
+                        "inverse-on-surface": "#313030",
+                        "inverse-surface": "#e5e2e1",
+                        "tertiary": "#ffb595",
+                        "on-secondary-fixed": "#001a41",
+                        "inverse-primary": "#005bc1",
+                        "secondary-fixed": "#d8e2ff",
+                        "on-error": "#690005",
+                        "surface-variant": "#353534",
+                        "surface-bright": "#393939",
+                        "on-primary-fixed-variant": "#004493",
+                        "on-surface-variant": "#c1c6d7",
+                        "outline-variant": "#414755",
+                        "surface-container-high": "#2a2a2a",
+                        "on-error-container": "#ffdad6",
+                        "surface-container-highest": "#353534",
+                        "primary-fixed-dim": "#adc6ff",
+                        "outline": "#8b90a0",
+                        "on-primary-fixed": "#001a41",
+                        "secondary-container": "#26467d",
+                        "on-tertiary-fixed-variant": "#7c2e00",
+                        "primary": "#adc6ff",
+                        "surface-tint": "#adc6ff",
+                        "surface-dim": "#131313",
+                        "primary-container": "#4b8eff",
+                        "on-surface": "#e5e2e1",
+                        "on-tertiary-container": "#4c1a00",
+                        "surface-container-lowest": "#0e0e0e",
+                        "on-secondary-container": "#98b5f3",
+                        "tertiary-fixed-dim": "#ffb595",
+                        "tertiary-container": "#ef6719",
+                        "error": "#ffb4ab",
+                        "on-primary-container": "#00285c",
+                        "on-tertiary-fixed": "#351000",
+                        "on-secondary-fixed-variant": "#26467d",
+                        "secondary-fixed-dim": "#adc6ff"
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    fontFamily: {
+                        "headline": ["Manrope"],
+                        "body": ["Inter"],
+                        "label": ["Inter"]
+                    }
+                },
+            },
+        }
+    </script>
+    
+    <style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .bg-electric-gradient {
+            background: linear-gradient(135deg, #ADC6FF 0%, #4B8EFF 100%);
+        }
+        .glass-panel {
+            background: rgba(32, 31, 31, 0.7);
+            backdrop-filter: blur(20px);
+        }
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: #131313; }
+        ::-webkit-scrollbar-thumb { background: #2a2a2a; border-radius: 10px; }
+        
+        body { min-height: max(300px, 100dvh); }
+        .tab-item.active { color: #ADC6FF; background: #2A2A2A; border-radius: 0.75rem; }
+        .tab-item.inactive { color: #C1C6D7; }
+    </style>
 </head>
-<body data-theme="dark">
-    <!-- Background Aura Blobs -->
-    <div class="glow-blob blob-1"></div>
-    <div class="glow-blob blob-2"></div>
-
-    <div class="app-container">
-        <!-- Sidebar -->
-        <aside class="sidebar animate-in">
-            <div style="padding: 0 16px 20px; border-bottom: 1px solid var(--glass-border);">
-                <h2 style="font-size: 18px; margin: 0; display: flex; align-items: center; gap: 8px;">
-                    <i data-lucide="zap" style="color: var(--primary)"></i>
-                    WB AI Manager
-                </h2>
+<body class="bg-surface text-on-surface font-body selection:bg-primary/30">
+    <header class="fixed top-0 w-full z-50 bg-[#131313] text-[#ADC6FF] flex justify-between items-center px-4 h-14">
+        <div class="flex items-center gap-3">
+            <span class="material-symbols-outlined text-[#ADC6FF]" onclick="toggleSidebar()">menu</span>
+            <h1 class="font-headline font-bold text-lg tracking-tight text-[#E5E2E1]">WBReply AI</h1>
+        </div>
+        <div class="flex items-center gap-2">
+            <div class="w-8 h-8 rounded-full bg-surface-container-high flex items-center justify-center">
+                <span class="material-symbols-outlined text-xs text-primary" style="font-variation-settings: 'FILL' 1;">bolt</span>
             </div>
-            
-            <nav style="margin-top: 20px;">
-                <div class="nav-item active" onclick="showView('dashboard')">
-                    <i data-lucide="zap"></i> Дашборд
-                </div>
-                <div class="nav-item" onclick="showView('ai')">
-                    <i data-lucide="sparkles"></i> Настройки ИИ
-                </div>
-                <div class="nav-item" onclick="showView('subscription')">
-                    <i data-lucide="crown"></i> Подписка
-                </div>
-            </nav>
+        </div>
+    </header>
 
-            <div style="margin-top: auto; padding-top: 20px; border-top: 1px solid var(--glass-border);">
-                <div class="nav-item" id="theme-toggle">
-                    <i data-lucide="moon"></i> Темная тема
-                </div>
-            </div>
-        </aside>
+    <main id="content-view" class="pt-20 pb-32 px-4 max-w-xl mx-auto">
+        <!-- Content injected by app.js -->
+    </main>
 
-        <!-- Main -->
-        <main class="main-content">
-            <header class="header animate-in">
-                <div style="display: flex; align-items: center; gap: 12px; flex: 1;">
-                    <h1 id="header-text" style="font-size: 18px; margin: 0">Дашборд</h1>
-                </div>
-                
-                <div style="display: flex; align-items: center; gap: 16px;">
-                    <div class="profile-icon" onclick="showView('subscription')" style="cursor: pointer; position: relative;">
-                        <div style="width: 40px; height: 40px; border-radius: 50%; background: var(--accent-gradient); border: 2px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.1); display: flex; align-items: center; justify-content: center;">
-                            <i data-lucide="user" style="color: white; width: 20px;"></i>
-                        </div>
-                    </div>
-                </div>
-            </header>
+    <nav class="fixed bottom-0 w-full flex justify-around items-center px-6 pb-6 pt-2 bg-[#131313]/70 backdrop-blur-xl rounded-t-2xl z-50 border-t border-[#414755]/15 shadow-[0_-4px_24px_0_rgba(173,198,255,0.06)]">
+        <a id="nav-settings" class="tab-item flex flex-col items-center justify-center px-3 py-1 transition-all active:scale-95" href="javascript:showView('settings')">
+            <span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">settings</span>
+            <span class="text-[11px] font-medium mt-1">Настройки</span>
+        </a>
+        <a id="nav-matrix" class="tab-item flex flex-col items-center justify-center p-2 transition-all active:scale-95" href="javascript:showView('matrix')">
+            <span class="material-symbols-outlined">grid_view</span>
+            <span class="text-[11px] font-medium mt-1">Матрица</span>
+        </a>
+        <a id="nav-subscription" class="tab-item flex flex-col items-center justify-center p-2 transition-all active:scale-95" href="javascript:showView('subscription')">
+            <span class="material-symbols-outlined">person</span>
+            <span class="text-[11px] font-medium mt-1">Аккаунт</span>
+        </a>
+    </nav>
 
-            <!-- Views -->
-            <div id="content-view" class="animate-in" style="animation-delay: 0.1s;">
-                <!-- Content will be injected here -->
-            </div>
-
-            <!-- Mobile Bottom Navigation -->
-            <nav class="bottom-nav">
-                <div class="bottom-nav-item active" onclick="showView('dashboard')">
-                    <i data-lucide="zap"></i>
-                    <span>Дашборд</span>
-                </div>
-                <div class="bottom-nav-item" onclick="showView('ai')">
-                    <i data-lucide="sparkles"></i>
-                    <span>ИИ Настр.</span>
-                </div>
-                <div class="bottom-nav-item" onclick="showView('subscription')">
-                    <i data-lucide="crown"></i>
-                    <span>Подписка</span>
-                </div>
-            </nav>
-        </main>
-    </div>
-
-    <script>
-        lucide.createIcons();
-    </script>
-    <!-- Vercel Analytics & Speed Insights -->
-    <script>
-      window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
-      window.si = window.si || function () { (window.siq = window.siq || []).push(arguments); };
-    </script>
-    <script defer src="/_vercel/insights/script.js"></script>
-    <script defer src="/_vercel/speed-insights/script.js"></script>
+    <script src="app.js"></script>
 </body>
 </html>
