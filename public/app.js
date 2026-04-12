@@ -439,8 +439,16 @@ function showView(view) {
     const content = document.getElementById('content-view');
     const headerTitle = document.getElementById('header-text');
 
-    // Update navigation active state
+    // Update navigation active state (Sidebar)
     document.querySelectorAll('.nav-item').forEach(item => {
+        item.classList.remove('active');
+        if (item.getAttribute('onclick')?.includes(`'${view}'`)) {
+            item.classList.add('active');
+        }
+    });
+
+    // Update navigation active state (Bottom Nav)
+    document.querySelectorAll('.bottom-nav-item').forEach(item => {
         item.classList.remove('active');
         if (item.getAttribute('onclick')?.includes(`'${view}'`)) {
             item.classList.add('active');

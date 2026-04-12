@@ -75,6 +75,26 @@
             <div id="content-view" class="animate-in" style="animation-delay: 0.1s;">
                 <!-- Content will be injected here -->
             </div>
+
+            <!-- Mobile Bottom Navigation -->
+            <nav class="bottom-nav">
+                <div class="bottom-nav-item active" onclick="showView('dashboard')">
+                    <i data-lucide="layout-dashboard"></i>
+                    <span>Дашборд</span>
+                </div>
+                <div class="bottom-nav-item" onclick="showView('reviews')">
+                    <i data-lucide="message-square"></i>
+                    <span>Отзывы</span>
+                </div>
+                <div class="bottom-nav-item" onclick="showView('products')">
+                    <i data-lucide="package"></i>
+                    <span>Матрица</span>
+                </div>
+                <div class="bottom-nav-item" onclick="showView('settings')">
+                    <i data-lucide="settings"></i>
+                    <span>ИИ/Настр.</span>
+                </div>
+            </nav>
         </main>
     </div>
 
