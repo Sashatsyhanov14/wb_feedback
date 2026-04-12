@@ -216,65 +216,94 @@ function renderMatrix() {
 }
 
 function renderSubscription() {
+    const expiredDate = state.settings.subscription_expires_at ? new Date(state.settings.subscription_expires_at).toLocaleDateString() : '12.06.2026';
+    
     return `
-        <div class="space-y-6">
-            <div class="mb-8">
-                <h2 class="font-headline text-3xl font-extrabold tracking-tight mb-2 text-on-surface">Мой аккаунт</h2>
-                <p class="text-on-surface-variant text-sm">Управление вашим профилем и подпиской</p>
-            </div>
-
-            <div class="grid grid-cols-1 gap-4">
-                <div class="bg-surface-container-low rounded-xl p-6 relative overflow-hidden group">
-                    <div class="absolute top-0 right-0 w-32 h-32 premium-gradient opacity-5 rounded-full -mr-16 -mt-16 blur-3xl"></div>
-                    <div class="flex justify-between items-start mb-6">
-                        <div class="space-y-1">
-                            <span class="text-on-surface-variant text-[10px] font-bold tracking-[0.2em] uppercase">Идентификатор</span>
-                            <div class="font-headline text-2xl font-bold tracking-tight text-primary">ID: ${state.telegramChatId}</div>
-                        </div>
-                        <div class="p-3 bg-surface-container-high rounded-lg">
-                            <span class="material-symbols-outlined text-primary">fingerprint</span>
-                        </div>
+        <div class="animate-in space-y-6">
+            <!-- User Identity -->
+            <section class="flex items-center justify-between p-4 rounded-xl bg-surface-container-low">
+                <div class="flex items-center gap-4">
+                    <div class="w-12 h-12 rounded-full premium-gradient flex items-center justify-center text-on-primary font-bold text-lg">
+                        ${state.telegramChatId.toString().slice(0, 2)}
                     </div>
-                    <div class="flex items-center gap-4">
-                        <div class="h-[1px] flex-grow bg-outline-variant/15"></div>
-                        <div class="text-[11px] text-on-surface-variant font-medium">Верифицированный аккаунт</div>
-                        <div class="h-[1px] flex-grow bg-outline-variant/15"></div>
+                    <div>
+                        <p class="text-sm font-label text-on-surface-variant leading-none mb-1">Telegram User</p>
+                        <p class="text-base font-bold font-headline tracking-wide">ID: ${state.telegramChatId}</p>
                     </div>
                 </div>
+                <span class="material-symbols-outlined text-outline">verified_user</span>
+            </section>
 
-                <div class="bg-surface-container-high rounded-xl p-6 border border-outline-variant/5">
-                    <div class="flex items-center justify-between mb-8">
-                        <div class="flex items-center gap-3">
-                            <div class="w-10 h-10 rounded-full premium-gradient flex items-center justify-center shadow-[0_0_20px_rgba(173,198,255,0.2)]">
-                                <span class="material-symbols-outlined text-on-primary text-xl" style="font-variation-settings: 'FILL' 1;">workspace_premium</span>
-                            </div>
-                            <div>
-                                <div class="text-on-surface font-semibold">${(state.settings.subscription_status || 'FREE').toUpperCase()} Тариф</div>
-                                <div class="text-on-surface-variant text-xs">Безлимитные ответы AI</div>
-                            </div>
-                        </div>
-                        <span class="bg-secondary-container text-on-secondary-container text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-wider">
-                            ${state.settings.subscription_status === 'premium' ? 'Активен' : 'Free'}
-                        </span>
+            <!-- Status Card (State A - Winner) -->
+            <section class="relative overflow-hidden p-5 rounded-xl bg-surface-container-high border-l-4 border-primary">
+                <div class="relative z-10">
+                    <div class="flex items-center gap-2 mb-2">
+                        <span class="material-symbols-outlined text-primary" style="font-variation-settings: 'FILL' 1;">workspace_premium</span>
+                        <h3 class="font-headline font-bold text-on-surface">🎉 Поздравляем! Вы попали в первую пятерку.</h3>
                     </div>
-                    <div class="bg-surface-container-lowest rounded-lg p-4">
-                        <div class="flex justify-between items-center">
-                            <span class="text-on-surface-variant text-sm">Подписка активна до:</span>
-                            <span class="text-on-surface font-medium">${state.settings.subscription_expires_at ? new Date(state.settings.subscription_expires_at).toLocaleDateString() : '∞'}</span>
-                        </div>
+                    <p class="text-sm text-on-surface-variant font-medium">Вам начислен БЕСПЛАТНЫЙ месяц доступа (до: ${expiredDate}).</p>
+                </div>
+                <!-- Decorative Grain/Light -->
+                <div class="absolute top-0 right-0 w-32 h-32 bg-primary/5 blur-3xl -mr-16 -mt-16"></div>
+            </section>
+
+            <!-- Pricing Tier Card (Premium Offer) -->
+            <section class="p-6 rounded-2xl bg-surface-container-lowest relative border border-outline-variant/10 shadow-2xl">
+                <div class="flex justify-between items-start mb-6">
+                    <div>
+                        <span class="text-[10px] font-extrabold tracking-[0.2em] text-primary uppercase mb-2 block">Premium Tier</span>
+                        <h2 class="font-headline text-2xl font-extrabold text-on-surface">⚡ СТАРТОВОЕ ПРЕДЛОЖЕНИЕ</h2>
+                    </div>
+                    <div class="bg-primary/10 px-3 py-1 rounded-full border border-primary/20">
+                        <span class="text-xs font-bold text-primary">-50%</span>
                     </div>
                 </div>
-
-                <div class="grid grid-cols-1 gap-4">
-                    <div class="bg-surface-container-low rounded-xl p-5 flex items-center justify-between">
-                        <div class="flex items-center gap-3">
-                            <span class="material-symbols-outlined text-on-surface-variant">forum</span>
-                            <div class="text-[11px] text-on-surface-variant uppercase font-bold tracking-tight">Ответов сгенерировано</div>
-                        </div>
-                        <div class="text-2xl font-bold font-headline text-primary">${state.reviews.length}</div>
+                <div class="mb-8">
+                    <div class="flex items-baseline gap-3 mb-1">
+                        <span class="text-4xl font-extrabold font-headline text-on-surface">499 ₽</span>
+                        <span class="text-xl font-medium text-on-surface-variant line-through opacity-50">999 ₽</span>
+                    </div>
+                    <p class="text-sm text-on-surface-variant">за первый месяц</p>
+                    <div class="mt-3 py-1.5 px-3 bg-surface-container-high rounded-lg inline-block">
+                        <p class="text-[11px] font-semibold text-primary">Далее автопродление 999 ₽/мес.</p>
                     </div>
                 </div>
-            </div>
+                <ul class="space-y-4 mb-8">
+                    <li class="flex items-center gap-3">
+                        <div class="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center">
+                            <span class="material-symbols-outlined text-[16px] text-primary" style="font-variation-settings: 'FILL' 1;">check</span>
+                        </div>
+                        <span class="text-sm font-medium text-on-surface">Безлимитные ИИ-ответы на отзывы</span>
+                    </li>
+                    <li class="flex items-center gap-3">
+                        <div class="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center">
+                            <span class="material-symbols-outlined text-[16px] text-primary" style="font-variation-settings: 'FILL' 1;">check</span>
+                        </div>
+                        <span class="text-sm font-medium text-on-surface">Матрица кросс-сейл допродаж</span>
+                    </li>
+                    <li class="flex items-center gap-3">
+                        <div class="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center">
+                            <span class="material-symbols-outlined text-[16px] text-primary" style="font-variation-settings: 'FILL' 1;">check</span>
+                        </div>
+                        <span class="text-sm font-medium text-on-surface">Персональные инструкции для ИИ (Tone of Voice)</span>
+                    </li>
+                </ul>
+                <button class="w-full py-4 premium-gradient rounded-xl font-headline font-extrabold text-on-primary-container shadow-[0_4px_24px_rgba(173,198,255,0.2)] active:scale-95 duration-150 transition-all">
+                    Оплатить 499 ₽
+                </button>
+                <p class="text-[10px] text-center text-outline mt-4 leading-relaxed">
+                    Безопасная оплата через сертифицированные шлюзы. <br/> Отмена подписки возможна в любой момент в настройках.
+                </p>
+            </section>
+            
+            <!-- Footer Links -->
+            <footer class="pt-4 pb-8 flex flex-col items-center gap-4">
+                <div class="flex gap-6">
+                    <a class="text-xs font-medium text-on-surface-variant hover:text-primary transition-colors" href="#">Публичная оферта</a>
+                    <a class="text-xs font-medium text-on-surface-variant hover:text-primary transition-colors" href="#">Поддержка</a>
+                </div>
+                <p class="text-[10px] text-outline uppercase tracking-widest opacity-40">WBReply AI • v2.4.0</p>
+            </footer>
         </div>
     `;
 }
