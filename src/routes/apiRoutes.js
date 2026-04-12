@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const supabase = require('../db/supabase');
 const wbService = require('../services/wbService');
+const telegramService = require('../services/telegramService');
 
 // Register or update seller (Onboarding)
 router.post('/register', async (req, res) => {
@@ -169,9 +170,16 @@ router.get('/matrix', async (req, res) => {
 
 router.post('/matrix', async (req, res) => {
   try {
-    const { nm_id, product_name, cross_sell_article, cross_sell_description } = req.body;
-    // For MVP, we'll use a hardcoded seller_id or get it from context
-    const { data: seller } = await supabase.from('sellers').select('id').limit(1).single();
+    const { telegramChatId, nm_id, product_name, cross_sell_article, cross_sell_description } = req.body;
+    
+    // Find seller by TG ID
+    const { data: seller, error: sError } = await supabase
+      .from('sellers')
+      .select('id')
+      .eq('telegram_chat_id', telegramChatId)
+      .single();
+    
+    if (sError || !seller) return res.status(404).json({ error: 'Seller not found' });
     
     const { data, error } = await supabase.from('product_matrix').upsert({
       seller_id: seller.id,
@@ -183,6 +191,16 @@ router.post('/matrix', async (req, res) => {
 
     if (error) throw error;
     res.json(data[0]);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.delete('/matrix/:id', async (req, res) => {
+  try {
+    const { error } = await supabase.from('product_matrix').delete().eq('id', req.params.id);
+    if (error) throw error;
+    res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

@@ -163,14 +163,10 @@ function renderMatrix() {
                 </p>
             </section>
 
-            <div class="grid grid-cols-2 gap-3 mb-8">
-                <div class="bg-surface-container-low p-4 rounded-xl">
-                    <div class="text-on-surface-variant text-[10px] uppercase tracking-wider mb-1">Активных пар</div>
+            <div class="grid grid-cols-1 gap-3 mb-8">
+                <div class="bg-surface-container-low p-4 rounded-xl flex items-center justify-between">
+                    <div class="text-on-surface-variant text-[10px] uppercase tracking-wider">Активных пар в матрице</div>
                     <div class="text-2xl font-headline font-bold text-primary">${state.matrix.length}</div>
-                </div>
-                <div class="bg-surface-container-low p-4 rounded-xl">
-                    <div class="text-on-surface-variant text-[10px] uppercase tracking-wider mb-1">CTR рекомендаций</div>
-                    <div class="text-2xl font-headline font-bold text-secondary">8.4%</div>
                 </div>
             </div>
 
@@ -261,28 +257,21 @@ function renderSubscription() {
                             ${state.settings.subscription_status === 'premium' ? 'Активен' : 'Free'}
                         </span>
                     </div>
-                    <div class="bg-surface-container-lowest rounded-lg p-4 mb-6">
+                    <div class="bg-surface-container-lowest rounded-lg p-4">
                         <div class="flex justify-between items-center">
                             <span class="text-on-surface-variant text-sm">Подписка активна до:</span>
                             <span class="text-on-surface font-medium">${state.settings.subscription_expires_at ? new Date(state.settings.subscription_expires_at).toLocaleDateString() : '∞'}</span>
                         </div>
                     </div>
-                    <button class="w-full premium-gradient text-on-primary font-semibold py-4 rounded-xl flex items-center justify-center gap-2 active:scale-[0.98] transition-transform relative overflow-hidden">
-                        <span>Продлить доступ</span>
-                        <span class="material-symbols-outlined text-lg" style="font-variation-settings: 'FILL' 1;">bolt</span>
-                    </button>
                 </div>
 
-                <div class="grid grid-cols-2 gap-4">
-                    <div class="bg-surface-container-low rounded-xl p-5">
-                        <span class="material-symbols-outlined text-on-surface-variant mb-3">forum</span>
-                        <div class="text-2xl font-bold font-headline">${state.reviews.length}</div>
-                        <div class="text-[11px] text-on-surface-variant">Ответов сгенерировано</div>
-                    </div>
-                    <div class="bg-surface-container-low rounded-xl p-5">
-                        <span class="material-symbols-outlined text-on-surface-variant mb-3">timer</span>
-                        <div class="text-2xl font-bold font-headline">0.4с</div>
-                        <div class="text-[11px] text-on-surface-variant">Средняя скорость</div>
+                <div class="grid grid-cols-1 gap-4">
+                    <div class="bg-surface-container-low rounded-xl p-5 flex items-center justify-between">
+                        <div class="flex items-center gap-3">
+                            <span class="material-symbols-outlined text-on-surface-variant">forum</span>
+                            <div class="text-[11px] text-on-surface-variant uppercase font-bold tracking-tight">Ответов сгенерировано</div>
+                        </div>
+                        <div class="text-2xl font-bold font-headline text-primary">${state.reviews.length}</div>
                     </div>
                 </div>
             </div>
