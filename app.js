@@ -1,6 +1,7 @@
 const express = require('express');
 const config = require('./src/config');
 const apiRoutes = require('./src/routes/apiRoutes');
+const telegramService = require('./src/services/telegramService');
 const { initJobs, processAll } = require('./src/jobs/reviewCron');
 require('dotenv').config();
 
@@ -20,8 +21,16 @@ app.get('/api/cron', async (req, res) => {
   res.json({ success: true, timestamp: new Date() });
 });
 
+// Telegram Webhook
+app.post('/api/bot', (req, res) => telegramService.handleUpdate(req, res));
+
 // Routes
 app.use('/api', apiRoutes);
+
+// Home route
+app.get('/', (req, res) => {
+  res.send('<h1>AI Review Responder</h1><p>Server is running. Monitoring reviews...</p>');
+});
 
 // Initialize background jobs
 initJobs();
