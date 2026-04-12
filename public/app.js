@@ -57,20 +57,17 @@ async function saveMatrixEntry(entry) {
 
 async function fetchSettings() {
     try {
-        const res = await fetch(`/api/settings/${state.telegramChatId}`);
-        if (res.status === 404) return null;
-        state.settings = await res.json();
-        
-        // Sync header token
-        if (state.settings.wb_token) {
-            document.getElementById('header-wb-token').value = state.settings.wb_token;
+        // Sync token in dashboard if it exists
+        const tokenInput = document.getElementById('dash-wb-token');
+        if (tokenInput && state.settings.wb_token) {
+            tokenInput.value = state.settings.wb_token;
         }
         
         return state.settings;
     } catch (e) { console.error('Settings fetch error:', e); return null; }
 }
 
-async function updateTokenFromHeader(val) {
+async function updateToken(val) {
     state.settings.wb_token = val;
     await saveSettings();
 }
@@ -163,26 +160,6 @@ function renderDashboard() {
                 </div>
                 <div class="card">
                     <div style="color: var(--text-muted); font-size: 14px; margin-bottom: 8px;">Ожидают проверки</div>
-                    <div style="font-size: 32px; font-weight: 700;">${state.stats.pending || 0}</div>
-                    <div style="color: #ff9f0a; font-size: 12px; margin-top: 8px;">Нужно ваше внимание</div>
-                </div>
-                <div class="card" style="background: var(--accent-gradient); color: white;">
-                    <div style="opacity: 0.8; font-size: 14px; margin-bottom: 8px;">Автоответы</div>
-                    <div style="font-size: 32px; font-weight: 700;">Работают</div>
-                    <div style="opacity: 0.9; font-size: 12px; margin-top: 8px;">Фоновый режим активен</div>
-                </div>
-            </div>
-
-            <div class="card" style="margin-top: 24px;">
-                <h3>Последняя активность</h3>
-                <div style="display: flex; flex-direction: column; gap: 12px;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; border-radius: 12px; background: var(--glass-border);">
-                        <span>Система мониторинга отзывов активна</span>
-                        <span style="font-size: 12px; color: var(--text-muted);">В реальном времени</span>
-                    </div>
-                </div>
-            </div>
-        </div>
     `;
 }
 
@@ -249,133 +226,97 @@ function renderRegistration() {
     `;
 }
 
-function renderAccount() {
-    return `
-        <div class="card animate-in" style="max-width: 600px; margin: 0 auto;">
-            <div style="display: flex; align-items: center; gap: 20px; margin-bottom: 32px; padding-bottom: 24px; border-bottom: 1px solid var(--glass-border);">
-                <div style="width: 80px; height: 80px; border-radius: 50%; background: var(--accent-gradient); display: flex; align-items: center; justify-content: center; border: 4px solid var(--glass-border);">
-                    <i data-lucide="user" style="color: white; width: 40px; height: 40px;"></i>
-                </div>
-                <div>
-                    <h2 style="margin: 0">Ваш профиль</h2>
-                    <p style="color: var(--text-muted); font-size: 14px;">Управление аккаунтом и подпиской</p>
-                </div>
-            </div>
-
-            <div style="display: flex; flex-direction: column; gap: 24px;">
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <div>
-                        <div style="font-weight: 600;">Telegram ID</div>
-                        <div style="font-size: 14px; color: var(--text-muted);">${state.telegramChatId}</div>
-                    </div>
-                    <i data-lucide="copy" style="width: 18px; color: var(--primary); cursor: pointer;"></i>
-                </div>
-
-                <div style="display: flex; justify-content: space-between; align-items: center; padding: 16px; border-radius: 16px; background: var(--glass-border);">
-                    <div>
-                        <div style="font-weight: 600;">Статус подписки</div>
-                        <div style="font-size: 14px; color: var(--primary); text-transform: uppercase; letter-spacing: 1px;">${state.settings.subscription_status || 'FREE'}</div>
-                    </div>
-                    ${state.settings.subscription_status === 'premium' ? 
-                        `<span class="badge badge-approved">Активна</span>` : 
-                        `<button class="btn btn-primary" style="padding: 8px 16px; font-size: 13px;">Продлить/Купить</button>`
-                    }
-                </div>
-                
-                <div style="font-size: 12px; color: var(--text-muted); text-align: center;">
-                    Премиум дает доступ к расширенной аналитике и неограниченным автоответам.
-                </div>
-            </div>
-        </div>
-    `;
-}
-
-function renderSettings() {
+function renderAI() {
     return `
         <div class="animate-in">
+            <!-- AI Persona -->
             <div class="card">
                 <h3 style="margin-top: 0; display: flex; align-items: center; gap: 8px;">
-                    <i data-lucide="cpu" style="width: 20px; color: var(--primary);"></i>
-                    Control Center
+                    <i data-lucide="sparkles" style="width: 20px; color: var(--primary);"></i>
+                    Пожелания по общению
                 </h3>
-                <div style="display: flex; flex-direction: column; gap: 20px;">
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <div>
-                            <div style="font-weight: 600;">Глобальный автоответчик</div>
-                            <div style="font-size: 12px; color: var(--text-muted);">Автоматическая отправка ответов на WB</div>
-                        </div>
-                        <label class="switch">
-                            <input type="checkbox" id="auto-reply-toggle" ${state.settings.is_auto_reply_enabled ? 'checked' : ''} onchange="state.settings.is_auto_reply_enabled = this.checked; saveSettings();">
-                            <span class="slider round"></span>
-                        </label>
-                    </div>
+                <p style="color: var(--text-muted); font-size: 12px; margin-bottom: 16px;">
+                    Пример: "Пиши кратко, на Вы, в конце добавляй 'С любовью, бренд X'".
+                </p>
+                <textarea id="ai-instructions" style="width: 100%; height: 100px; padding: 12px; border-radius: 12px; border: 1px solid var(--glass-border); background: var(--glass-border); color: var(--text); margin-bottom: 16px;">${state.settings.custom_instructions || ''}</textarea>
+                <button class="btn btn-primary" style="width: 100%" onclick="state.settings.custom_instructions = document.getElementById('ai-instructions').value; saveSettings();">Сохранить характер ИИ</button>
+            </div>
 
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <div>
-                            <div style="font-weight: 600;">Обработка плохих отзывов (1-3★)</div>
-                            <div style="font-size: 12px; color: var(--text-muted);">Безопасно отвечать на негатив с помощью ИИ</div>
-                        </div>
-                        <label class="switch">
-                            <input type="checkbox" id="bad-reviews-toggle" ${state.settings.respond_to_bad_reviews ? 'checked' : ''} onchange="state.settings.respond_to_bad_reviews = this.checked; saveSettings();">
-                            <span class="slider round"></span>
-                        </label>
+            <!-- AI Strategy (Toggles) -->
+            <div class="card" style="margin-top: 24px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                    <div>
+                        <div style="font-weight: 600; font-size: 14px;">Автоответчик</div>
+                        <div style="font-size: 11px; color: var(--text-muted);">Включить автоматическую отправку</div>
                     </div>
+                    <label class="switch">
+                        <input type="checkbox" ${state.settings.is_auto_reply_enabled ? 'checked' : ''} onchange="state.settings.is_auto_reply_enabled = this.checked; saveSettings();">
+                        <span class="slider round"></span>
+                    </label>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <div style="font-weight: 600; font-size: 14px;">Отвечать на плохие (1-3★)</div>
+                        <div style="font-size: 11px; color: var(--text-muted);">Безопасно ли ИИ отвечать на негатив</div>
+                    </div>
+                    <label class="switch">
+                        <input type="checkbox" ${state.settings.respond_to_bad_reviews ? 'checked' : ''} onchange="state.settings.respond_to_bad_reviews = this.checked; saveSettings();">
+                        <span class="slider round"></span>
+                    </label>
                 </div>
             </div>
 
+            <!-- Matrix -->
             <div class="card" style="margin-top: 24px;">
                 <h3 style="display: flex; align-items: center; gap: 8px;">
-                    <i data-lucide="sparkles" style="width: 20px; color: var(--primary);"></i>
-                    AI Persona (Инструкции)
+                    <i data-lucide="link" style="width: 20px; color: var(--primary);"></i>
+                    Матрица доп. продаж
                 </h3>
-                <p style="color: var(--text-muted); font-size: 13px; margin-bottom: 16px;">
-                    Опишите характер ответов. Например: "Пиши кратко, на Вы, в конце добавляй 'С любовью, бренд X'".
-                </p>
-                <textarea id="ai-instructions" style="width: 100%; height: 120px; padding: 12px; border-radius: 12px; border: 1px solid var(--glass-border); background: var(--glass-border); color: var(--text); margin-bottom: 16px;">${state.settings.custom_instructions || ''}</textarea>
-                <button class="btn btn-primary" style="width: 100%" onclick="state.settings.custom_instructions = document.getElementById('ai-instructions').value; saveSettings();">Сохранить инструкции для ИИ</button>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px;">
+                    <input type="text" id="m-nm-id" placeholder="Ваш Артикул" style="padding: 8px; font-size: 13px;">
+                    <input type="text" id="m-cross-id" placeholder="Рекомендация" style="padding: 8px; font-size: 13px;">
+                </div>
+                <button class="btn btn-primary" style="width: 100%; padding: 10px;" onclick="handleAddMatrix()">Добавить связь</button>
+                
+                <div style="margin-top: 16px; display: flex; flex-direction: column; gap: 8px;">
+                    ${state.matrix.map(item => `
+                        <div style="display: flex; justify-content: space-between; padding: 10px; background: rgba(255,255,255,0.02); border-radius: 10px; border: 1px solid var(--glass-border); font-size: 13px;">
+                            <span>${item.nm_id}</span>
+                            <span style="color: var(--primary)">→ ${item.cross_sell_article}</span>
+                        </div>
+                    `).join('')}
+                </div>
             </div>
         </div>
     `;
 }
 
-function renderProducts() {
+function renderSubscription() {
     return `
-        <div class="animate-in">
-            <div class="card" style="margin-bottom: 24px;">
-                <h3 style="margin-top: 0">Связи для доп. продаж</h3>
-                <p style="color: var(--text-muted); font-size: 13px; margin-bottom: 16px;">Добавляйте неограниченное количество связок артикулов.</p>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-                    <div style="font-size: 12px; color: var(--text-muted);">Артикул WB (nmId)</div>
-                    <div style="font-size: 12px; color: var(--text-muted);">Рекомендация (nmId)</div>
-                    <input type="text" id="m-nm-id" placeholder="1234567..." style="padding: 10px; border-radius: 8px; border: 1px solid var(--glass-border); background: var(--glass-border); color: var(--text);">
-                    <input type="text" id="m-cross-id" placeholder="7654321..." style="padding: 10px; border-radius: 8px; border: 1px solid var(--glass-border); background: var(--glass-border); color: var(--text);">
+        <div class="card animate-in" style="max-width: 500px; margin: 0 auto;">
+            <div style="text-align: center; margin-bottom: 32px;">
+                <div style="width: 72px; height: 72px; background: var(--accent-gradient); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px;">
+                    <i data-lucide="crown" style="color: white; width: 32px; height: 32px;"></i>
                 </div>
-                <button class="btn btn-primary" style="margin-top: 16px; width: 100%" onclick="handleAddMatrix()">
-                    <i data-lucide="plus" style="width: 14px; margin-right: 4px;"></i>
-                    Добавить связку
-                </button>
+                <h2 style="margin: 0">Ваша подписка</h2>
+                <p style="color: var(--text-muted); font-size: 14px;">Статус: <span style="color: var(--primary); font-weight: 600;">${(state.settings.subscription_status || 'FREE').toUpperCase()}</span></p>
             </div>
-
-            <div class="review-list">
-                ${state.matrix.length === 0 ? '<p style="text-align: center; color: var(--text-muted);">Список пуст</p>' : ''}
-                ${state.matrix.map(item => `
-                    <div class="card" style="display: flex; justify-content: space-between; align-items: center; padding: 12px 20px;">
-                        <div style="display: flex; align-items: center; gap: 12px;">
-                            <div style="background: var(--glass-border); padding: 8px; border-radius: 8px;">
-                                <i data-lucide="link" style="width: 14px; color: var(--primary);"></i>
-                            </div>
-                            <div>
-                                <div style="font-weight: 600; font-size: 14px;">${item.nm_id}</div>
-                                <div style="font-size: 12px; color: var(--text-muted);">Ваш товар</div>
-                            </div>
-                        </div>
-                        <div style="font-size: 18px; color: var(--glass-border);">→</div>
-                        <div style="text-align: right;">
-                            <div style="font-weight: 600; font-size: 14px; color: var(--primary);">${item.cross_sell_article || '—'}</div>
-                            <div style="font-size: 12px; color: var(--text-muted);">Рекомендация</div>
-                        </div>
-                    </div>
-                `).join('')}
+            
+            <div style="display: flex; flex-direction: column; gap: 20px;">
+                <div style="padding: 16px; border-radius: 16px; background: rgba(139, 92, 246, 0.05); border: 1px dashed var(--primary);">
+                    <div style="font-weight: 600;">Почему важен Premium?</div>
+                    <ul style="font-size: 13px; color: var(--text-muted); padding-left: 20px; margin-top: 8px;">
+                        <li>Неограниченные автоответы 24/7</li>
+                        <li>Расширенная аналитика продаж</li>
+                        <li>Приоритетная генерация ИИ</li>
+                    </ul>
+                </div>
+                
+                <button class="btn btn-primary" style="padding: 14px;">Продлить / Улучшить</button>
+                
+                <div style="text-align: center; font-size: 12px; color: var(--text-muted);">
+                    Ваш Telegram ID: ${state.telegramChatId}
+                </div>
             </div>
         </div>
     `;
@@ -458,21 +399,12 @@ function showView(view) {
     if (view === 'dashboard') {
         content.innerHTML = renderDashboard();
         headerTitle.innerText = 'Дашборд';
-    } else if (view === 'reviews') {
-        content.innerHTML = renderReviews();
-        headerTitle.innerText = 'Управление отзывами';
-    } else if (view === 'products') {
-        content.innerHTML = renderProducts();
-        headerTitle.innerText = 'Матрица товаров (Контекст)';
-    } else if (view === 'analytics') {
-        content.innerHTML = renderAnalytics();
-        headerTitle.innerText = 'Аналитика и Инсайты';
-    } else if (view === 'settings') {
-        content.innerHTML = renderSettings();
-        headerTitle.innerText = 'Настройки и ИИ';
-    } else if (view === 'account') {
-        content.innerHTML = renderAccount();
-        headerTitle.innerText = 'Аккаунт';
+    } else if (view === 'ai') {
+        content.innerHTML = renderAI();
+        headerTitle.innerText = 'Настройки ИИ';
+    } else if (view === 'subscription') {
+        content.innerHTML = renderSubscription();
+        headerTitle.innerText = 'Подписка';
     } else if (view === 'registration') {
         content.innerHTML = renderRegistration();
         headerTitle.innerText = 'Регистрация';

@@ -28,16 +28,13 @@
             
             <nav style="margin-top: 20px;">
                 <div class="nav-item active" onclick="showView('dashboard')">
-                    <i data-lucide="layout-dashboard"></i> Дашборд
+                    <i data-lucide="zap"></i> Дашборд
                 </div>
-                <div class="nav-item" onclick="showView('reviews')">
-                    <i data-lucide="message-square"></i> Отзывы
+                <div class="nav-item" onclick="showView('ai')">
+                    <i data-lucide="sparkles"></i> Настройки ИИ
                 </div>
-                <div class="nav-item" onclick="showView('products')">
-                    <i data-lucide="package"></i> Матрица продаж
-                </div>
-                <div class="nav-item" onclick="showView('settings')">
-                    <i data-lucide="settings"></i> Настройки/ИИ
+                <div class="nav-item" onclick="showView('subscription')">
+                    <i data-lucide="crown"></i> Подписка
                 </div>
             </nav>
 
@@ -52,18 +49,11 @@
         <main class="main-content">
             <header class="header animate-in">
                 <div style="display: flex; align-items: center; gap: 12px; flex: 1;">
-                    <div class="header-token-box">
-                        <i data-lucide="key" style="width: 14px; color: var(--text-muted);"></i>
-                        <input type="password" id="header-wb-token" placeholder="WB API Token..." onchange="updateTokenFromHeader(this.value)" style="background: transparent; border: none; font-size: 12px; color: var(--text); outline: none; width: 140px;">
-                    </div>
-                    <span class="badge badge-approved" id="api-status-badge">
-                        <span style="width: 6px; height: 6px; background: #30d158; border-radius: 50%"></span>
-                        API OK
-                    </span>
+                    <h1 id="header-text" style="font-size: 18px; margin: 0">Дашборд</h1>
                 </div>
                 
                 <div style="display: flex; align-items: center; gap: 16px;">
-                    <div class="profile-icon" onclick="showView('account')" style="cursor: pointer; position: relative;">
+                    <div class="profile-icon" onclick="showView('subscription')" style="cursor: pointer; position: relative;">
                         <div style="width: 40px; height: 40px; border-radius: 50%; background: var(--accent-gradient); border: 2px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.1); display: flex; align-items: center; justify-content: center;">
                             <i data-lucide="user" style="color: white; width: 20px;"></i>
                         </div>
@@ -79,20 +69,16 @@
             <!-- Mobile Bottom Navigation -->
             <nav class="bottom-nav">
                 <div class="bottom-nav-item active" onclick="showView('dashboard')">
-                    <i data-lucide="layout-dashboard"></i>
+                    <i data-lucide="zap"></i>
                     <span>Дашборд</span>
                 </div>
-                <div class="bottom-nav-item" onclick="showView('reviews')">
-                    <i data-lucide="message-square"></i>
-                    <span>Отзывы</span>
+                <div class="bottom-nav-item" onclick="showView('ai')">
+                    <i data-lucide="sparkles"></i>
+                    <span>ИИ Настр.</span>
                 </div>
-                <div class="bottom-nav-item" onclick="showView('products')">
-                    <i data-lucide="package"></i>
-                    <span>Матрица</span>
-                </div>
-                <div class="bottom-nav-item" onclick="showView('settings')">
-                    <i data-lucide="settings"></i>
-                    <span>ИИ/Настр.</span>
+                <div class="bottom-nav-item" onclick="showView('subscription')">
+                    <i data-lucide="crown"></i>
+                    <span>Подписка</span>
                 </div>
             </nav>
         </main>
