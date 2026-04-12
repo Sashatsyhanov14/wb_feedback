@@ -1,6 +1,6 @@
 const express = require('express');
 const config = require('./src/config');
-const maxRoutes = require('./src/routes/maxRoutes');
+const apiRoutes = require('./src/routes/apiRoutes');
 const { initJobs, processAll } = require('./src/jobs/reviewCron');
 require('dotenv').config();
 
@@ -21,7 +21,6 @@ app.get('/api/cron', async (req, res) => {
 });
 
 // Routes
-app.use('/max', maxRoutes);
 app.use('/api', apiRoutes);
 
 // Initialize background jobs
