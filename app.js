@@ -1,4 +1,5 @@
 const express = require('express');
+const path = require('path');
 const config = require('./src/config');
 const apiRoutes = require('./src/routes/apiRoutes');
 const telegramService = require('./src/services/telegramService');
@@ -7,7 +8,7 @@ require('dotenv').config();
 
 const app = express();
 app.use(express.json());
-app.use(express.static('public'));
+app.use(express.static(path.join(__dirname, 'public')));
 
 // Vercel Cron Trigger
 app.get('/api/cron', async (req, res) => {
