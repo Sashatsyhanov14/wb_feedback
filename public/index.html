@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>WB AI Responder | Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="app.css">
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body data-theme="light">
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar animate-in">
+            <div style="padding: 0 16px 20px; border-bottom: 1px solid var(--glass-border);">
+                <h2 style="font-size: 18px; margin: 0; display: flex; align-items: center; gap: 8px;">
+                    <i data-lucide="zap" style="color: var(--primary)"></i>
+                    WB AI Manager
+                </h2>
+            </div>
+            
+            <nav style="margin-top: 20px;">
+                <div class="nav-item active" onclick="showView('dashboard')">
+                    <i data-lucide="layout-dashboard"></i> Дашборд
+                </div>
+                <div class="nav-item" onclick="showView('reviews')">
+                    <i data-lucide="message-square"></i> Отзывы
+                </div>
+                <div class="nav-item" onclick="showView('products')">
+                    <i data-lucide="package"></i> Матрица товаров
+                </div>
+                <div class="nav-item" onclick="showView('analytics')">
+                    <i data-lucide="bar-chart-3"></i> Аналитика
+                </div>
+                <div class="nav-item" onclick="showView('settings')">
+                    <i data-lucide="settings"></i> Настройки
+                </div>
+            </nav>
+
+            <div style="margin-top: auto; padding-top: 20px; border-top: 1px solid var(--glass-border);">
+                <div class="nav-item" id="theme-toggle">
+                    <i data-lucide="moon"></i> Темная тема
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main -->
+        <main class="main-content">
+            <header class="header animate-in">
+                <div id="view-title">
+                    <h1 id="header-text">Дашборд</h1>
+                </div>
+                <div style="display: flex; align-items: center; gap: 16px;">
+                    <span class="badge badge-approved" style="display: flex; align-items: center; gap: 4px;">
+                        <span style="width: 6px; height: 6px; background: #30d158; border-radius: 50%"></span>
+                        WB API Online
+                    </span>
+                    <div style="width: 40px; height: 40px; border-radius: 50%; background: var(--accent-gradient); border: 2px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.1)"></div>
+                </div>
+            </header>
+
+            <!-- Views -->
+            <div id="content-view" class="animate-in" style="animation-delay: 0.1s;">
+                <!-- Content will be injected here -->
+            </div>
+        </main>
+    </div>
+
+    <script>
+        lucide.createIcons();
+    </script>
+    <!-- Vercel Analytics & Speed Insights -->
+    <script>
+      window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
+      window.si = window.si || function () { (window.siq = window.siq || []).push(arguments); };
+    </script>
+    <script defer src="/_vercel/insights/script.js"></script>
+    <script defer src="/_vercel/speed-insights/script.js"></script>
+</body>
+</html>

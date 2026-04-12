@@ -1,0 +1,13 @@
+node_modules
+.env
+.env.local
+.DS_Store
+dist
+build
+.vercel
+package-lock.json
+*.log
+brain/
+tmp/
+CORTEX_SESSION/
+ecosystem.config.js
