@@ -3,6 +3,42 @@ const router = express.Router();
 const supabase = require('../db/supabase');
 const wbService = require('../services/wbService');
 
+// Register or update seller (Onboarding)
+router.post('/register', async (req, res) => {
+  try {
+    const { maxUserId, wbToken, brandName, sellerDescription, customInstructions } = req.body;
+
+    if (!maxUserId || !wbToken) {
+      return res.status(400).json({ error: 'maxUserId and wbToken are required' });
+    }
+
+    // 1. Validate WB Token
+    const isValid = await wbService.validateToken(wbToken);
+    if (!isValid) {
+      return res.status(400).json({ error: 'Invalid Wildberries API token' });
+    }
+
+    // 2. Upsert seller in DB
+    const { data, error } = await supabase
+      .from('sellers')
+      .upsert({
+        max_user_id: maxUserId,
+        wb_token: wbToken,
+        brand_name: brandName,
+        seller_description: sellerDescription,
+        custom_instructions: customInstructions
+      }, { onConflict: 'max_user_id' })
+      .select()
+      .single();
+
+    if (error) throw error;
+    res.json({ success: true, seller: data });
+  } catch (error) {
+    console.error('Registration error:', error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Get all reviews with optional status filter
 router.get('/reviews', async (req, res) => {
   try {

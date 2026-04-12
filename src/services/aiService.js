@@ -20,11 +20,12 @@ class AIService {
    * @param {string} reviewText - The text of the review from WB
    * @param {object} productMetadata - Product name, description, characteristics
    * @param {object} productMatrix - Internal name, cross-sell info
+   * @param {object} sellerSettings - Brand name, seller description, custom instructions
    * @param {string} model - The model to use (default: nex-agi/deepseek-v3.1-nex-n1)
    */
-  async generateResponse(reviewText, productMetadata, productMatrix, model = 'nex-agi/deepseek-v3.1-nex-n1') {
+  async generateResponse(reviewText, productMetadata, productMatrix, sellerSettings = {}, model = 'nex-agi/deepseek-v3.1-nex-n1') {
     try {
-      const systemPrompt = this._buildSystemPrompt(productMetadata, productMatrix);
+      const systemPrompt = this._buildSystemPrompt(productMetadata, productMatrix, sellerSettings);
       
       const response = await this.client.post('/chat/completions', {
         model: model,
@@ -47,11 +48,17 @@ class AIService {
   /**
    * Internal helper to build the prompt for AI
    */
-  _buildSystemPrompt(product, matrix) {
+  _buildSystemPrompt(product, matrix, seller) {
+    const brandName = seller?.brand_name || 'нашего магазина';
     const productName = matrix?.product_name || product?.name || 'товар';
     
-    let prompt = `Ты — вежливый менеджер магазина на Wildberries. Твоя задача — написать ответ на отзыв покупателя.
-Информация о товаре:
+    let prompt = `Ты — вежливый менеджер магазина "${brandName}" на Wildberries. Твоя задача — написать ответ на отзыв покупателя.`;
+
+    if (seller?.seller_description) {
+      prompt += `\n\nИнформация о бренде/магазине:\n${seller.seller_description}`;
+    }
+
+    prompt += `\n\nИнформация о товаре:
 Название: ${productName}`;
 
     if (product?.description) prompt += `\nОписание: ${product.description}`;
@@ -63,6 +70,10 @@ class AIService {
 
     if (matrix?.cross_sell_article) {
       prompt += `\n\nСПЕЦИАЛЬНОЕ ЗАДАНИЕ (Cross-sell): В конце ответа ненавязчиво порекомендуй покупателю обратить внимание на наш другой товар (артикул ${matrix.cross_sell_article}). ${matrix.cross_sell_description || ''}`;
+    }
+
+    if (seller?.custom_instructions) {
+      prompt += `\n\nДОПОЛНИТЕЛЬНЫЕ ИНСТРУКЦИИ ОТ ПРОДАВЦА:\n${seller.custom_instructions}`;
     }
 
     prompt += `

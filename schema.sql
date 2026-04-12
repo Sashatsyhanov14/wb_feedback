@@ -8,6 +8,9 @@ create table sellers (
     wb_token text not null, -- Store encrypted if requested by logic later
     is_auto_reply_enabled boolean default false,
     auto_reply_min_rating integer default 4,
+    brand_name text,
+    seller_description text,
+    custom_instructions text,
     created_at timestamp with time zone default now()
 );
 

@@ -74,7 +74,7 @@ class ReviewService {
       let productMetadata = cacheService.get(cacheKey);
 
       if (!productMetadata) {
-        productMetadata = await wbService.getProductMetadata(feedback.nmId);
+        productMetadata = await wbService.getProductMetadata(feedback.nmId, seller.wb_token);
         if (productMetadata) {
           cacheService.set(cacheKey, productMetadata, 1440); // Cache for 24 hours
         }
@@ -89,7 +89,7 @@ class ReviewService {
         .single();
 
       // 6. Generate AI response (now returns JSON)
-      const aiData = await aiService.generateResponse(feedback.text, productMetadata, productMatrix);
+      const aiData = await aiService.generateResponse(feedback.text, productMetadata, productMatrix, seller);
       if (!aiData || !aiData.text) return;
 
       const aiResponse = aiData.text;
@@ -99,7 +99,7 @@ class ReviewService {
 
       if (isAutoReplyAllowed) {
         // Auto-send to WB
-        const success = await wbService.sendAnswer(feedback.id, aiResponse);
+        const success = await wbService.sendAnswer(feedback.id, aiResponse, seller.wb_token);
         if (success) {
           await this.logReview(seller.id, feedback, aiResponse, 'auto_posted', aiData.category, aiData.sentiment);
           await maxService.sendMessage(seller.max_user_id, `✅ Отзыв на артикул ${feedback.nmId} (${feedback.productValuation}⭐) обработан автоматически.\n\nТекст ответа: "${aiResponse}"`);
