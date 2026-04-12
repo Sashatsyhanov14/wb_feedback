@@ -234,6 +234,7 @@ function renderSubscription() {
                 <span class="material-symbols-outlined text-outline">verified_user</span>
             </section>
 
+            ${state.settings.is_top_5 ? `
             <!-- Status Card (State A - Winner) -->
             <section class="relative overflow-hidden p-5 rounded-xl bg-surface-container-high border-l-4 border-primary">
                 <div class="relative z-10">
@@ -246,6 +247,7 @@ function renderSubscription() {
                 <!-- Decorative Grain/Light -->
                 <div class="absolute top-0 right-0 w-32 h-32 bg-primary/5 blur-3xl -mr-16 -mt-16"></div>
             </section>
+            ` : ''}
 
             <!-- Pricing Tier Card (Premium Offer) -->
             <section class="p-6 rounded-2xl bg-surface-container-lowest relative border border-outline-variant/10 shadow-2xl">
@@ -288,7 +290,7 @@ function renderSubscription() {
                         <span class="text-sm font-medium text-on-surface">Персональные инструкции для ИИ (Tone of Voice)</span>
                     </li>
                 </ul>
-                <button class="w-full py-4 premium-gradient rounded-xl font-headline font-extrabold text-on-primary-container shadow-[0_4px_24px_rgba(173,198,255,0.2)] active:scale-95 duration-150 transition-all">
+                <button onclick="showToast('Оплата временно недоступна')" class="w-full py-4 premium-gradient rounded-xl font-headline font-extrabold text-on-primary-container shadow-[0_4px_24px_rgba(173,198,255,0.2)] active:scale-95 duration-150 transition-all">
                     Оплатить 499 ₽
                 </button>
                 <p class="text-[10px] text-center text-outline mt-4 leading-relaxed">
