@@ -11,6 +11,9 @@ create table sellers (
     brand_name text,
     seller_description text,
     custom_instructions text,
+    subscription_status text default 'free',
+    subscription_expires_at timestamp,
+    respond_to_bad_reviews boolean default false,
     created_at timestamp with time zone default now()
 );
 

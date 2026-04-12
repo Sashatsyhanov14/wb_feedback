@@ -95,9 +95,13 @@ class ReviewService {
       const aiResponse = aiData.text;
 
       // 7. Handle sending logic
-      const isAutoReplyAllowed = seller.is_auto_reply_enabled && feedback.productValuation >= (seller.auto_reply_min_rating || 4);
+      const isBadReview = feedback.productValuation <= 3;
+      const canAutoReply = seller.is_auto_reply_enabled && (
+        (!isBadReview && feedback.productValuation >= (seller.auto_reply_min_rating || 4)) || 
+        (isBadReview && seller.respond_to_bad_reviews)
+      );
 
-      if (isAutoReplyAllowed) {
+      if (canAutoReply) {
         // Auto-send to WB
         const success = await wbService.sendAnswer(feedback.id, aiResponse, seller.wb_token);
         if (success) {

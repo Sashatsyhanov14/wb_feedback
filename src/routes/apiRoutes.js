@@ -6,35 +6,32 @@ const wbService = require('../services/wbService');
 // Register or update seller (Onboarding)
 router.post('/register', async (req, res) => {
   try {
-    const { telegramChatId, wbToken, brandName, sellerDescription, customInstructions } = req.body;
-
+    const { telegramChatId, wbToken, brandName, sellerDescription } = req.body;
+    
     if (!telegramChatId || !wbToken) {
       return res.status(400).json({ error: 'telegramChatId and wbToken are required' });
     }
 
-    // 1. Validate WB Token
-    const isValid = await wbService.validateToken(wbToken);
-    if (!isValid) {
-      return res.status(400).json({ error: 'Invalid Wildberries API token' });
-    }
+    // Validate token with WB
+    const isValid = await wbService.getNewReviews(wbToken); 
+    if (!isValid) return res.status(400).json({ error: 'Invalid WB Token' });
 
-    // 2. Upsert seller in DB
     const { data, error } = await supabase
       .from('sellers')
-      .upsert({
-        telegram_chat_id: telegramChatId,
+      .upsert({ 
+        telegram_chat_id: telegramChatId, 
         wb_token: wbToken,
         brand_name: brandName,
         seller_description: sellerDescription,
-        custom_instructions: customInstructions
-      }, { onConflict: 'telegram_chat_id' })
+        respond_to_bad_reviews: false, // Default
+        subscription_status: 'free' // Default
+      })
       .select()
       .single();
 
     if (error) throw error;
     res.json({ success: true, seller: data });
   } catch (error) {
-    console.error('Registration error:', error.message);
     res.status(500).json({ error: error.message });
   }
 });
@@ -95,7 +92,7 @@ router.get('/settings/:telegramChatId', async (req, res) => {
   try {
     const { data, error } = await supabase
       .from('sellers')
-      .select('is_auto_reply_enabled, auto_reply_min_rating, brand_name, seller_description, custom_instructions')
+      .select('is_auto_reply_enabled, auto_reply_min_rating, brand_name, seller_description, custom_instructions, respond_to_bad_reviews, subscription_status')
       .eq('telegram_chat_id', req.params.telegramChatId)
       .single();
     
@@ -109,14 +106,33 @@ router.get('/settings/:telegramChatId', async (req, res) => {
 // UPDATE seller settings
 router.post('/settings/:telegramChatId', async (req, res) => {
   try {
-    const { is_auto_reply_enabled, auto_reply_min_rating, brand_name, seller_description, custom_instructions } = req.body;
-    const { error } = await supabase
-      .from('sellers')
-      .update({ is_auto_reply_enabled, auto_reply_min_rating, brand_name, seller_description, custom_instructions })
-      .eq('telegram_chat_id', req.params.telegramChatId);
+    const { 
+      is_auto_reply_enabled, 
+      auto_reply_min_rating, 
+      custom_instructions,
+      respond_to_bad_reviews,
+      brand_name,
+      seller_description,
+      wb_token
+    } = req.body;
     
+    const { data, error } = await supabase
+      .from('sellers')
+      .update({ 
+        is_auto_reply_enabled, 
+        auto_reply_min_rating, 
+        custom_instructions,
+        respond_to_bad_reviews,
+        brand_name,
+        seller_description,
+        wb_token
+      })
+      .eq('telegram_chat_id', req.params.telegramChatId)
+      .select()
+      .single();
+
     if (error) throw error;
-    res.json({ success: true });
+    res.json({ success: true, settings: data });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

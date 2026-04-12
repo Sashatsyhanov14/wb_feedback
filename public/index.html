@@ -9,8 +9,13 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="app.css">
     <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
 </head>
-<body data-theme="light">
+<body data-theme="dark">
+    <!-- Background Aura Blobs -->
+    <div class="glow-blob blob-1"></div>
+    <div class="glow-blob blob-2"></div>
+
     <div class="app-container">
         <!-- Sidebar -->
         <aside class="sidebar animate-in">
@@ -29,13 +34,10 @@
                     <i data-lucide="message-square"></i> Отзывы
                 </div>
                 <div class="nav-item" onclick="showView('products')">
-                    <i data-lucide="package"></i> Матрица товаров
-                </div>
-                <div class="nav-item" onclick="showView('analytics')">
-                    <i data-lucide="bar-chart-3"></i> Аналитика
+                    <i data-lucide="package"></i> Матрица продаж
                 </div>
                 <div class="nav-item" onclick="showView('settings')">
-                    <i data-lucide="settings"></i> Настройки
+                    <i data-lucide="settings"></i> Настройки/ИИ
                 </div>
             </nav>
 
@@ -49,15 +51,23 @@
         <!-- Main -->
         <main class="main-content">
             <header class="header animate-in">
-                <div id="view-title">
-                    <h1 id="header-text">Дашборд</h1>
-                </div>
-                <div style="display: flex; align-items: center; gap: 16px;">
-                    <span class="badge badge-approved" style="display: flex; align-items: center; gap: 4px;">
+                <div style="display: flex; align-items: center; gap: 12px; flex: 1;">
+                    <div class="header-token-box">
+                        <i data-lucide="key" style="width: 14px; color: var(--text-muted);"></i>
+                        <input type="password" id="header-wb-token" placeholder="WB API Token..." onchange="updateTokenFromHeader(this.value)" style="background: transparent; border: none; font-size: 12px; color: var(--text); outline: none; width: 140px;">
+                    </div>
+                    <span class="badge badge-approved" id="api-status-badge">
                         <span style="width: 6px; height: 6px; background: #30d158; border-radius: 50%"></span>
-                        WB API Online
+                        API OK
                     </span>
-                    <div style="width: 40px; height: 40px; border-radius: 50%; background: var(--accent-gradient); border: 2px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.1)"></div>
+                </div>
+                
+                <div style="display: flex; align-items: center; gap: 16px;">
+                    <div class="profile-icon" onclick="showView('account')" style="cursor: pointer; position: relative;">
+                        <div style="width: 40px; height: 40px; border-radius: 50%; background: var(--accent-gradient); border: 2px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.1); display: flex; align-items: center; justify-content: center;">
+                            <i data-lucide="user" style="color: white; width: 20px;"></i>
+                        </div>
+                    </div>
                 </div>
             </header>
 
