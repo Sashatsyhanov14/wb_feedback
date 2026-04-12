@@ -27,11 +27,6 @@ app.post('/api/bot', (req, res) => telegramService.handleUpdate(req, res));
 // Routes
 app.use('/api', apiRoutes);
 
-// Home route
-app.get('/', (req, res) => {
-  res.send('<h1>AI Review Responder</h1><p>Server is running. Monitoring reviews...</p>');
-});
-
 // Initialize background jobs
 initJobs();
 
