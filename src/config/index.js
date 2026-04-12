@@ -8,5 +8,7 @@ module.exports = {
   maxBotToken: process.env.MAX_BOT_TOKEN,
   maxAppId: process.env.MAX_APP_ID,
   wbToken: process.env.WB_TOKEN,
-  port: process.env.PORT || 3000
+  port: process.env.PORT || 3000,
+  nodeEnv: process.env.NODE_ENV || 'development',
+  cronSecret: process.env.CRON_SECRET
 };

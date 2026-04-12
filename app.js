@@ -12,7 +12,7 @@ app.use(express.static('public'));
 app.get('/api/cron', async (req, res) => {
   // Simple protection with header or query param
   const authHeader = req.headers.authorization;
-  if (config.nodeEnv === 'production' && authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (config.nodeEnv === 'production' && authHeader !== `Bearer ${config.cronSecret}`) {
     return res.status(401).end();
   }
   
