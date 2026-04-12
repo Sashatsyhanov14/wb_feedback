@@ -24,11 +24,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         state.telegramChatId = 'TEST_USER_123';
     }
 
-    // 2. Load Initial Data
-    await refreshData();
-    
-    // 3. Initial View
+    // 2. Initial View (Immediate render)
     showView('settings');
+
+    // 3. Load Data & Update
+    await refreshData();
+    showView(state.currentView);
 });
 
 async function refreshData() {
@@ -72,6 +73,7 @@ async function saveSettings() {
 function showView(view) {
     state.currentView = view;
     const content = document.getElementById('content-view');
+    if (!content) return;
 
     // Update Nav active classes
     document.querySelectorAll('.tab-item').forEach(item => {
@@ -100,7 +102,7 @@ function showView(view) {
 
 function renderSettings() {
     return `
-        <div class="space-y-6 animate-in">
+        <div class="space-y-6">
             <div class="mb-8">
                 <span class="text-primary text-xs font-bold tracking-widest uppercase opacity-70">Workspace</span>
                 <h2 class="font-headline text-3xl font-extrabold text-on-surface tracking-tight mt-1">Настройки</h2>
@@ -153,7 +155,7 @@ function renderSettings() {
 
 function renderMatrix() {
     return `
-        <div class="animate-in space-y-6">
+        <div class="space-y-6">
             <section class="mb-8">
                 <h2 class="text-3xl font-headline font-extrabold tracking-tight text-on-surface mb-2">Матрица допродаж</h2>
                 <p class="text-sm text-on-surface-variant leading-relaxed">
@@ -192,7 +194,6 @@ function renderMatrix() {
                     </div>
                 `).join('')}
 
-                <!-- New Row -->
                 <div class="bg-surface-container-high p-4 rounded-xl flex items-center gap-3 border border-primary/20">
                     <div class="flex-1 space-y-1">
                         <label class="text-[10px] text-on-surface-variant ml-3 uppercase font-semibold">Артикул товара</label>
@@ -205,7 +206,6 @@ function renderMatrix() {
                         <label class="text-[10px] text-on-surface-variant ml-3 uppercase font-semibold">Рекомендация</label>
                         <input id="new-cross-id" class="w-full bg-surface-container-lowest border-none rounded-lg text-sm text-on-surface focus:ring-1 focus:ring-primary h-10 px-3 transition-all" placeholder="Введите SKU" type="text">
                     </div>
-                    <div class="pt-5 w-5"></div>
                 </div>
             </div>
 
@@ -221,7 +221,7 @@ function renderMatrix() {
 
 function renderSubscription() {
     return `
-        <div class="animate-in space-y-6">
+        <div class="space-y-6">
             <div class="mb-8">
                 <h2 class="font-headline text-3xl font-extrabold tracking-tight mb-2 text-on-surface">Мой аккаунт</h2>
                 <p class="text-on-surface-variant text-sm">Управление вашим профилем и подпиской</p>
@@ -340,7 +340,7 @@ function toggleTokenVisibility() {
 
 function showToast(message, isError = false) {
     const toast = document.createElement('div');
-    toast.className = \`fixed bottom-24 left-1/2 -translate-x-1/2 px-6 py-3 rounded-full text-white text-xs font-bold z-[100] transition-all transform scale-90 opacity-0 \${isError ? 'bg-error-container text-on-error-container border border-error' : 'bg-primary text-on-primary'}\`;
+    toast.className = `fixed bottom-24 left-1/2 -translate-x-1/2 px-6 py-3 rounded-full text-white text-xs font-bold z-[100] transition-all transform scale-90 opacity-0 ${isError ? 'bg-error-container text-on-error-container border border-error' : 'bg-primary text-on-primary'}`;
     toast.innerText = message;
     document.body.appendChild(toast);
     
