@@ -35,26 +35,17 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 async function refreshData() {
     try {
-        const res = await fetch(`/api/settings/${state.telegramChatId}`);
-        if (res.status === 200) {
-            const data = await res.json();
-            state.settings = { ...state.settings, ...data };
-        }
-        
-        const matrixRes = await fetch(`/api/matrix/${state.telegramChatId}`);
-        if (matrixRes.status === 200) {
-            state.matrix = await matrixRes.json();
-        }
+        const [settings, matrix, stats, reviews] = await Promise.all([
+            fetch(`/api/settings/${state.telegramChatId}`).then(r => r.status === 200 ? r.json() : null),
+            fetch(`/api/matrix/${state.telegramChatId}`).then(r => r.status === 200 ? r.json() : null),
+            fetch(`/api/stats/${state.telegramChatId}`).then(r => r.status === 200 ? r.json() : null),
+            fetch(`/api/reviews/${state.telegramChatId}`).then(r => r.status === 200 ? r.json() : null)
+        ]);
 
-        const statsRes = await fetch(`/api/stats/${state.telegramChatId}`);
-        if (statsRes.status === 200) {
-            state.stats = await statsRes.json();
-        }
-
-        const reviewsRes = await fetch(`/api/reviews/${state.telegramChatId}`);
-        if (reviewsRes.status === 200) {
-            state.reviews = await reviewsRes.json();
-        }
+        if (settings) state.settings = { ...state.settings, ...settings };
+        if (matrix) state.matrix = matrix;
+        if (stats) state.stats = stats;
+        if (reviews) state.reviews = reviews;
     } catch (e) {
         console.error('Refresh data error:', e);
     }
