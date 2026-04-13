@@ -51,8 +51,15 @@ async function refreshData() {
     }
 }
 
-async function saveSettings() {
+async function handleSaveSettings() {
     try {
+        // Extract current values from the form
+        const tokenInput = document.getElementById('wb-token-input');
+        const instructionsInput = document.getElementById('ai-instructions-input');
+        
+        if (tokenInput) state.settings.wb_token = tokenInput.value;
+        if (instructionsInput) state.settings.custom_instructions = instructionsInput.value;
+
         const res = await fetch(`/api/settings/${state.telegramChatId}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
