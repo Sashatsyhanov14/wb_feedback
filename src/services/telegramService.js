@@ -11,7 +11,30 @@ class TelegramService {
   }
 
   _setupHandlers() {
-    this.bot.start((ctx) => ctx.reply('Привет! Я бот для ответов на отзывы WB. Пришли мне свой Chat ID, если он тебе нужен: ' + ctx.chat.id));
+    this.bot.start((ctx) => {
+      const welcome = `🚀 *Добро пожаловать в WBReply AI!*
+
+Я ваш интеллектуальный ассистент для автоматизации ответов на отзывы Wildberries.
+
+*Что я умею:*
+✅ Генерировать умные ответы с учетом вашего Tone of Voice.
+✅ Увеличивать продажи через рекомендательную матрицу.
+✅ Анализировать тональность отзывов.
+
+💡 *Ваш Chat ID:* \`${ctx.chat.id}\` (он может понадобиться в приложении)
+
+Чтобы начать, нажмите кнопку ниже и перейдите в раздел *Настройки*:`;
+
+      return ctx.reply(welcome, {
+        parse_mode: 'Markdown',
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: '🚀 Открыть Приложение', web_app: { url: process.env.APP_URL || 'https://wb-feedback.vercel.app' } }],
+            [{ text: '🆘 Поддержка', url: 'https://t.me/edh4hhr' }]
+          ]
+        }
+      });
+    });
     
     // Handle inline buttons
     this.bot.action(/approve_(.+)/, async (ctx) => {
