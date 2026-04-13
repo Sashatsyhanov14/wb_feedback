@@ -382,7 +382,7 @@ function renderSubscription() {
                 </div>
 
                 <div class="mb-8">
-                    <span class="text-[10px] font-black tracking-[0.3em] text-primary/60 uppercase mb-3 block">Legatus AI • Premium</span>
+                    <span class="text-[10px] font-black tracking-[0.3em] text-primary/60 uppercase mb-3 block">WBReply AI • Premium</span>
                     <h2 class="font-headline text-3xl font-extrabold text-on-surface leading-tight mb-4">Стартовое Предложение</h2>
                     
                     <div class="flex items-baseline gap-3 mb-2">
@@ -432,7 +432,7 @@ function renderSubscription() {
             <footer class="pt-8 pb-12 flex flex-col items-center gap-6">
                 <div class="flex gap-8">
                     <a class="text-[11px] font-bold text-on-surface-variant/50 hover:text-primary transition-colors uppercase tracking-widest" href="offer.html">Оферта</a>
-                    <a class="text-[11px] font-bold text-on-surface-variant/50 hover:text-primary transition-colors uppercase tracking-widest" href="https://t.me/sashatsyhanov" target="_blank">Поддержка</a>
+                    <a class="text-[11px] font-bold text-on-surface-variant/50 hover:text-primary transition-colors uppercase tracking-widest" href="https://t.me/edh4hhr" target="_blank">Поддержка</a>
                 </div>
                 <div class="flex flex-col items-center gap-1 opacity-30">
                     <p class="text-[10px] text-on-surface font-black uppercase tracking-[0.5em]">WBReply AI</p>

@@ -12,5 +12,5 @@ module.exports = {
   nodeEnv: process.env.NODE_ENV || 'development',
   cronSecret: process.env.CRON_SECRET,
   adminId: '795056847',
-  adminUsername: process.env.TELEGRAM_ADMIN_USERNAME || '@sashatsyhanov'
+  adminUsername: process.env.TELEGRAM_ADMIN_USERNAME || '@edh4hhr'
 };
