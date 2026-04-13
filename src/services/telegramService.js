@@ -119,8 +119,26 @@ class TelegramService {
   /**
    * Middleware for Vercel/Express webhook
    */
-  handleUpdate(req, res) {
-    return this.bot.webhookCallback('/api/bot')(req, res);
+  async handleUpdate(req, res) {
+    try {
+      if (!req.body) {
+        console.warn('⚠️ Received empty body in /api/bot');
+        return res.status(200).send('OK'); // Telegram expects 200
+      }
+
+      console.log(`📩 Incoming update: ${Object.keys(req.body).filter(k => k !== 'update_id')}`);
+      
+      await this.bot.handleUpdate(req.body);
+      
+      if (!res.headersSent) {
+        res.status(200).send('OK');
+      }
+    } catch (err) {
+      console.error('❌ Error handling bot update:', err.message);
+      if (!res.headersSent) {
+        res.status(500).send('Error');
+      }
+    }
   }
 
   /**
