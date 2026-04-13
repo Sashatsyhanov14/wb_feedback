@@ -17,6 +17,7 @@ class WBService {
    * @returns {Promise<boolean>}
    */
   async validateToken(token) {
+    if (token === 'MOCK_TOKEN') return true;
     try {
       // Small request to check if token is valid
       await this.client.get(`${WB_FEEDBACK_API_URL}/api/v1/feedbacks`, {
@@ -25,9 +26,8 @@ class WBService {
       });
       return true;
     } catch (error) {
+      // ...
       if (error.response?.status === 401) return false;
-      console.error('Token validation error:', error.response?.data || error.message);
-      // If it's another error (500 etc), we might want to return false or throw
       return false;
     }
   }
@@ -45,23 +45,39 @@ class WBService {
   }
 
   /**
-   * Fetch reviews from Wildberries
-   * @param {boolean} isAnswered - Filter for answered/unanswered reviews
-   * @param {number} take - Number of reviews to fetch (max 5000)
-   * @param {number} skip - Offset for pagination
-   * @param {object} options - Additional filters (nmId, order, dateFrom, dateTo, token)
+   * Fetch reviews from Wildberries (Mock support added)
    */
   async getReviews(isAnswered = false, take = 10, skip = 0, options = {}) {
+    const { token, ...params } = options;
+    
+    // MOCK MODE
+    if (token === 'MOCK_TOKEN') {
+      return {
+        data: {
+          feedbacks: [
+            {
+              id: 'mock_rev_1',
+              text: 'Очень классное платье! Цвет как на фото, размер подошел.',
+              productValuation: 5,
+              nmId: 123456,
+              createdDate: new Date().toISOString()
+            },
+            {
+              id: 'mock_rev_2',
+              text: 'Приехал рваный пакет, товар испачкан. Ужасно!',
+              productValuation: 1,
+              nmId: 123456,
+              createdDate: new Date().toISOString()
+            }
+          ]
+        }
+      };
+    }
+
     try {
-      const { token, ...params } = options;
       const response = await this.client.get(`${WB_FEEDBACK_API_URL}/api/v1/feedbacks`, {
         headers: this._getHeaders(token),
-        params: {
-          isAnswered,
-          take,
-          skip,
-          ...params
-        }
+        params: { isAnswered, take, skip, ...params }
       });
       return response.data;
     } catch (error) {
@@ -71,19 +87,20 @@ class WBService {
   }
 
   /**
-   * Fetch product metadata (context) for AI
-   * @param {number|string} nmId - Wildberries article number
-   * @param {string} token - WB API token
+   * Fetch product metadata (Mock support added)
    */
   async getProductMetadata(nmId, token) {
+    if (token === 'MOCK_TOKEN') {
+      return {
+        name: 'Платье вечернее Silk',
+        description: 'Элегантное платье из натурального шелка.',
+        characteristics: [{ name: 'Материал', value: 'Шелк 100%' }]
+      };
+    }
+
     try {
       const response = await this.client.post(`${WB_CONTENT_API_URL}/content/v2/get/cards/list`, {
-        settings: {
-          cursor: { limit: 1 },
-          filter: {
-            nmIDs: [Number(nmId)]
-          }
-        }
+        settings: { cursor: { limit: 1 }, filter: { nmIDs: [Number(nmId)] } }
       }, {
         headers: this._getHeaders(token)
       });
@@ -103,12 +120,14 @@ class WBService {
   }
 
   /**
-   * Send a reply to a review
-   * @param {string} feedbackId - Unique review ID
-   * @param {string} text - Reply text (2-5000 chars)
-   * @param {string} token - WB API token
+   * Send a reply to a review (Mock support added)
    */
   async sendAnswer(feedbackId, text, token) {
+    if (token === 'MOCK_TOKEN') {
+      console.log(`[MOCK] Sending answer to ${feedbackId}: "${text}"`);
+      return true;
+    }
+
     try {
       const response = await this.client.post(`${WB_FEEDBACK_API_URL}/api/v1/feedbacks/answer`, {
         id: feedbackId,

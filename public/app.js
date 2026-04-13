@@ -10,7 +10,8 @@ let state = {
     },
     reviews: [],
     matrix: [],
-    currentView: 'settings'
+    currentView: 'settings',
+    stats: { approved: 0, pending: 0, total: 0 }
 };
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -72,6 +73,28 @@ async function saveSettings() {
     } catch (e) {
         console.error('Save settings error:', e);
         showToast('Ошибка сохранения', true);
+    }
+}
+
+async function handleSync() {
+    try {
+        if (!state.settings.wb_token) {
+            showToast('Сначала введите WB Токен в настройках', true);
+            return;
+        }
+        showToast('Запуск синхронизации...', false);
+        const res = await fetch(`/api/sync/${state.telegramChatId}`, { method: 'POST' });
+        const data = await res.json();
+        if (data.success) {
+            showToast(data.message);
+            await refreshData();
+            showView('subscription');
+        } else {
+            showToast(data.error || 'Ошибка синхронизации', true);
+        }
+    } catch (e) {
+        console.error('Sync error:', e);
+        showToast('Ошибка сети', true);
     }
 }
 
@@ -241,6 +264,11 @@ function renderSubscription() {
                     <p class="text-xl font-black font-headline text-on-surface">${state.stats?.approved || 0}</p>
                 </div>
             </section>
+
+            <button onclick="handleSync()" class="w-full bg-surface-container-high border border-outline-variant/10 text-on-surface py-4 rounded-xl font-bold font-headline flex items-center justify-center gap-3 active:scale-[0.98] transition-all mb-8 shadow-lg">
+                <span class="material-symbols-outlined text-primary">sync</span>
+                Синхронизировать отзывы
+            </button>
 
             ${state.settings.is_top_5 ? `
             <!-- Status Card (State A - Winner) -->

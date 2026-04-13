@@ -95,7 +95,10 @@ class ReviewService {
 
       // 6. Generate AI response (now returns JSON)
       const aiData = await aiService.generateResponse(feedback.text, productMetadata, productMatrix, seller);
-      if (!aiData || !aiData.text) return;
+      if (!aiData || !aiData.text) {
+        console.warn(`[ReviewService] AI failed to generate response for review ${feedback.id}. Skipping.`);
+        return;
+      }
 
       const aiResponse = aiData.text;
 

@@ -226,14 +226,8 @@ router.get('/stats/:telegramChatId', async (req, res) => {
   try {
     const { telegramChatId } = req.params;
 
-    // Find seller
-    const { data: seller, error: sError } = await supabase
-      .from('sellers')
-      .select('id')
-      .eq('telegram_chat_id', telegramChatId)
-      .single();
-    
-    if (sError || !seller) return res.status(404).json({ error: 'Seller not found' });
+    const seller = await ensureSeller(telegramChatId);
+    if (!seller) return res.status(404).json({ error: 'Seller not found or created' });
 
     const { data: totalReviews } = await supabase.from('review_logs').select('id', { count: 'exact' }).eq('seller_id', seller.id);
     const { data: pendingReviews } = await supabase.from('review_logs').select('id', { count: 'exact' }).eq('seller_id', seller.id).ilike('status', 'pending%');
@@ -253,14 +247,9 @@ router.get('/stats/:telegramChatId', async (req, res) => {
 
 router.get('/matrix/:telegramChatId', async (req, res) => {
   try {
-    // Find seller first
-    const { data: seller, error: sError } = await supabase
-      .from('sellers')
-      .select('id')
-      .eq('telegram_chat_id', req.params.telegramChatId)
-      .single();
-    
-    if (sError || !seller) return res.status(404).json({ error: 'Seller not found' });
+    const { telegramChatId } = req.params;
+    const seller = await ensureSeller(telegramChatId);
+    if (!seller) return res.status(404).json({ error: 'Seller not found' });
 
     const { data, error } = await supabase
       .from('product_matrix')
@@ -317,14 +306,8 @@ router.get('/analytics/:telegramChatId', async (req, res) => {
   try {
     const { telegramChatId } = req.params;
 
-    // Find seller
-    const { data: seller, error: sError } = await supabase
-      .from('sellers')
-      .select('id')
-      .eq('telegram_chat_id', telegramChatId)
-      .single();
-    
-    if (sError || !seller) return res.status(404).json({ error: 'Seller not found' });
+    const seller = await ensureSeller(telegramChatId);
+    if (!seller) return res.status(404).json({ error: 'Seller not found' });
 
     const { data: reviews, error } = await supabase
       .from('review_logs')
@@ -348,6 +331,26 @@ router.get('/analytics/:telegramChatId', async (req, res) => {
     });
 
     res.json(stats);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Manual sync trigger
+const reviewService = require('../services/reviewService');
+
+router.post('/sync/:telegramChatId', async (req, res) => {
+  try {
+    const { telegramChatId } = req.params;
+    const seller = await ensureSeller(telegramChatId);
+    if (!seller || !seller.wb_token) {
+      return res.status(400).json({ error: 'Добавьте WB Токен в настройках' });
+    }
+
+    console.log(`[Manual Sync] Triggering for seller ${seller.id}`);
+    await reviewService.processSellerReviews(seller);
+    
+    res.json({ success: true, message: 'Синхронизация запущена. Проверьте сообщения от бота!' });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
