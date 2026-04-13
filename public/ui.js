@@ -360,7 +360,7 @@ function renderSubscription() {
             <!-- Footer Links -->
             <footer class="pt-8 pb-12 flex flex-col items-center gap-6">
                 <div class="flex gap-8">
-                    <a class="text-[11px] font-bold text-on-surface-variant/50 hover:text-primary transition-colors uppercase tracking-widest" href="#">Оферта</a>
+                    <a class="text-[11px] font-bold text-on-surface-variant/50 hover:text-primary transition-colors uppercase tracking-widest" href="offer.html">Оферта</a>
                     <a class="text-[11px] font-bold text-on-surface-variant/50 hover:text-primary transition-colors uppercase tracking-widest" href="#">Поддержка</a>
                 </div>
                 <div class="flex flex-col items-center gap-1 opacity-30">
