@@ -199,34 +199,39 @@ class TelegramService {
   }
 
   /**
-   * Send a plain text message to a user
-   * @param {string|number} chatId - Telegram Chat ID
-   * @param {string} text - Message content
+   * Helper to escape HTML characters
    */
+  _escapeHtml(text) {
+    if (!text) return '';
+    return text
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+  }
+
   async sendMessage(chatId, text) {
     try {
-      await this.bot.telegram.sendMessage(chatId, text);
+      await this.bot.telegram.sendMessage(chatId, text, { parse_mode: 'HTML' });
       return true;
     } catch (error) {
-      console.error(`Error sending Telegram message to ${chatId}:`, error.message);
-      return false;
+      console.error(`❌ Error sending Telegram message to ${chatId}:`, error.message);
+      // Last resort: plain text
+      try {
+        await this.bot.telegram.sendMessage(chatId, text);
+        return true;
+      } catch (e) { return false; }
     }
   }
 
-  /**
-   * Send a review draft with buttons (Approved/Reject logic placeholder)
-   * @param {string|number} chatId - Telegram Chat ID
-   * @param {string} logId - Internal Review Log ID
-   * @param {string} draftText - The AI generated draft
-   */
   async sendReviewDraft(chatId, logId, draftText) {
     try {
-      // Clean draftText from characters that break standard Markdown
-      const cleanDraft = draftText.replace(/[_*`\[\]()]/g, '\\$&');
-      const message = `💡 *Сгенерирован черновик ответа*:\n\n${cleanDraft}`;
+      const escapedDraft = this._escapeHtml(draftText);
+      const message = `<b>💡 Сгенерирован черновик ответа:</b>\n\n${escapedDraft}`;
       
       await this.bot.telegram.sendMessage(chatId, message, {
-        parse_mode: 'Markdown',
+        parse_mode: 'HTML',
         reply_markup: {
           inline_keyboard: [
             [
@@ -241,12 +246,13 @@ class TelegramService {
       });
       return true;
     } catch (error) {
-      console.error(`Error sending Telegram review draft to ${chatId}:`, error.message);
-      // Fallback: send without markdown if it failed
+      console.error(`❌ Error sending Telegram review draft to ${chatId}:`, error.message);
+      // Fallback: send without HTML
       try {
         await this.bot.telegram.sendMessage(chatId, `💡 Сгенерирован черновик ответа:\n\n${draftText}`);
         return true;
       } catch (inner) {
+        console.error(`❌ CRITICAL: Fallback ALSO failed for ${chatId}:`, inner.message);
         return false;
       }
     }
