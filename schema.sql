@@ -2,7 +2,7 @@
 create extension if not exists "uuid-ossp";
 
 -- 1. Sellers table
-create table sellers (
+create table if not exists sellers (
     id uuid default uuid_generate_v4() primary key,
     telegram_chat_id bigint not null unique,
     wb_token text not null,
@@ -18,7 +18,7 @@ create table sellers (
 );
 
 -- 2. Product matrix table
-create table product_matrix (
+create table if not exists product_matrix (
     id uuid default uuid_generate_v4() primary key,
     seller_id uuid references sellers(id) on delete cascade,
     nm_id bigint not null, -- WB Article
@@ -30,7 +30,7 @@ create table product_matrix (
 );
 
 -- 3. Review logs table
-create table review_logs (
+create table if not exists review_logs (
     id uuid default uuid_generate_v4() primary key,
     seller_id uuid references sellers(id) on delete cascade,
     review_id text not null,
@@ -46,7 +46,7 @@ create table review_logs (
 );
 
 -- 4. Chat history table (for persistent AI Consultant memory)
-create table chat_history (
+create table if not exists chat_history (
     id uuid default uuid_generate_v4() primary key,
     seller_id uuid references sellers(id) on delete cascade,
     role text not null, -- 'user', 'assistant'
@@ -55,7 +55,7 @@ create table chat_history (
 );
 
 -- 5. Indexes for performance
-create index idx_review_logs_seller_id on review_logs(seller_id);
-create index idx_product_matrix_seller_id on product_matrix(seller_id);
-create index idx_sellers_telegram_id on sellers(telegram_chat_id);
-create index idx_chat_history_seller_id on chat_history(seller_id);
+create index if not exists idx_review_logs_seller_id on review_logs(seller_id);
+create index if not exists idx_product_matrix_seller_id on product_matrix(seller_id);
+create index if not exists idx_sellers_telegram_id on sellers(telegram_chat_id);
+create index if not exists idx_chat_history_seller_id on chat_history(seller_id);
