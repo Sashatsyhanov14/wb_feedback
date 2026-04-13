@@ -242,15 +242,99 @@ router.get('/stats/:telegramChatId', async (req, res) => {
     const seller = await ensureSeller(telegramChatId);
     if (!seller) return res.status(404).json({ error: 'Seller not found or created' });
 
-    const { data: totalReviews } = await supabase.from('review_logs').select('id', { count: 'exact' }).eq('seller_id', seller.id);
-    const { data: pendingReviews } = await supabase.from('review_logs').select('id', { count: 'exact' }).eq('seller_id', seller.id).ilike('status', 'pending%');
-    const { data: approvedReviews } = await supabase.from('review_logs').select('id', { count: 'exact' }).eq('seller_id', seller.id).in('status', ['approved', 'auto_posted']);
+    const todayStart = new Date();
+    todayStart.setHours(0,0,0,0);
+    const todayISO = todayStart.toISOString();
+
+    const { count: total } = await supabase
+      .from('review_logs')
+      .select('id', { count: 'exact', head: true })
+      .eq('seller_id', seller.id);
+
+    const { count: pending } = await supabase
+      .from('review_logs')
+      .select('id', { count: 'exact', head: true })
+      .eq('seller_id', seller.id)
+      .eq('status', 'pending');
+
+    const { count: approved } = await supabase
+      .from('review_logs')
+      .select('id', { count: 'exact', head: true })
+      .eq('seller_id', seller.id)
+      .in('status', ['approved', 'auto_posted']);
+
+    const { count: approvedToday } = await supabase
+      .from('review_logs')
+      .select('id', { count: 'exact', head: true })
+      .eq('seller_id', seller.id)
+      .in('status', ['approved', 'auto_posted'])
+      .gte('created_at', todayISO);
 
     res.json({
-      total: totalReviews?.length || 0,
-      pending: pendingReviews?.length || 0,
-      approved: approvedReviews?.length || 0
+      total: total || 0,
+      pending: pending || 0,
+      approved: approved || 0,
+      approvedToday: approvedToday || 0
     });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Admin Global Stats
+router.get('/admin/stats/:adminId', async (req, res) => {
+  try {
+    const { adminId } = req.params;
+    if (adminId !== config.adminId) return res.status(403).json({ error: 'Access denied' });
+
+    const todayStart = new Date();
+    todayStart.setHours(0,0,0,0);
+    const todayISO = todayStart.toISOString();
+
+    const { count: totalSellers } = await supabase.from('sellers').select('id', { count: 'exact', head: true });
+    
+    const { count: newToday } = await supabase.from('sellers')
+      .select('id', { count: 'exact', head: true })
+      .gte('joined_at', todayISO);
+
+    const { count: activeToday } = await supabase.from('sellers')
+      .select('id', { count: 'exact', head: true })
+      .gte('last_active_at', todayISO);
+
+    const { count: withoutToken } = await supabase.from('sellers')
+      .select('id', { count: 'exact', head: true })
+      .or('wb_token.is.null,wb_token.eq.""');
+
+    const { count: totalApproved } = await supabase.from('review_logs')
+      .select('id', { count: 'exact', head: true })
+      .in('status', ['approved', 'auto_posted']);
+
+    res.json({
+      totalSellers: totalSellers || 0,
+      newToday: newToday || 0,
+      activeToday: activeToday || 0,
+      withoutToken: withoutToken || 0,
+      totalApproved: totalApproved || 0
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Admin: Get latest sellers
+router.get('/admin/users/:adminId', async (req, res) => {
+  try {
+    const { adminId } = req.params;
+    if (adminId !== config.adminId) return res.status(403).json({ error: 'Access denied' });
+
+    const { data: users, error } = await supabase
+      .from('sellers')
+      .select('telegram_chat_id, joined_at, last_active_at, wb_token')
+      .order('last_active_at', { ascending: false })
+      .limit(5);
+
+    if (error) throw error;
+    res.json(users);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

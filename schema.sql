@@ -15,6 +15,8 @@ create table if not exists sellers (
     subscription_expires_at timestamp with time zone,
     is_top_5 boolean default false,
     respond_to_bad_reviews boolean default false,
+    joined_at timestamp with time zone default now(),
+    last_active_at timestamp with time zone default now(),
     created_at timestamp with time zone default now()
 );
 
