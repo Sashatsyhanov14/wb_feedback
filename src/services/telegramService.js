@@ -221,9 +221,10 @@ class TelegramService {
    */
   async sendReviewDraft(chatId, logId, draftText) {
     try {
-      const message = `💡 *Сгенерирован черновик ответа*:\n\n${draftText}`;
+      // Clean draftText from characters that break standard Markdown
+      const cleanDraft = draftText.replace(/[_*`\[\]()]/g, '\\$&');
+      const message = `💡 *Сгенерирован черновик ответа*:\n\n${cleanDraft}`;
       
-      // Inline buttons for quick actions (logic for handling these would be in a separate bot handler)
       await this.bot.telegram.sendMessage(chatId, message, {
         parse_mode: 'Markdown',
         reply_markup: {
@@ -241,7 +242,13 @@ class TelegramService {
       return true;
     } catch (error) {
       console.error(`Error sending Telegram review draft to ${chatId}:`, error.message);
-      return false;
+      // Fallback: send without markdown if it failed
+      try {
+        await this.bot.telegram.sendMessage(chatId, `💡 Сгенерирован черновик ответа:\n\n${draftText}`);
+        return true;
+      } catch (inner) {
+        return false;
+      }
     }
   }
 }
