@@ -95,7 +95,7 @@ class TelegramService {
     if (config.nodeEnv === 'development') {
       console.log('🤖 Starting Telegram Bot in [POLLING] mode...');
       try {
-        await this.bot.telegram.deleteWebhook({ drop_pending_updates: true });
+        // We don't delete webhook here anymore to avoid hijacking Vercel
         this.bot.launch();
       } catch (e) {
         console.error('Bot launch failed:', e.message);

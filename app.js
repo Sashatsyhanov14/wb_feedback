@@ -22,7 +22,27 @@ app.get('/api/cron', async (req, res) => {
   res.json({ success: true, timestamp: new Date() });
 });
 
-// Telegram Webhook
+// Telegram Webhook setup (Manual trigger)
+app.get('/api/setup', async (req, res) => {
+  try {
+    const protocol = req.headers['x-forwarded-proto'] || 'http';
+    const host = req.headers.host;
+    const webhookUrl = `${protocol}://${host}/api/bot`;
+    
+    console.log(`Manual setup triggered. Setting webhook to: ${webhookUrl}`);
+    await telegramService.bot.telegram.setWebhook(webhookUrl);
+    
+    res.json({ 
+      success: true, 
+      webhookUrl, 
+      message: 'Бот успешно привязан к этому серверу! Теперь он должен отвечать на /start.' 
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Telegram Webhook recipient
 app.post('/api/bot', (req, res) => telegramService.handleUpdate(req, res));
 
 // Routes
