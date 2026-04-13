@@ -37,20 +37,40 @@ router.post('/register', async (req, res) => {
   }
 });
 
+// Helper to get or create seller by TG ID
+async function ensureSeller(telegramChatId) {
+  let { data: seller, error } = await supabase
+    .from('sellers')
+    .select('id, created_at, subscription_status')
+    .eq('telegram_chat_id', telegramChatId)
+    .single();
+
+  if (error && error.code === 'PGRST116') {
+    const { data: newSeller, error: insertError } = await supabase
+      .from('sellers')
+      .insert({ 
+        telegram_chat_id: telegramChatId,
+        wb_token: '', 
+        is_auto_reply_enabled: true,
+        respond_to_bad_reviews: false,
+        subscription_status: 'free'
+      })
+      .select()
+      .single();
+    if (insertError) return null;
+    return newSeller;
+  }
+  return seller;
+}
+
 // Get all reviews for a specific seller
 router.get('/reviews/:telegramChatId', async (req, res) => {
   try {
     const { telegramChatId } = req.params;
     const { status } = req.query;
     
-    // Find seller
-    const { data: seller, error: sError } = await supabase
-      .from('sellers')
-      .select('id')
-      .eq('telegram_chat_id', telegramChatId)
-      .single();
-    
-    if (sError || !seller) return res.status(404).json({ error: 'Seller not found' });
+    const seller = await ensureSeller(telegramChatId);
+    if (!seller) return res.json([]); // Return empty reviews if user can't be created
 
     let query = supabase
       .from('review_logs')
@@ -106,13 +126,34 @@ router.post('/reviews/:id/approve', async (req, res) => {
 // GET seller settings
 router.get('/settings/:telegramChatId', async (req, res) => {
   try {
-    const { data: seller, error } = await supabase
+    const { telegramChatId } = req.params;
+    
+    // Attempt to find seller
+    let { data: seller, error } = await supabase
       .from('sellers')
       .select('*')
-      .eq('telegram_chat_id', req.params.telegramChatId)
+      .eq('telegram_chat_id', telegramChatId)
       .single();
     
-    if (error) throw error;
+    // Seamless Onboarding: If not found, create a new record
+    if (error && error.code === 'PGRST116') { // PGRST116 is "No rows found"
+      const { data: newSeller, error: insertError } = await supabase
+        .from('sellers')
+        .insert({ 
+          telegram_chat_id: telegramChatId,
+          wb_token: '', 
+          is_auto_reply_enabled: true,
+          respond_to_bad_reviews: false,
+          subscription_status: 'free'
+        })
+        .select()
+        .single();
+        
+      if (insertError) throw insertError;
+      seller = newSeller;
+    } else if (error) {
+      throw error;
+    }
 
     // Find rank of this seller
     const { count: totalBefore } = await supabase
@@ -140,6 +181,7 @@ router.get('/settings/:telegramChatId', async (req, res) => {
       is_top_5
     });
   } catch (error) {
+    console.error('Settings error:', error);
     res.status(500).json({ error: error.message });
   }
 });
