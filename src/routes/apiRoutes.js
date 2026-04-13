@@ -208,6 +208,10 @@ router.post('/settings/:telegramChatId', async (req, res) => {
       wb_token
     } = req.body;
     
+    // Ensure seller exists (Seamless Onboarding)
+    const seller = await ensureSeller(req.params.telegramChatId);
+    if (!seller) throw new Error('Could not initialize seller profile');
+
     const { data, error } = await supabase
       .from('sellers')
       .update({ 
@@ -219,7 +223,7 @@ router.post('/settings/:telegramChatId', async (req, res) => {
         seller_description,
         wb_token
       })
-      .eq('telegram_chat_id', req.params.telegramChatId)
+      .eq('id', seller.id)
       .select()
       .single();
 
