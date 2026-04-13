@@ -7,6 +7,7 @@ const aiService = require('./aiService');
 class TelegramService {
   constructor() {
     this.bot = new Telegraf(config.telegramBotToken);
+    this.chatContexts = new Map(); // Store session-based memories
     this._setupHandlers();
   }
 
