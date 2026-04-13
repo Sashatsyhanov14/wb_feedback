@@ -1,10 +1,4 @@
 {
-  "crons": [
-    {
-      "path": "/api/cron",
-      "schedule": "*/15 * * * *"
-    }
-  ],
   "rewrites": [
     { "source": "/api/bot", "destination": "/app.js" },
     { "source": "/api/cron", "destination": "/app.js" },
