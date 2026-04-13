@@ -7,7 +7,6 @@ const aiService = require('./aiService');
 class TelegramService {
   constructor() {
     this.bot = new Telegraf(config.telegramBotToken);
-    this.chatContexts = new Map(); // Store session-based memories
     this._setupHandlers();
   }
 
@@ -58,23 +57,37 @@ class TelegramService {
       try {
         await ctx.sendChatAction('typing');
         
-        // Get or init history
-        if (!this.chatContexts.has(chatId)) {
-          this.chatContexts.set(chatId, []);
-        }
-        const history = this.chatContexts.get(chatId);
+        // 1. Ensure seller exists and get seller_id
+        const { data: seller, error: sellerError } = await supabase
+          .from('sellers')
+          .select('id')
+          .eq('telegram_chat_id', chatId)
+          .single();
 
+        if (sellerError || !seller) {
+          console.warn('Seller not found for persistent chat:', chatId);
+          return ctx.reply('Пожалуйста, сначала откройте наше приложение, чтобы я мог вас узнать! 😊');
+        }
+
+        // 2. Load persistent history from Supabase (last 10 messages)
+        const { data: dbHistory } = await supabase
+          .from('chat_history')
+          .select('role, content')
+          .eq('seller_id', seller.id)
+          .order('created_at', { ascending: false })
+          .limit(10);
+
+        const history = (dbHistory || []).reverse();
+
+        // 3. Generate response using AI
         const answer = await aiService.generateConsultation(userMessage, history);
         await ctx.reply(answer, { parse_mode: 'Markdown' });
 
-        // Update history
-        history.push({ role: 'user', content: userMessage });
-        history.push({ role: 'assistant', content: answer });
-        
-        // Keep memory lean (last 10 messages total = 5 exchanges)
-        if (history.length > 10) {
-          this.chatContexts.set(chatId, history.slice(-10));
-        }
+        // 4. Save to Supabase (User message + Assistant response)
+        await supabase.from('chat_history').insert([
+          { seller_id: seller.id, role: 'user', content: userMessage },
+          { seller_id: seller.id, role: 'assistant', content: answer }
+        ]);
 
         // Notification logic: If AI mentions adminUsername, notify admin
         if (answer.includes(config.adminUsername) && config.adminId) {
