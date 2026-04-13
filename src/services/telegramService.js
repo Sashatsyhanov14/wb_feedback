@@ -95,24 +95,12 @@ class TelegramService {
     if (config.nodeEnv === 'development') {
       console.log('🤖 Starting Telegram Bot in [POLLING] mode...');
       try {
-        // We don't delete webhook here anymore to avoid hijacking Vercel
         this.bot.launch();
       } catch (e) {
         console.error('Bot launch failed:', e.message);
       }
     } else {
       console.log('🌐 Bot using [WEBHOOK] mode on Vercel.');
-      // Auto-set webhook if host is known
-      const host = process.env.APP_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null);
-      if (host) {
-        const webhookUrl = `${host}/api/bot`;
-        console.log(`📡 Setting webhook to: ${webhookUrl}`);
-        this.bot.telegram.setWebhook(webhookUrl).catch(err => {
-          console.error('Failed to set webhook:', err.message);
-        });
-      } else {
-        console.warn('⚠️ WEBHOOK_URL not set. Bot updates will not reach this server.');
-      }
     }
   }
 

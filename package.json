@@ -2,10 +2,10 @@
   "name": "ai-review-responder",
   "version": "1.0.0",
   "description": "AI-powered review responder for Wildberries",
-  "main": "app.js",
+  "main": "index.js",
   "scripts": {
-    "start": "node app.js",
-    "dev": "nodemon app.js",
+    "start": "node index.js",
+    "dev": "nodemon index.js",
     "test-system": "node tests/system_verification.js"
   },
   "dependencies": {

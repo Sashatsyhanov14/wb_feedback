@@ -1,7 +1,7 @@
 {
   "rewrites": [
-    { "source": "/api/bot", "destination": "/app.js" },
-    { "source": "/api/cron", "destination": "/app.js" },
-    { "source": "/api/(.*)", "destination": "/app.js" }
+    { "source": "/api/bot", "destination": "/index.js" },
+    { "source": "/api/cron", "destination": "/index.js" },
+    { "source": "/api/(.*)", "destination": "/index.js" }
   ]
 }

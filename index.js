@@ -1,0 +1,67 @@
+const express = require('express');
+const path = require('path');
+const config = require('./src/config');
+const apiRoutes = require('./src/routes/apiRoutes');
+const telegramService = require('./src/services/telegramService');
+const { initJobs, processAll } = require('./src/jobs/reviewCron');
+require('dotenv').config();
+
+const app = express();
+app.use(express.json());
+app.use(express.static(path.join(__dirname, 'public')));
+
+// Vercel Cron Trigger
+app.get('/api/cron', async (req, res) => {
+  const authHeader = req.headers.authorization;
+  if (config.nodeEnv === 'production' && authHeader !== `Bearer ${config.cronSecret}`) {
+    return res.status(401).end();
+  }
+  await processAll();
+  res.json({ success: true, timestamp: new Date() });
+});
+
+// Telegram Webhook setup (Manual trigger)
+app.get('/api/setup', async (req, res) => {
+  try {
+    const protocol = req.headers['x-forwarded-proto'] || 'https';
+    const host = req.headers.host;
+    const webhookUrl = `${protocol}://${host}/api/bot`;
+    
+    console.log(`Manual setup triggered. Setting webhook to: ${webhookUrl}`);
+    await telegramService.bot.telegram.setWebhook(webhookUrl);
+    
+    res.json({ 
+      success: true, 
+      webhookUrl, 
+      message: 'Бот успешно привязан к этому серверу! Теперь он должен отвечать на /start.' 
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Telegram Webhook recipient
+app.post('/api/bot', (req, res) => telegramService.handleUpdate(req, res));
+
+// Routes
+app.use('/api', apiRoutes);
+
+// Initialize background jobs
+initJobs();
+
+// Launch Bot
+telegramService.launch();
+
+// Health check
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date() });
+});
+
+const PORT = config.port;
+if (process.env.NODE_ENV !== 'production') {
+  app.listen(PORT, () => {
+    console.log(`Local server running on port ${PORT}`);
+  });
+}
+
+module.exports = app;
