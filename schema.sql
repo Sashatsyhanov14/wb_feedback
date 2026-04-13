@@ -62,3 +62,9 @@ create index if not exists idx_review_logs_seller_id on review_logs(seller_id);
 create index if not exists idx_product_matrix_seller_id on product_matrix(seller_id);
 create index if not exists idx_sellers_telegram_id on sellers(telegram_chat_id);
 create index if not exists idx_chat_history_seller_id on chat_history(seller_id);
+
+-- 6. Disable RLS for internal service-role access
+alter table if exists sellers disable row level security;
+alter table if exists product_matrix disable row level security;
+alter table if exists review_logs disable row level security;
+alter table if exists chat_history disable row level security;

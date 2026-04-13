@@ -102,6 +102,9 @@ class TelegramService {
           
           if (insertError) {
             console.error('❌ Failed to create seller in Supabase:', insertError.message);
+            if (chatId.toString() === config.adminId) {
+              await ctx.reply(`⚠️ Ошибка создания профиля в БД: ${insertError.message}`);
+            }
             // Fallback to anonymous session but continue bot response
           } else {
             seller = newSeller;
@@ -130,7 +133,16 @@ class TelegramService {
             { seller_id: seller.id, role: 'user', content: userMessage },
             { seller_id: seller.id, role: 'assistant', content: answer }
           ]);
-          if (historyError) console.error('❌ History Save Error:', historyError.message);
+          if (historyError) {
+            console.error('❌ History Save Error:', historyError.message);
+            if (chatId.toString() === config.adminId) {
+              await ctx.reply(`⚠️ Ошибка сохранения истории: ${historyError.message}`);
+            }
+          }
+        } else {
+          if (chatId.toString() === config.adminId) {
+            await ctx.reply('⚠️ Не удалось создать/найти профиль продавца в БД. История не сохранена.');
+          }
         }
 
         // Notification logic: If AI mentions adminUsername, notify admin
