@@ -77,7 +77,7 @@ router.post('/register', async (req, res) => {
 async function ensureSeller(telegramChatId) {
   let { data: seller, error } = await supabase
     .from('sellers')
-    .select('id, created_at, subscription_status')
+    .select('*')
     .eq('telegram_chat_id', telegramChatId)
     .single();
 

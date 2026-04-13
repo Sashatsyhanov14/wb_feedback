@@ -240,6 +240,10 @@ function renderMatrix() {
                         <label class="text-[10px] text-on-surface-variant ml-3 uppercase font-semibold">Рекомендация</label>
                         <input id="new-cross-id" class="w-full bg-surface-container-lowest border-none rounded-lg text-sm text-on-surface focus:ring-1 focus:ring-primary h-10 px-3 transition-all" placeholder="Введите SKU" type="text">
                     </div>
+                    <button class="pt-5 text-primary hover:scale-110 transition-transform" onclick="handleAddMatrixRow()">
+                        <span class="material-symbols-outlined text-[28px]">add_box</span>
+                    </button>
+                </div>
             </div>
         </div>
     `;
