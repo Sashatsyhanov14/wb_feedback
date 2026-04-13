@@ -3,6 +3,7 @@ require('dotenv').config();
 module.exports = {
   supabaseUrl: process.env.SUPABASE_URL,
   supabaseKey: process.env.SUPABASE_KEY,
+  supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY,
   geminiApiKey: process.env.GEMINI_API_KEY,
   polzaAiApiKey: process.env.POLZA_AI_API_KEY,
   telegramBotToken: process.env.TELEGRAM_BOT_TOKEN,
