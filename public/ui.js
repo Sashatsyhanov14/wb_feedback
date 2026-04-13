@@ -531,16 +531,22 @@ async function handleAddMatrixRow() {
     if (!nm_id || !cross_sell_article) return showToast('Заполните оба поля', true);
 
     try {
-        await fetch('/api/matrix', {
+        const res = await fetch('/api/matrix', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ telegram_chat_id: state.telegramChatId, nm_id, cross_sell_article })
         });
-        await refreshData();
-        showView('matrix');
-        showToast('Пара добавлена');
+        
+        const data = await res.json();
+        if (res.ok) {
+            await refreshData();
+            showView('matrix');
+            showToast('Пара добавлена');
+        } else {
+            showToast(data.error || 'Ошибка сохранения', true);
+        }
     } catch (e) {
-        showToast('Ошибка добавления', true);
+        showToast('Ошибка сети', true);
     }
 }
 

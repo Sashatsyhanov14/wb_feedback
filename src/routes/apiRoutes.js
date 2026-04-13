@@ -398,13 +398,22 @@ router.get('/matrix/:telegramChatId', async (req, res) => {
 
 router.post('/matrix', async (req, res) => {
   try {
-    const { telegramChatId, nm_id, product_name, cross_sell_article, cross_sell_description } = req.body;
+    const { 
+      telegramChatId, 
+      telegram_chat_id, 
+      nm_id, 
+      product_name, 
+      cross_sell_article, 
+      cross_sell_description 
+    } = req.body;
+    
+    const chatId = telegramChatId || telegram_chat_id;
     
     // Find seller by TG ID
     const { data: seller, error: sError } = await supabase
       .from('sellers')
       .select('id')
-      .eq('telegram_chat_id', telegramChatId)
+      .eq('telegram_chat_id', chatId)
       .single();
     
     if (sError || !seller) return res.status(404).json({ error: 'Seller not found' });
