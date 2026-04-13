@@ -80,37 +80,58 @@ class TelegramService {
       try {
         await ctx.sendChatAction('typing');
         
-        // 1. Ensure seller exists and get seller_id
-        const { data: seller, error: sellerError } = await supabase
+        // 1. Ensure seller exists and get seller_id (using UPSERT logic)
+        let { data: seller, error: sellerError } = await supabase
           .from('sellers')
           .select('id')
           .eq('telegram_chat_id', chatId)
           .single();
 
         if (sellerError || !seller) {
-          console.warn('Seller not found for persistent chat:', chatId);
-          return ctx.reply('Пожалуйста, сначала откройте наше приложение, чтобы я мог вас узнать! 😊');
+          console.log(`🆕 Creating new seller for chat ${chatId}`);
+          const { data: newSeller, error: insertError } = await supabase
+            .from('sellers')
+            .insert({ 
+              telegram_chat_id: chatId, 
+              wb_token: 'pending',
+              subscription_status: 'free',
+              is_top_5: false
+            })
+            .select('id')
+            .single();
+          
+          if (insertError) {
+            console.error('❌ Failed to create seller in Supabase:', insertError.message);
+            // Fallback to anonymous session but continue bot response
+          } else {
+            seller = newSeller;
+          }
         }
 
-        // 2. Load persistent history from Supabase (last 10 messages)
-        const { data: dbHistory } = await supabase
-          .from('chat_history')
-          .select('role, content')
-          .eq('seller_id', seller.id)
-          .order('created_at', { ascending: false })
-          .limit(10);
-
-        const history = (dbHistory || []).reverse();
+        // 2. Load persistent history from Supabase if seller exists
+        let history = [];
+        if (seller) {
+          const { data: dbHistory } = await supabase
+            .from('chat_history')
+            .select('role, content')
+            .eq('seller_id', seller.id)
+            .order('created_at', { ascending: false })
+            .limit(10);
+          history = (dbHistory || []).reverse();
+        }
 
         // 3. Generate response using AI
         const answer = await aiService.generateConsultation(userMessage, history);
         await ctx.reply(answer, { parse_mode: 'Markdown' });
 
         // 4. Save to Supabase (User message + Assistant response)
-        await supabase.from('chat_history').insert([
-          { seller_id: seller.id, role: 'user', content: userMessage },
-          { seller_id: seller.id, role: 'assistant', content: answer }
-        ]);
+        if (seller) {
+          const { error: historyError } = await supabase.from('chat_history').insert([
+            { seller_id: seller.id, role: 'user', content: userMessage },
+            { seller_id: seller.id, role: 'assistant', content: answer }
+          ]);
+          if (historyError) console.error('❌ History Save Error:', historyError.message);
+        }
 
         // Notification logic: If AI mentions adminUsername, notify admin
         if (answer.includes(config.adminUsername) && config.adminId) {

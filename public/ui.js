@@ -22,9 +22,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         const tg = window.Telegram.WebApp;
         tg.expand();
         tg.ready();
-        state.telegramChatId = tg.initDataUnsafe.user?.id || '795056847';
+        state.telegramChatId = tg.initDataUnsafe.user?.id || 795056847;
     } else {
-        state.telegramChatId = '795056847';
+        state.telegramChatId = 795056847;
     }
 
     // 2. Initial View (Immediate render)

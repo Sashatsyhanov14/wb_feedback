@@ -4,6 +4,42 @@ const supabase = require('../db/supabase');
 const wbService = require('../services/wbService');
 const telegramService = require('../services/telegramService');
 
+// --- Debugging Endpoint ---
+router.get('/debug-db', async (req, res) => {
+  try {
+    console.log('🔍 Running Database Diagnostic...');
+    
+    // 1. Check connection/keys by fetching 1 seller
+    const { data: testRead, error: readError } = await supabase.from('sellers').select('id').limit(1).maybeSingle();
+    
+    // 2. Try a test insert (we'll use a unique chat ID that won't collide)
+    const testId = 999999 + Math.floor(Math.random() * 1000);
+    const { data: testWrite, error: writeError } = await supabase
+      .from('sellers')
+      .insert({ telegram_chat_id: testId, wb_token: 'TEST' })
+      .select()
+      .single();
+
+    // 3. Cleanup test data
+    if (testWrite) {
+      await supabase.from('sellers').delete().eq('id', testWrite.id);
+    }
+
+    res.json({
+      status: 'diagnostic_complete',
+      read: { success: !readError, error: readError },
+      write: { success: !writeError, error: writeError },
+      env: {
+        hasUrl: !!process.env.SUPABASE_URL,
+        hasKey: !!process.env.SUPABASE_KEY,
+        hasServiceKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message, stack: err.stack });
+  }
+});
+
 // Register or update seller (Onboarding)
 router.post('/register', async (req, res) => {
   try {
