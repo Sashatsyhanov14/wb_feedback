@@ -31,6 +31,9 @@ app.use('/api', apiRoutes);
 // Initialize background jobs
 initJobs();
 
+// Launch Bot
+telegramService.launch();
+
 // Basic route for testing
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date() });

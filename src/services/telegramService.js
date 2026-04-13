@@ -89,6 +89,24 @@ class TelegramService {
   }
 
   /**
+   * Launch the bot (Polling for Dev, Webhook for Prod)
+   */
+  async launch() {
+    if (config.nodeEnv === 'development') {
+      console.log('🤖 Starting Telegram Bot in [POLLING] mode...');
+      try {
+        // Clear any existing webhooks first to avoid conflicts
+        await this.bot.telegram.deleteWebhook({ drop_pending_updates: true });
+        this.bot.launch();
+      } catch (e) {
+        console.error('Bot launch failed:', e.message);
+      }
+    } else {
+      console.log('🌐 Bot using [WEBHOOK] mode on Vercel.');
+    }
+  }
+
+  /**
    * Middleware for Vercel/Express webhook
    */
   handleUpdate(req, res) {
