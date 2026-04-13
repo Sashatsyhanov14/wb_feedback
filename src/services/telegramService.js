@@ -83,6 +83,7 @@ class TelegramService {
         }
       } catch (err) {
         console.error('Consultation handler error:', err);
+        await ctx.reply('⚠️ Извините, произошла внутренняя ошибка при обработке сообщения. Мы уже разбираемся!');
       }
     });
   }
