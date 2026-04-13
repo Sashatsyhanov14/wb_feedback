@@ -13,6 +13,7 @@ create table if not exists sellers (
     custom_instructions text,
     subscription_status text default 'free',
     subscription_expires_at timestamp with time zone,
+    is_top_5 boolean default false,
     respond_to_bad_reviews boolean default false,
     created_at timestamp with time zone default now()
 );

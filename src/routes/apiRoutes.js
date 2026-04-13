@@ -46,6 +46,13 @@ async function ensureSeller(telegramChatId) {
     .single();
 
   if (error && error.code === 'PGRST116') {
+    // 1. Check total sellers count for Top-5 promo
+    const { count } = await supabase.from('sellers').select('id', { count: 'exact', head: true });
+    const isTop5 = (count || 0) < 5;
+    
+    // 2. Set expiration date (30 days from now) if top 5
+    const expiresAt = isTop5 ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() : null;
+
     const { data: newSeller, error: insertError } = await supabase
       .from('sellers')
       .insert({ 
@@ -53,7 +60,9 @@ async function ensureSeller(telegramChatId) {
         wb_token: '', 
         is_auto_reply_enabled: true,
         respond_to_bad_reviews: false,
-        subscription_status: 'free'
+        subscription_status: isTop5 ? 'premium' : 'free',
+        subscription_expires_at: expiresAt,
+        is_top_5: isTop5
       })
       .select()
       .single();

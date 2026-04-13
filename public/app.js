@@ -244,7 +244,14 @@ function renderMatrix() {
 }
 
 function renderSubscription() {
-    const expiredDate = state.settings.subscription_expires_at ? new Date(state.settings.subscription_expires_at).toLocaleDateString() : '12.06.2026';
+    const expiresAt = state.settings.subscription_expires_at;
+    let daysLeft = 0;
+    if (expiresAt) {
+        const diff = new Date(expiresAt) - new Date();
+        daysLeft = Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
+    }
+
+    const expiredDateStr = expiresAt ? new Date(expiresAt).toLocaleDateString() : '—';
     
     return `
         <div class="animate-in space-y-8 pb-12">
@@ -270,22 +277,33 @@ function renderSubscription() {
                 Синхронизировать отзывы
             </button>
 
-            ${state.settings.is_top_5 ? `
-            <!-- Status Card (State A - Winner) -->
-            <section class="relative overflow-hidden p-6 rounded-2xl bg-surface-container-high border-2 border-primary/30 shadow-xl shadow-primary/5">
-                <div class="relative z-10 flex items-start gap-4">
-                    <div class="w-12 h-12 rounded-xl bg-primary/20 flex items-center justify-center flex-shrink-0">
-                        <span class="material-symbols-outlined text-primary text-2xl" style="font-variation-settings: 'FILL' 1;">workspace_premium</span>
+            <!-- Subscription Status Card -->
+            <section class="relative overflow-hidden p-6 rounded-2xl bg-surface-container-high border-2 ${daysLeft > 3 ? 'border-primary/30' : 'border-error/30'} shadow-xl shadow-primary/5">
+                <div class="relative z-10 flex items-center justify-between">
+                    <div class="flex items-start gap-4">
+                        <div class="w-12 h-12 rounded-xl ${daysLeft > 3 ? 'bg-primary/20' : 'bg-error/20'} flex items-center justify-center flex-shrink-0">
+                            <span class="material-symbols-outlined ${daysLeft > 3 ? 'text-primary' : 'text-error'} text-2xl" style="font-variation-settings: 'FILL' 1;">
+                                ${daysLeft > 0 ? 'workspace_premium' : 'lock'}
+                            </span>
+                        </div>
+                        <div>
+                            <h3 class="font-headline font-bold text-on-surface text-base mb-1">
+                                ${state.settings.subscription_status === 'premium' ? 'Premium Доступ' : 'Бесплатный план'}
+                            </h3>
+                            <p class="text-sm text-on-surface-variant font-medium">Активен до: <span class="text-on-surface italic">${expiredDateStr}</span></p>
+                        </div>
                     </div>
-                    <div>
-                        <h3 class="font-headline font-bold text-on-surface text-base mb-1">Приветствуем Первопроходца!</h3>
-                        <p class="text-sm text-on-surface-variant font-medium leading-relaxed">Вы попали в топ-5 первых пользователей. Вам начислен <span class="text-primary font-bold">БЕСПЛАТНЫЙ месяц</span> Premium доступа до ${expiredDate}.</p>
+                    <div class="text-right">
+                        <p class="text-[10px] uppercase font-black text-on-surface-variant/50 mb-1">Осталось</p>
+                        <p class="text-2xl font-black font-headline ${daysLeft > 3 ? 'text-primary' : 'text-error'}">${daysLeft} дн.</p>
                     </div>
                 </div>
-                <!-- Decorative Grain/Light -->
-                <div class="absolute top-0 right-0 w-32 h-32 bg-primary/10 blur-3xl -mr-16 -mt-16"></div>
+                ${state.settings.is_top_5 ? `
+                <div class="mt-4 pt-4 border-t border-outline-variant/10">
+                    <p class="text-xs text-on-surface-variant/80">Вы получили этот доступ как <span class="text-primary font-bold">Первопроходец</span> (Топ-5 пользователей).</p>
+                </div>
+                ` : ''}
             </section>
-            ` : ''}
 
             <!-- Pricing Tier Card (Premium Offer) -->
             <section class="p-8 rounded-[2rem] bg-surface-container-lowest relative border border-outline-variant/20 shadow-2xl overflow-hidden group">
