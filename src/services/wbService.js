@@ -81,8 +81,7 @@ class WBService {
         settings: {
           cursor: { limit: 1 },
           filter: {
-            withPhoto: -1,
-            textSearch: String(nmId)
+            nmIDs: [Number(nmId)]
           }
         }
       }, {

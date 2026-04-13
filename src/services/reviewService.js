@@ -25,8 +25,13 @@ class ReviewService {
         if (error) throw error;
         if (!sellers || sellers.length === 0) break;
 
-        // Process sellers in parallel with controlled concurrency
-        await Promise.allSettled(sellers.map(seller => this.processSellerReviews(seller)));
+        // Process sellers sequentially to avoid hitting rate limits (3 req/sec global)
+        for (const seller of sellers) {
+          if (!seller.wb_token) continue;
+          await this.processSellerReviews(seller);
+          // Small delay between sellers to pace requests
+          await new Promise(resolve => setTimeout(resolve, 500)); 
+        }
 
         offset += limit;
         if (sellers.length < limit) hasMore = false;
