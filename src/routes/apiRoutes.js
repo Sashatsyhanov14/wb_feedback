@@ -37,11 +37,26 @@ router.post('/register', async (req, res) => {
   }
 });
 
-// Get all reviews with optional status filter
-router.get('/reviews', async (req, res) => {
+// Get all reviews for a specific seller
+router.get('/reviews/:telegramChatId', async (req, res) => {
   try {
+    const { telegramChatId } = req.params;
     const { status } = req.query;
-    let query = supabase.from('review_logs').select('*').order('created_at', { ascending: false });
+    
+    // Find seller
+    const { data: seller, error: sError } = await supabase
+      .from('sellers')
+      .select('id')
+      .eq('telegram_chat_id', telegramChatId)
+      .single();
+    
+    if (sError || !seller) return res.status(404).json({ error: 'Seller not found' });
+
+    let query = supabase
+      .from('review_logs')
+      .select('*')
+      .eq('seller_id', seller.id)
+      .order('created_at', { ascending: false });
     
     if (status) query = query.eq('status', status);
 
@@ -91,14 +106,39 @@ router.post('/reviews/:id/approve', async (req, res) => {
 // GET seller settings
 router.get('/settings/:telegramChatId', async (req, res) => {
   try {
-    const { data, error } = await supabase
+    const { data: seller, error } = await supabase
       .from('sellers')
-      .select('is_auto_reply_enabled, auto_reply_min_rating, brand_name, seller_description, custom_instructions, respond_to_bad_reviews, subscription_status')
+      .select('*')
       .eq('telegram_chat_id', req.params.telegramChatId)
       .single();
     
     if (error) throw error;
-    res.json(data);
+
+    // Find rank of this seller
+    const { count: totalBefore } = await supabase
+      .from('sellers')
+      .select('id', { count: 'exact', head: true })
+      .lt('created_at', seller.created_at);
+
+    const is_top_5 = (totalBefore || 0) < 5;
+    
+    // Auto-apply promo for top 5 if they are still 'free'
+    if (is_top_5 && seller.subscription_status === 'free') {
+      const expiresAt = new Date(new Date(seller.created_at).getTime() + 30 * 24 * 60 * 60 * 1000).toISOString();
+      const { data: updated, error: uError } = await supabase
+        .from('sellers')
+        .update({ subscription_status: 'premium', subscription_expires_at: expiresAt })
+        .eq('id', seller.id)
+        .select()
+        .single();
+      
+      if (!uError) return res.json({ ...updated, is_top_5: true });
+    }
+
+    res.json({
+      ...seller,
+      is_top_5
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -139,12 +179,23 @@ router.post('/settings/:telegramChatId', async (req, res) => {
   }
 });
 
-// Get dashboard stats
-router.get('/stats', async (req, res) => {
+// Get dashboard stats for a specific seller
+router.get('/stats/:telegramChatId', async (req, res) => {
   try {
-    const { data: totalReviews } = await supabase.from('review_logs').select('id', { count: 'exact' });
-    const { data: pendingReviews } = await supabase.from('review_logs').select('id', { count: 'exact' }).ilike('status', 'pending%');
-    const { data: approvedReviews } = await supabase.from('review_logs').select('id', { count: 'exact' }).in('status', ['approved', 'auto_posted']);
+    const { telegramChatId } = req.params;
+
+    // Find seller
+    const { data: seller, error: sError } = await supabase
+      .from('sellers')
+      .select('id')
+      .eq('telegram_chat_id', telegramChatId)
+      .single();
+    
+    if (sError || !seller) return res.status(404).json({ error: 'Seller not found' });
+
+    const { data: totalReviews } = await supabase.from('review_logs').select('id', { count: 'exact' }).eq('seller_id', seller.id);
+    const { data: pendingReviews } = await supabase.from('review_logs').select('id', { count: 'exact' }).eq('seller_id', seller.id).ilike('status', 'pending%');
+    const { data: approvedReviews } = await supabase.from('review_logs').select('id', { count: 'exact' }).eq('seller_id', seller.id).in('status', ['approved', 'auto_posted']);
 
     res.json({
       total: totalReviews?.length || 0,
@@ -158,9 +209,22 @@ router.get('/stats', async (req, res) => {
 
 // --- Product Matrix ---
 
-router.get('/matrix', async (req, res) => {
+router.get('/matrix/:telegramChatId', async (req, res) => {
   try {
-    const { data, error } = await supabase.from('product_matrix').select('*');
+    // Find seller first
+    const { data: seller, error: sError } = await supabase
+      .from('sellers')
+      .select('id')
+      .eq('telegram_chat_id', req.params.telegramChatId)
+      .single();
+    
+    if (sError || !seller) return res.status(404).json({ error: 'Seller not found' });
+
+    const { data, error } = await supabase
+      .from('product_matrix')
+      .select('*')
+      .eq('seller_id', seller.id);
+      
     if (error) throw error;
     res.json(data);
   } catch (error) {
@@ -206,12 +270,24 @@ router.delete('/matrix/:id', async (req, res) => {
   }
 });
 
-// GET Analytics data
-router.get('/analytics', async (req, res) => {
+// GET Analytics data for a specific seller
+router.get('/analytics/:telegramChatId', async (req, res) => {
   try {
+    const { telegramChatId } = req.params;
+
+    // Find seller
+    const { data: seller, error: sError } = await supabase
+      .from('sellers')
+      .select('id')
+      .eq('telegram_chat_id', telegramChatId)
+      .single();
+    
+    if (sError || !seller) return res.status(404).json({ error: 'Seller not found' });
+
     const { data: reviews, error } = await supabase
       .from('review_logs')
       .select('rating, category, sentiment')
+      .eq('seller_id', seller.id)
       .not('category', 'is', null);
 
     if (error) throw error;

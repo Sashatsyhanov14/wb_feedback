@@ -90,8 +90,9 @@ class AIService {
   /**
    * Generate a consultation response for platform support
    * @param {string} query - User question
+   * @param {array} history - Previous messages for context
    */
-  async generateConsultation(query) {
+  async generateConsultation(query, history = []) {
     try {
       const systemPrompt = `Ты — экспертный ИИ-ассистент сервиса Legatus AI (WBReply AI). Твоя задача — консультировать продавцов на Wildberries по работе нашего сервиса.
       
@@ -114,12 +115,15 @@ class AIService {
 - Если спросят как войти — четко скажи про кнопку в Меню.
 - Используй смайлики умеренно (🚀, 💡, ✅).`;
 
+      const messages = [
+        { role: 'system', content: systemPrompt },
+        ...history.slice(-10), // Take last 10 messages for context
+        { role: 'user', content: query }
+      ];
+
       const response = await this.client.post('/chat/completions', {
         model: 'nex-agi/deepseek-v3.1-nex-n1',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: query }
-        ],
+        messages: messages,
         temperature: 0.5
       });
 

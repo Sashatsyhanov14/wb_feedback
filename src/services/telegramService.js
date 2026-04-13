@@ -51,10 +51,29 @@ class TelegramService {
       // Ignore commands
       if (ctx.message.text.startsWith('/')) return;
 
+      const chatId = ctx.from.id;
+      const userMessage = ctx.message.text;
+
       try {
         await ctx.sendChatAction('typing');
-        const answer = await aiService.generateConsultation(ctx.message.text);
+        
+        // Get or init history
+        if (!this.chatContexts.has(chatId)) {
+          this.chatContexts.set(chatId, []);
+        }
+        const history = this.chatContexts.get(chatId);
+
+        const answer = await aiService.generateConsultation(userMessage, history);
         await ctx.reply(answer, { parse_mode: 'Markdown' });
+
+        // Update history
+        history.push({ role: 'user', content: userMessage });
+        history.push({ role: 'assistant', content: answer });
+        
+        // Keep memory lean (last 10 messages total = 5 exchanges)
+        if (history.length > 10) {
+          this.chatContexts.set(chatId, history.slice(-10));
+        }
 
         // Notification logic: If AI mentions adminUsername, notify admin
         if (answer.includes(config.adminUsername) && config.adminId) {
