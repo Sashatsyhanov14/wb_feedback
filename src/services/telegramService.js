@@ -114,9 +114,13 @@ class TelegramService {
   }
 
   async launch() {
-    if (config.nodeEnv === 'development') {
+    // If on Vercel, we use webhooks.
+    // If on VPS without domain, we use polling.
+    if (!process.env.VERCEL) {
       console.log('🤖 Starting Telegram Bot [POLLING]...');
       this.bot.launch().catch(e => console.error('TG Launch:', e.message));
+    } else {
+      console.log('🌐 Webhook mode active (Vercel)');
     }
   }
 

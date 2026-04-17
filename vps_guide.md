@@ -10,6 +10,9 @@
 # Обновление системы
 sudo apt update && sudo apt upgrade -y
 
+# Команда для подключения (уже с вашим IP):
+# ssh root@155.212.219.233
+
 # Установка Node.js (v20+)
 curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
 sudo apt-get install -y nodejs
