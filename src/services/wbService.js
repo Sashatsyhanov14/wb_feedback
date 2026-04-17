@@ -52,18 +52,19 @@ class WBService {
     
     // MOCK MODE
     if (token === 'MOCK_TOKEN') {
+      const timestamp = Date.now();
       return {
         data: {
           feedbacks: [
             {
-              id: 'mock_rev_1',
+              id: `mock_rev_1_${timestamp}`,
               text: 'Очень классное платье! Цвет как на фото, размер подошел.',
               productValuation: 5,
               nmId: 123456,
               createdDate: new Date().toISOString()
             },
             {
-              id: 'mock_rev_2',
+              id: `mock_rev_2_${timestamp}`,
               text: 'Приехал рваный пакет, товар испачкан. Ужасно!',
               productValuation: 1,
               nmId: 123456,

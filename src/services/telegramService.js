@@ -212,6 +212,7 @@ class TelegramService {
   }
 
   async sendMessage(chatId, text) {
+    console.log(`[TelegramService] Sending message to ${chatId}: ${text.slice(0, 50)}...`);
     try {
       await this.bot.telegram.sendMessage(chatId, text, { parse_mode: 'HTML' });
       return true;

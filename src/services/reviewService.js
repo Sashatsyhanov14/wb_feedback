@@ -110,6 +110,7 @@ class ReviewService {
       );
 
       if (canAutoReply) {
+        console.log(`[ReviewService] Auto-replying to review ${feedback.id}`);
         // Auto-send to WB
         const success = await wbService.sendAnswer(feedback.id, aiResponse, seller.wb_token);
         if (success) {
@@ -117,11 +118,13 @@ class ReviewService {
           await telegramService.sendMessage(seller.telegram_chat_id, `✅ Отзыв на артикул ${feedback.nmId} (${feedback.productValuation}⭐) обработан автоматически.\n\nТекст ответа: "${aiResponse}"`);
         }
       } else {
+        console.log(`[ReviewService] Sending draft for review ${feedback.id} to chat ${seller.telegram_chat_id}`);
         // Send draft to Telegram Bot
         const logStatus = seller.is_auto_reply_enabled ? 'pending_low_rating' : 'pending';
         const logId = await this.logReview(seller.id, feedback, aiResponse, logStatus, aiData.category, aiData.sentiment);
         
-        await telegramService.sendReviewDraft(seller.telegram_chat_id, logId, aiResponse);
+        const telSuccess = await telegramService.sendReviewDraft(seller.telegram_chat_id, logId, aiResponse);
+        console.log(`[ReviewService] Telegram delivery result: ${telSuccess}`);
       }
     } catch (error) {
       console.error(`Error processing review ${feedback.id}:`, error.message);
