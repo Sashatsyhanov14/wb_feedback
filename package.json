@@ -6,6 +6,7 @@
   "scripts": {
     "start": "node index.js",
     "dev": "nodemon index.js",
+    "build": "tailwindcss -i ./public/style.css -o ./public/dist.css --minify",
     "test-system": "node tests/system_verification.js"
   },
   "dependencies": {
