@@ -339,7 +339,7 @@ router.get('/admin/stats/:adminId', async (req, res) => {
 
     const { count: withoutToken } = await supabase.from('sellers')
       .select('id', { count: 'exact', head: true })
-      .or('wb_token.is.null,wb_token.eq.""');
+      .filter('wb_token', 'eq', ''); // Since it's NOT NULL, just check empty string
 
     const { count: totalApproved } = await supabase.from('review_logs')
       .select('id', { count: 'exact', head: true })
@@ -353,6 +353,7 @@ router.get('/admin/stats/:adminId', async (req, res) => {
       totalApproved: totalApproved || 0
     });
   } catch (error) {
+    console.error(`[AdminStats] CRITICAL ERROR for admin ${req.params.adminId}:`, error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -372,6 +373,7 @@ router.get('/admin/users/:adminId', async (req, res) => {
     if (error) throw error;
     res.json(users);
   } catch (error) {
+    console.error(`[AdminUsers] Error for admin ${req.params.adminId}:`, error);
     res.status(500).json({ error: error.message });
   }
 });
