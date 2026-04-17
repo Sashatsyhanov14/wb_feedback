@@ -81,14 +81,16 @@ async function ensureSeller(telegramChatId) {
     .select('*')
     .eq('telegram_chat_id', telegramChatId)
     .single();
-
+  
   if (error && error.code === 'PGRST116') {
     // 1. Check total sellers count for Top-5 promo
     const { count } = await supabase.from('sellers').select('id', { count: 'exact', head: true });
     const isTop5 = (count || 0) < 5;
     
-    // 2. Set expiration date (30 days from now) if top 5
-    const expiresAt = isTop5 ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() : null;
+    // 2. Set expiration date (3 days trial for all, or 30 for top 5)
+    // We stick to 3 days trial for everyone as per recent instructions
+    const trialDays = 3;
+    const expiresAt = new Date(Date.now() + trialDays * 24 * 60 * 60 * 1000).toISOString();
 
     const { data: newSeller, error: insertError } = await supabase
       .from('sellers')
@@ -103,7 +105,12 @@ async function ensureSeller(telegramChatId) {
       })
       .select()
       .single();
+
     if (insertError) return null;
+
+    // 🔴 ADMIN NOTIFICATION: New User
+    await telegramService.sendMessage(config.adminId, `🆕 <b>Новая регистрация!</b>\nID: <code>${telegramChatId}</code>\nПользователь зашел в приложение.`);
+
     return newSeller;
   }
   return seller;
@@ -249,6 +256,8 @@ router.post('/settings/:telegramChatId', async (req, res) => {
     const seller = await ensureSeller(req.params.telegramChatId);
     if (!seller) throw new Error('Could not initialize seller profile');
 
+    const isFirstToken = !seller.wb_token && wb_token;
+
     const { data, error } = await supabase
       .from('sellers')
       .update({ 
@@ -265,6 +274,11 @@ router.post('/settings/:telegramChatId', async (req, res) => {
       .single();
 
     if (error) throw error;
+
+    if (isFirstToken) {
+      await telegramService.sendMessage(config.adminId, `🔑 <b>Токен добавлен!</b>\nЮзер: <code>${req.params.telegramChatId}</code>\nМагазин готов к работе.`);
+    }
+
     res.json({ success: true, settings: data });
   } catch (error) {
     res.status(500).json({ error: error.message });

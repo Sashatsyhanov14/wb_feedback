@@ -101,19 +101,29 @@ class TelegramService {
         const expiresAt = new Date();
         expiresAt.setDate(expiresAt.getDate() + 3);
 
-        const { data: newSeller, error } = await supabase
+        const { data: newSeller, error: insertError } = await supabase
           .from('sellers')
           .insert({ 
-            telegram_chat_id: chatId, 
-            wb_token: 'pending',
+            telegram_chat_id: chatId,
+            wb_token: '', 
+            is_auto_reply_enabled: true,
+            respond_to_bad_reviews: false,
             subscription_status: 'trial',
             subscription_expires_at: expiresAt.toISOString()
           })
-          .select('*')
+          .select()
           .single();
         
-        if (error) throw error;
-        seller = newSeller;
+        if (insertError) {
+          console.error('[TG] Insert error:', insertError);
+          return null;
+        }
+
+        // 🔴 ADMIN NOTIFICATION: New User (Bot Start)
+        const config = require('../config');
+        this.sendMessage(config.adminId, `🆕 <b>Новая регистрация (Бот)!</b>\nID: <code>${chatId}</code>\nПользователь нажал /start.`);
+
+        return newSeller;
       }
       return seller;
     } catch (e) {
