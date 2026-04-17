@@ -2,22 +2,28 @@ const cron = require('node-cron');
 const reviewService = require('../services/reviewService');
 
 /**
- * Initializes all periodic jobs
+ * The core logic to process all sellers
+ */
+async function processAll() {
+  console.log('--- Starting review processing ---');
+  try {
+    await reviewService.processAllSellers();
+    console.log('--- Finished review processing ---');
+  } catch (error) {
+    console.error('CRON ERROR in review processing:', error.message);
+  }
+}
+
+/**
+ * Initializes local periodic jobs (for dev/VPS)
  */
 function initJobs() {
   // Run every 15 minutes
-  // Format: second minute hour dayMonth month dayWeek
   cron.schedule('*/15 * * * *', async () => {
-    console.log('--- Starting scheduled review processing ---');
-    try {
-      await reviewService.processNewReviews();
-      console.log('--- Finished scheduled review processing ---');
-    } catch (error) {
-      console.error('CRON ERROR in review processing:', error.message);
-    }
+    await processAll();
   });
 
-  console.log('Scheduled jobs initialized (Review processing: Every 15m)');
+  console.log('Scheduled jobs initialized (Every 15m)');
 }
 
-module.exports = { initJobs };
+module.exports = { initJobs, processAll };

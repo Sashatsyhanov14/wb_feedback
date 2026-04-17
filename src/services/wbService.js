@@ -104,7 +104,7 @@ class WBService {
       const response = await this.client.post(`${WB_CONTENT_API_URL}/content/v2/get/cards/list`, {
         settings: { 
           cursor: { limit: 1 }, 
-          filter: { withNm: [Number(nmId)] } 
+          filter: { nmIDs: [Number(nmId)] } 
         }
       }, {
         headers: this._getHeaders(token)

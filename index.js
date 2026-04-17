@@ -58,9 +58,9 @@ app.get('/health', (req, res) => {
 });
 
 const PORT = config.port;
-if (process.env.NODE_ENV !== 'production') {
+if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
   app.listen(PORT, () => {
-    console.log(`Local server running on port ${PORT}`);
+    console.log(`Server running on port ${PORT}`);
   });
 }
 
