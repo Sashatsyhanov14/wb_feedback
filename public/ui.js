@@ -174,11 +174,6 @@ function renderSettings() {
                     <textarea id="ai-instructions-input" class="w-full bg-surface-container-lowest border-none rounded-lg p-4 text-on-surface-variant focus:ring-1 focus:ring-primary transition-all text-sm leading-relaxed resize-none placeholder:text-outline/40" 
                         placeholder="Например: Пиши вежливо, обращайся на Вы, в конце предлагай новинки..." rows="8">${state.settings.custom_instructions || ''}</textarea>
                 </div>
-                <div class="mt-4 flex flex-wrap gap-2">
-                    <button class="text-[10px] px-3 py-1.5 bg-surface-container-high rounded-full text-on-surface-variant border border-outline-variant/10">#вежливость</button>
-                    <button class="text-[10px] px-3 py-1.5 bg-surface-container-high rounded-full text-on-surface-variant border border-outline-variant/10">#допродажи</button>
-                    <button class="text-[10px] px-3 py-1.5 bg-surface-container-high rounded-full text-on-surface-variant border border-outline-variant/10">#официальный_тон</button>
-                </div>
             </section>
 
             <div class="pt-4">
@@ -453,6 +448,10 @@ async function handleSaveSettings() {
     
     if (tokenInput) state.settings.wb_token = tokenInput.value;
     if (instructionsInput) state.settings.custom_instructions = instructionsInput.value;
+    
+    // Auto-reply is forced to true globally
+    state.settings.is_auto_reply_enabled = true;
+    state.settings.auto_reply_min_rating = 1;
     
     await saveSettings();
 }

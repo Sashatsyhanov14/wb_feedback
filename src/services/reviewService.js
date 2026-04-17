@@ -1,177 +1,165 @@
 const wbService = require('./wbService');
 const aiService = require('./aiService');
 const telegramService = require('./telegramService');
-const cacheService = require('./cacheService');
 const supabase = require('../db/supabase');
 
 class ReviewService {
   /**
-   * Main entry point for processing new reviews
+   * Main cron/sync entry point
    */
-  async processNewReviews() {
+  async processAllSellers() {
+    console.log('[ReviewService] Starting processing for all sellers...');
     try {
-      console.log('[ReviewService] Starting global review processing...');
-      // 1. Get all sellers from DB in batches for scalability
-      let hasMore = true;
-      let offset = 0;
-      const limit = 50;
+      const { data: sellers, error } = await supabase
+        .from('sellers')
+        .select('*')
+        .not('wb_token', 'is', null);
 
-      while (hasMore) {
-        const { data: sellers, error } = await supabase
-          .from('sellers')
-          .select('*')
-          .range(offset, offset + limit - 1);
+      if (error) throw error;
+      if (!sellers || sellers.length === 0) return;
 
-        if (error) throw error;
-        if (!sellers || sellers.length === 0) break;
-
-        // Process sellers sequentially to avoid hitting rate limits (3 req/sec global)
-        for (const seller of sellers) {
-          if (!seller.wb_token) continue;
-          await this.processSellerReviews(seller);
-          // Small delay between sellers to pace requests
-          await new Promise(resolve => setTimeout(resolve, 500)); 
-        }
-
-        offset += limit;
-        if (sellers.length < limit) hasMore = false;
+      for (const seller of sellers) {
+        await this.processSellerReviews(seller);
+        await new Promise(resolve => setTimeout(resolve, 500));
       }
-      console.log('[ReviewService] Global processing finished.');
     } catch (error) {
-      console.error('Error in processNewReviews:', error.message);
+      console.error('[ReviewService] Process all error:', error.message);
     }
   }
 
   /**
-   * Process reviews for a specific seller
+   * Fetch and process new reviews for one seller
    */
   async processSellerReviews(seller) {
     try {
-      // 2. Fetch unanswered reviews from WB (limit to 20 for one pass)
-      const reviewsData = await wbService.getReviews(false, 20, 0, { token: seller.wb_token });
-      const feedbacks = reviewsData?.data?.feedbacks || [];
+      console.log(`[ReviewService] Processing reviews for ${seller.brand_name || seller.telegram_chat_id}...`);
+      
+      const response = await wbService.getReviews(false, 30, 0, { token: seller.wb_token });
+      const reviews = response?.data?.feedbacks || [];
+      
+      if (reviews.length === 0) return;
 
-      for (const feedback of feedbacks) {
-        await this.processSingleReview(seller, feedback);
+      for (const review of reviews) {
+        // Check if already handled or exists as pending
+        const { data: existing } = await supabase
+          .from('review_logs')
+          .select('id, status')
+          .eq('review_id', review.id)
+          .maybeSingle();
+
+        // If it was already posted, skip
+        if (existing && (existing.status === 'auto_posted' || existing.status === 'approved' || existing.status === 'rejected')) {
+          continue;
+        }
+
+        // If it exists as 'pending', we RE-PROCESS it to apply new styles
+        const isUpdate = existing && existing.status === 'pending';
+        await this.processSingleReview(seller, review, isUpdate ? existing.id : null);
       }
     } catch (error) {
-      console.error(`Error processing reviews for seller ${seller.id}:`, error.message);
+      console.error(`[ReviewService] Error for seller ${seller.id}:`, error.message);
     }
   }
 
   /**
-   * Process a single review: get context, generate AI response, and send (if auto) or draft
+   * Core logic for a single review
    */
-  async processSingleReview(seller, feedback) {
+  async processSingleReview(seller, feedback, existingLogId = null) {
     try {
-      // 3. Check if we already processed this review (Optimized with index)
-      const { data: existingLog } = await supabase
-        .from('review_logs')
-        .select('id')
-        .eq('review_id', feedback.id)
-        .eq('seller_id', seller.id)
-        .single();
+      const productMetadata = await wbService.getProductMetadata(feedback.nmId, seller.wb_token);
 
-      if (existingLog) return; 
-
-      // 4. Get product context with Caching
-      const cacheKey = `product_meta_${feedback.nmId}`;
-      let productMetadata = cacheService.get(cacheKey);
-
-      if (!productMetadata) {
-        productMetadata = await wbService.getProductMetadata(feedback.nmId, seller.wb_token);
-        
-        // If meta service returns generic name, try to use name from feedback
-        if (productMetadata.name === 'Товар Wildberries' && feedback.productName) {
-          productMetadata.name = feedback.productName;
-        }
-
-        if (productMetadata) {
-          cacheService.set(cacheKey, productMetadata, 1440); // Cache for 24 hours
-        }
-      }
-
-      // 5. Get internal product settings from Matrix
-      console.log(`[ReviewService] Searching matrix for nmId: ${feedback.nmId} (Type: ${typeof feedback.nmId}), seller_id: ${seller.id}`);
-      
-      const { data: productMatrix, error: matrixError } = await supabase
+      const { data: productMatrix } = await supabase
         .from('product_matrix')
         .select('*')
-        .eq('nm_id', Number(feedback.nmId))
         .eq('seller_id', seller.id)
-        .maybeSingle();
-
-      if (matrixError) {
-        console.error(`[ReviewService] Matrix query error:`, matrixError.message);
-      }
+        .eq('nm_id', feedback.nmId)
+        .maybeSingle(); // maybeSingle instead of single to prevent errors if not found
       
-      if (productMatrix) {
-        console.log(`[ReviewService] Matrix match found! Recommend: ${productMatrix.cross_sell_article}`);
-      } else {
-        console.log(`[ReviewService] No matrix match found for nmId ${feedback.nmId}`);
-      }
-
-      // 6. Generate AI response (now returns JSON)
+      console.log(`[ReviewService] Matrix lookup for nmId ${feedback.nmId}: ${productMatrix ? 'FOUND (' + productMatrix.cross_sell_article + ')' : 'NOT FOUND'}`);
+      
+      console.log(`[ReviewService] Processing review for seller instructions: "${seller.custom_instructions || 'MISSING'}"`);
       const aiData = await aiService.generateResponse(feedback.text, productMetadata, productMatrix, seller);
-      if (!aiData || !aiData.text) {
-        console.warn(`[ReviewService] AI failed to generate response for review ${feedback.id}. Skipping.`);
-        return;
-      }
+      if (!aiData || !aiData.text) return;
 
       const aiResponse = aiData.text;
-
-      // 7. Handle sending logic
-      const isBadReview = feedback.productValuation <= 3;
-      const canAutoReply = seller.is_auto_reply_enabled && (
-        (!isBadReview && feedback.productValuation >= (seller.auto_reply_min_rating || 4)) || 
-        (isBadReview && seller.respond_to_bad_reviews)
-      );
+      
+      // USER REQUEST: Auto-reply is ALWAYS true
+      const canAutoReply = true;
 
       if (canAutoReply) {
         console.log(`[ReviewService] Auto-replying to review ${feedback.id}`);
-        // Auto-send to WB
         const success = await wbService.sendAnswer(feedback.id, aiResponse, seller.wb_token);
-        if (success) {
-          await this.logReview(seller.id, feedback, aiResponse, 'auto_posted', aiData.category, aiData.sentiment);
-          await telegramService.sendMessage(seller.telegram_chat_id, `✅ Отзыв на артикул ${feedback.nmId} (${feedback.productValuation}⭐) обработан автоматически.\n\nТекст ответа: "${aiResponse}"`);
-        }
-      } else {
-        console.log(`[ReviewService] Sending draft for review ${feedback.id} to chat ${seller.telegram_chat_id}`);
-        // Send draft to Telegram Bot
-        const logStatus = seller.is_auto_reply_enabled ? 'pending_low_rating' : 'pending';
-        const logId = await this.logReview(seller.id, feedback, aiResponse, logStatus, aiData.category, aiData.sentiment);
         
-        const telSuccess = await telegramService.sendReviewDraft(seller.telegram_chat_id, logId, aiResponse, {
-          reviewText: feedback.text,
-          rating: feedback.productValuation,
-          productInfo: productMetadata?.name || matrix?.product_name || 'Товар',
-          nmId: feedback.nmId
-        });
-        console.log(`[ReviewService] Telegram delivery result: ${telSuccess}`);
+        if (success) {
+          await this.saveReviewLog(seller.id, feedback, aiResponse, 'auto_posted', aiData, existingLogId);
+          
+          // USER REQUESTED TEMPLATE:
+          // Отзыв (5⭐️):
+          // "Текст отзыва"
+          // Товар: Название
+          // 
+          // ответ:
+          // "Текст ответа"
+          const template = `Отзыв (${feedback.productValuation}⭐️):\n` +
+            `"${this._escapeHtml(feedback.text)}"\n` +
+            `Товар: ${this._escapeHtml(productMetadata?.name || feedback.nmId)}\n\n` +
+            `ответ:\n` +
+            `"${this._escapeHtml(aiResponse)}"`;
+
+          await telegramService.sendMessage(seller.telegram_chat_id, template);
+          return;
+        }
       }
+
+      // If not auto-replying, save as draft and notify
+      const logId = await this.saveReviewLog(seller.id, feedback, aiResponse, 'pending', aiData, existingLogId);
+      
+      const productInfo = productMatrix?.product_name || productMetadata?.name || feedback.nmId;
+      await telegramService.sendReviewDraft(seller.telegram_chat_id, logId, aiResponse, {
+        reviewText: feedback.text,
+        rating: feedback.productValuation,
+        productInfo: productInfo,
+        nmId: feedback.nmId
+      });
+
     } catch (error) {
-      console.error(`Error processing review ${feedback.id}:`, error.message);
+      console.error(`[ReviewService] Error processing review ${feedback.id}:`, error.message);
     }
   }
 
   /**
-   * Log review processing to DB
+   * Unified save/update log
    */
-  async logReview(sellerId, feedback, draftText, status, category, sentiment) {
-    const { data, error } = await supabase.from('review_logs').insert({
+  async saveReviewLog(sellerId, feedback, response, status, aiData, existingId = null) {
+    const logData = {
       seller_id: sellerId,
       review_id: feedback.id,
+      nm_id: feedback.nmId,
       text: feedback.text,
       rating: feedback.productValuation,
-      nm_id: feedback.nmId,
-      ai_response_draft: draftText,
+      ai_response_draft: response,
       status: status,
-      category: category,
-      sentiment: sentiment
-    }).select().single();
+      category: aiData.category,
+      sentiment: aiData.sentiment
+    };
 
-    if (error) throw error;
-    return data.id;
+    if (existingId) {
+      const { error } = await supabase.from('review_logs').update(logData).eq('id', existingId);
+      if (error) throw error;
+      return existingId;
+    } else {
+      const { data, error } = await supabase.from('review_logs').insert(logData).select().single();
+      if (error) throw error;
+      return data.id;
+    }
+  }
+
+  _escapeHtml(text) {
+    if (!text) return '';
+    return text
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
   }
 }
 

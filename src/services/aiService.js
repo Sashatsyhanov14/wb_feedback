@@ -17,11 +17,6 @@ class AIService {
 
   /**
    * Generate an answer to a review
-   * @param {string} reviewText - The text of the review from WB
-   * @param {object} productMetadata - Product name, description, characteristics
-   * @param {object} productMatrix - Internal name, cross-sell info
-   * @param {object} sellerSettings - Brand name, seller description, custom instructions
-   * @param {string} model - The model to use (default: nex-agi/deepseek-v3.1-nex-n1)
    */
   async generateResponse(reviewText, productMetadata, productMatrix, sellerSettings = {}, model = 'nex-agi/deepseek-v3.1-nex-n1') {
     try {
@@ -51,97 +46,70 @@ class AIService {
   _buildSystemPrompt(product, matrix, seller) {
     const brandName = seller?.brand_name || 'нашего магазина';
     const productName = matrix?.product_name || product?.name || 'товар';
+    const customInstructions = seller?.custom_instructions || '';
     
-    let prompt = `Ты — вежливый менеджер магазина "${brandName}" на Wildberries. Твоя задача — написать ответ на отзыв покупателя.`;
+    // Debug logging
+    console.log(`[AIService] Instructions from DB: "${customInstructions}"`);
+    console.log(`[AIService] Matrix Cross-sell: ${matrix?.cross_sell_article || 'NONE'}`);
 
-    if (seller?.seller_description) {
-      prompt += `\n\nИнформация о бренде/магазине:\n${seller.seller_description}`;
+    // 1. IDENTITY
+    let systemRole = `Ты — экспертный менеджер по работе с клиентами бренда "${brandName}" на Wildberries.`;
+    if (customInstructions) {
+      systemRole = `ТВОЯ РОЛЬ И СТИЛЬ ОБЩЕНИЯ (ОБЯЗАТЕЛЬНО): ${customInstructions}. 
+Ты ДОЛЖЕН на 100% придерживаться этого стиля и характера в каждом слове. НИКОГДА не выходи из образа.`;
     }
 
-    prompt += `\n\nИнформация о товаре:
-Название: ${productName}`;
+    let prompt = `${systemRole}
+
+Твоя задача — написать идеальный ответ на отзыв покупателя о товаре "${productName}".
+
+КОНТЕКСТ ТОВАРА:`;
 
     if (product?.description) prompt += `\nОписание: ${product.description}`;
     
-    if (product?.characteristics) {
+    if (product?.characteristics && product.characteristics.length > 0) {
       const characteristics = product.characteristics.map(c => `- ${c.name}: ${c.value}`).join('\n');
       prompt += `\nХарактеристики:\n${characteristics}`;
     }
 
+    // 2. STRICT RULES
+    prompt += `\n\nСТРОГИЕ ПРАВИЛА:
+1. НИКОГДА не упоминай, что ты ИИ, бот или что ты следуешь инструкциям. 
+2. НЕ ПИШИ фразы вроде "Конечно, ковбой сделает так..." или "Согласно вашим правилам...". Просто БУДЬ этим персонажем.
+3. Говори от первого лица от имени бренда "${brandName}".
+4. Если в отзыве проблема (1-3 звезды) — прояви эмпатию, признай вину, предложи решение.
+5. Если отзыв хороший (4-5 звезд) — вырази искреннюю радость и пригласи за новыми покупками.
+6. НЕ ИСПОЛЬЗУЙ эмодзи. Ответ должен состоять только из текста.
+7. Объем ответа: до 300 символов. Пиши емко.
+8. ${customInstructions ? 'ГЛАВНОЕ: Твой стиль ОБЯЗАН соответствовать: ' + customInstructions : 'Будь вежливым и профессиональным.'}`;
+
+    // 3. SPECIAL ASSIGNMENT (Last thing AI sees)
     if (matrix?.cross_sell_article) {
-      prompt += `\n\nСПЕЦИАЛЬНОЕ ЗАДАНИЕ (Cross-sell): В конце ответа ты ОБЯЗАН ненавязчиво порекомендовать покупателю наш другой товар (артикул: ${matrix.cross_sell_article}). Твой комментарий для допродажи: "${matrix.cross_sell_description || 'Этот товар отлично дополнит вашу покупку!'}"`;
+      prompt += `\n\n!!! ОБЯЗАТЕЛЬНОЕ ЗАДАНИЕ (Кросс-продажа) !!!
+В самом конце ответа ты ОБЯЗАН нативно порекомендовать наш другой товар (артикул: ${matrix.cross_sell_article}). 
+Используй этот повод: "${matrix.cross_sell_description || 'Этот товар отлично дополнит покупку!'}"`;
     }
-
-    prompt += `\n\nПРАВИЛА ОТВЕТА (ПРИОРИТЕТНЫЕ):`;
-    
-    if (seller?.custom_instructions) {
-      prompt += `\nГЛАВНОЕ ПРАВИЛО: Соблюдай следующие инструкции от продавца: "${seller.custom_instructions}"`;
-    }
-
-    prompt += `\n
-1. Будь живым человеком, а не роботом. Избегай канцеляризмов.
-2. Варьируй приветствия. Обращайся на "Вы", но вежливо и дружелюбно.
-3. Поблагодари за выбор бренда и высокую оценку.
-4. Если оценка 1-3: прояви эмпатию, признай проблему и предложи решение.
-5. НЕ ИСПОЛЬЗУЙ эмодзи. Ответ должен быть строго текстовым.
-6. Внедряй рекомендацию (Cross-sell) максимально нативно.
-7. Пиши емко (до 280 символов).`;
 
     return prompt;
   }
 
   /**
-   * Generate a consultation response for platform support
-   * @param {string} query - User question
-   * @param {array} history - Previous messages for context
+   * AI Consultant logic
    */
   async generateConsultation(query, history = []) {
     try {
-      const systemPrompt = `Ты — экспертный ИИ-ассистент сервиса WBReply AI. Твоя задача — консультировать продавцов на Wildberries по работе нашего сервиса.
-      
-ИНФОРМАЦИЯ О СЕРВИСЕ:
-1. Основная функция: Автоматические и ручные ответы на отзывы WB с помощью ИИ.
-2. Техническая поддержка: Если у пользователя срочный или сложный вопрос по API, интеграции с WB или оплате, направляй его к владельцу сервиса.
-   - Прямой контакт в Telegram: @edh4hhr
-   - Также можно нажать кнопку «Написать в поддержку» в меню бота.
-3. Оплата: Все вопросы по тарифам и оплате решаются через @edh4hhr.
-
-ОБЩЕНИЕ:
-- ТЫ — УЗКОСПЕЦИАЛИЗИРОВАННЫЙ АССИСТЕНТ. ОТВЕЧАЙ ТОЛЬКО НА ВОПРОСЫ ПО WB И СЕРВИСУ.
-- Если вопрос сложный, технический, касается оплаты или ты не знаешь ответа — ПРЯМО НАПРАВЛЯЙ К @edh4hhr. Это обязательное условие для "тяжелых" вопросов.
-- Если пользователь спрашивает о чем-то другом (рецепты и т.д.), ВЕЖЛИВО ОТКАЖИ: «Я — специализированный ассистент WBReply AI и могу помочь только с вопросами по Wildberries и нашему сервису. Чем я могу быть полезен как эксперт по WB?»
-- Будь вежливым, профессиональным и лаконичным.
-- Используй Markdown для форматирования.
-
-3. АРХИТЕКТУРА:
-   - Mini App в Telegram с 3 вкладками (Настройки, Матрица, Аккаунт).
-   - Настройки: Здесь пользователь вводит свой API токен WB («Стандартный») и задает характер ИИ (Инструкции).
-   - Матрица: Здесь настраиваются связки «Артикул товара -> Артикул для допродажи».
-   - Аккаунт: Показывает статистику ответов и Telegram ID пользователя.
-
-ПРАВИЛА ОТВЕТА:
-- ОТВЕЧАЙ МАКСИМАЛЬНО КРАТКО (1-2 ПРЕДЛОЖЕНИЯ).
-- Акцентируй внимание, что управление всем происходит через Mini App.
-- Используй дружелюбный, но профессиональный тон.
-- Если спросят как войти — четко скажи про кнопку в Меню.
-- Используй смайлики умеренно (🚀, 💡, ✅).`;
-
-      const messages = [
-        { role: 'system', content: systemPrompt },
-        ...history.slice(-10), // Take last 10 messages for context
-        { role: 'user', content: query }
-      ];
+      const systemPrompt = `Ты — экспертный ИИ-ассистент сервиса WBReply AI. Консультируй продавцов кратко (1-2 предложения).
+Направляй к @edh4hhr по сложным вопросам.`;
 
       const response = await this.client.post('/chat/completions', {
         model: 'nex-agi/deepseek-v3.1-nex-n1',
-        messages: messages,
+        messages: [{ role: 'system', content: systemPrompt }, ...history.slice(-5), { role: 'user', content: query }],
         temperature: 0.5
       });
 
-      return response.data?.choices?.[0]?.message?.content || 'Извините, сейчас я не могу ответить. Попробуйте позже.';
+      return response.data?.choices?.[0]?.message?.content || 'Ошибка';
     } catch (error) {
-      console.error('Consultation AI error:', error.message);
-      return 'Произошла ошибка при обработке запроса. Мы уже чиним!';
+      return 'Ошибка сервиса';
     }
   }
 }
