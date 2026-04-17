@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const config = require('../config');
 const supabase = require('../db/supabase');
 const wbService = require('../services/wbService');
 const telegramService = require('../services/telegramService');
@@ -319,49 +320,76 @@ router.get('/stats/:telegramChatId', async (req, res) => {
 
 // Admin Global Stats
 router.get('/admin/stats/:adminId', async (req, res) => {
+  let adminIdFromParams;
   try {
     const { adminId } = req.params;
-    if (adminId !== config.adminId) return res.status(403).json({ error: 'Access denied' });
+    adminIdFromParams = adminId;
+    
+    // Authorization check
+    if (adminId !== config.adminId) {
+      console.warn(`[AdminStats] Unauthorized access attempt by ${adminId}`);
+      return res.status(403).json({ error: 'Access denied' });
+    }
 
     const todayStart = new Date();
     todayStart.setHours(0,0,0,0);
     const todayISO = todayStart.toISOString();
 
-    const { count: totalSellers } = await supabase.from('sellers').select('id', { count: 'exact', head: true });
-    
-    const { count: newToday } = await supabase.from('sellers')
-      .select('id', { count: 'exact', head: true })
-      .gte('joined_at', todayISO);
+    // Initialize counts
+    let totalSellers = 0;
+    let newToday = 0;
+    let activeToday = 0;
+    let withoutToken = 0;
+    let totalApproved = 0;
 
-    const { count: activeToday } = await supabase.from('sellers')
-      .select('id', { count: 'exact', head: true })
-      .gte('last_active_at', todayISO);
+    // Fetch counts sequentially or in parallel for safety
+    try {
+      const { count: tsCount } = await supabase.from('sellers').select('id', { count: 'exact', head: true });
+      totalSellers = tsCount || 0;
+      
+      const { count: ntCount } = await supabase.from('sellers')
+        .select('id', { count: 'exact', head: true })
+        .gte('joined_at', todayISO);
+      newToday = ntCount || 0;
 
-    const { count: withoutToken } = await supabase.from('sellers')
-      .select('id', { count: 'exact', head: true })
-      .filter('wb_token', 'eq', ''); // Since it's NOT NULL, just check empty string
+      const { count: atCount } = await supabase.from('sellers')
+        .select('id', { count: 'exact', head: true })
+        .gte('last_active_at', todayISO);
+      activeToday = atCount || 0;
 
-    const { count: totalApproved } = await supabase.from('review_logs')
-      .select('id', { count: 'exact', head: true })
-      .in('status', ['approved', 'auto_posted']);
+      const { count: wtCount } = await supabase.from('sellers')
+        .select('id', { count: 'exact', head: true })
+        .filter('wb_token', 'eq', '');
+      withoutToken = wtCount || 0;
+
+      const { count: taCount } = await supabase.from('review_logs')
+        .select('id', { count: 'exact', head: true })
+        .in('status', ['approved', 'auto_posted']);
+      totalApproved = taCount || 0;
+    } catch (dbError) {
+      console.error('[AdminStats] Database query error:', dbError);
+    }
 
     res.json({
-      totalSellers: totalSellers || 0,
-      newToday: newToday || 0,
-      activeToday: activeToday || 0,
-      withoutToken: withoutToken || 0,
-      totalApproved: totalApproved || 0
+      totalSellers,
+      newToday,
+      activeToday,
+      withoutToken,
+      totalApproved
     });
   } catch (error) {
-    console.error(`[AdminStats] CRITICAL ERROR for admin ${req.params.adminId}:`, error);
-    res.status(500).json({ error: error.message });
+    console.error(`[AdminStats] CRITICAL ERROR for admin ${adminIdFromParams}:`, error);
+    res.status(500).json({ error: error.message || 'Internal Server Error' });
   }
 });
 
 // Admin: Get latest sellers
 router.get('/admin/users/:adminId', async (req, res) => {
+  let adminIdFromParams;
   try {
     const { adminId } = req.params;
+    adminIdFromParams = adminId;
+    
     if (adminId !== config.adminId) return res.status(403).json({ error: 'Access denied' });
 
     const { data: users, error } = await supabase
@@ -371,10 +399,10 @@ router.get('/admin/users/:adminId', async (req, res) => {
       .limit(5);
 
     if (error) throw error;
-    res.json(users);
+    res.json(users || []);
   } catch (error) {
-    console.error(`[AdminUsers] Error for admin ${req.params.adminId}:`, error);
-    res.status(500).json({ error: error.message });
+    console.error(`[AdminUsers] Error for admin ${adminIdFromParams}:`, error);
+    res.status(500).json({ error: error.message || 'Internal Server Error' });
   }
 });
 
