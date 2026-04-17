@@ -410,7 +410,7 @@ function renderSubscription() {
                     </div>
                 </div>
 
-                <button onclick="showToast('Оплата временно недоступна')" class="w-full py-5 premium-gradient rounded-2xl font-headline font-black text-on-primary-container shadow-[0_8px_32px_rgba(173,198,255,0.3)] hover:shadow-[0_12px_48px_rgba(173,198,255,0.4)] hover:brightness-110 active:scale-[0.97] duration-300 transition-all uppercase tracking-widest text-sm flex items-center justify-center gap-3">
+                <button onclick="showToast('Оплата временно недоступна')" class="w-full py-5 bg-electric-gradient rounded-2xl font-headline font-black text-on-primary shadow-[0_8px_32px_rgba(173,198,255,0.3)] hover:scale-[1.02] active:scale-[0.97] duration-300 transition-all uppercase tracking-widest text-sm flex items-center justify-center gap-3">
                     <span>Оплатить подписку</span>
                     <span class="material-symbols-outlined font-bold">bolt</span>
                 </button>
