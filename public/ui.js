@@ -374,15 +374,9 @@ function renderSubscription() {
 
             <!-- Pricing Tier Card (Premium Offer) -->
             <section class="p-8 rounded-[2rem] bg-surface-container-lowest relative border border-outline-variant/20 shadow-2xl overflow-hidden group">
-                <div class="absolute top-0 right-0 p-4">
-                    <div class="bg-primary/15 px-4 py-1.5 rounded-full border border-primary/30 backdrop-blur-md">
-                        <span class="text-[11px] font-black text-primary tracking-tighter">-50% OFF</span>
-                    </div>
-                </div>
-
                 <div class="mb-8">
                     <span class="text-[10px] font-black tracking-[0.3em] text-primary/60 uppercase mb-3 block">WBReply AI • Premium</span>
-                    <h2 class="font-headline text-3xl font-extrabold text-on-surface leading-tight mb-4">Стартовое Предложение</h2>
+                    <h2 class="font-headline text-3xl font-extrabold text-on-surface leading-tight mb-4">Первые 3 дня — бесплатно</h2>
                     
                     <div class="flex items-baseline gap-3 mb-2">
                         <span class="text-5xl font-black font-headline text-on-surface tracking-tighter">749 ₽</span>
