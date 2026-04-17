@@ -10,6 +10,26 @@ class ReviewService {
   async processSellerReviews(seller) {
     if (!seller || !seller.wb_token) return;
 
+    // --- Subscription Check ---
+    const now = new Date();
+    const expiresAt = seller.subscription_expires_at ? new Date(seller.subscription_expires_at) : null;
+    
+    if (expiresAt && now > expiresAt) {
+      console.log(`[ReviewService] Subscription EXPIRED for ${seller.telegram_chat_id}`);
+      
+      // Update status in DB if not already expired
+      if (seller.subscription_status !== 'expired') {
+        await supabase.from('sellers').update({ subscription_status: 'expired' }).eq('id', seller.id);
+        
+        // Notify user
+        const message = `⚠️ <b>Ваша подписка на WBReply AI истекла!</b>\n\n` +
+          `Авто-ответы на отзывы приостановлены. Для возобновления работы, пожалуйста, оплатите тариф (749 руб/мес) в разделе <b>«Аккаунт»</b> внутри Mini App.\n\n` +
+          `Если возникли вопросы: @edh4hhr 🚀`;
+        await telegramService.sendMessage(seller.telegram_chat_id, message);
+      }
+      return;
+    }
+
     try {
       console.log(`[ReviewService] Starting Sync for seller ${seller.telegram_chat_id}`);
       

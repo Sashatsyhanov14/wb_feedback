@@ -385,14 +385,13 @@ function renderSubscription() {
                     <h2 class="font-headline text-3xl font-extrabold text-on-surface leading-tight mb-4">Стартовое Предложение</h2>
                     
                     <div class="flex items-baseline gap-3 mb-2">
-                        <span class="text-5xl font-black font-headline text-on-surface tracking-tighter">499 ₽</span>
-                        <span class="text-xl font-medium text-on-surface-variant/40 line-through">999 ₽</span>
+                        <span class="text-5xl font-black font-headline text-on-surface tracking-tighter">749 ₽</span>
                     </div>
-                    <p class="text-xs text-on-surface-variant/60 font-semibold mb-4 uppercase tracking-wider">за первый месяц пользования</p>
+                    <p class="text-xs text-on-surface-variant/60 font-semibold mb-4 uppercase tracking-wider">в месяц после завершения триала</p>
                     
                     <div class="py-2 px-4 bg-primary/10 rounded-xl inline-flex items-center gap-2 border border-primary/20">
                         <span class="material-symbols-outlined text-primary text-sm">schedule</span>
-                        <p class="text-[11px] font-bold text-primary">Далее автопродление 999 ₽/мес.</p>
+                        <p class="text-[11px] font-bold text-primary">Автопродление каждые 30 дней.</p>
                     </div>
                 </div>
 

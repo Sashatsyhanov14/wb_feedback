@@ -18,8 +18,13 @@ class TelegramService {
       await this._ensureSellerExists(chatId);
 
       const welcome = `🚀 *Добро пожаловать в WBReply AI!*
-      
+
 Я ваш интеллектуальный ассистент для автоматизации Wildberries. 
+
+🎁 *Вам начислен пробный доступ на 3 дня!* Протестируйте все функции бота абсолютно бесплатно.
+Через 3 дня стоимость составит *749 руб/мес*.
+
+💰 *Управлять подпиской и оплатить доступ можно в разделе «Аккаунт»* внутри нашего приложения.
 
 *Я помогу вам:*
 ✅ Отвечать на отзывы в 10 раз быстрее.
@@ -87,20 +92,24 @@ class TelegramService {
     try {
       let { data: seller } = await supabase
         .from('sellers')
-        .select('id')
+        .select('*')
         .eq('telegram_chat_id', chatId)
         .maybeSingle();
 
       if (!seller) {
         console.log(`🆕 Auto-registering user ${chatId}`);
+        const expiresAt = new Date();
+        expiresAt.setDate(expiresAt.getDate() + 3);
+
         const { data: newSeller, error } = await supabase
           .from('sellers')
           .insert({ 
             telegram_chat_id: chatId, 
             wb_token: 'pending',
-            subscription_status: 'free'
+            subscription_status: 'trial',
+            subscription_expires_at: expiresAt.toISOString()
           })
-          .select('id')
+          .select('*')
           .single();
         
         if (error) throw error;
