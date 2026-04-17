@@ -18,9 +18,9 @@ class AIService {
   /**
    * Generate an answer to a review
    */
-  async generateResponse(reviewText, productMetadata, productMatrix, sellerSettings = {}, model = 'nex-agi/deepseek-v3.1-nex-n1') {
+  async generateResponse(reviewText, productMetadata, productMatrix, sellerSettings = {}, extraContext = {}, model = 'nex-agi/deepseek-v3.1-nex-n1') {
     try {
-      const systemPrompt = this._buildSystemPrompt(productMetadata, productMatrix, sellerSettings);
+      const systemPrompt = this._buildSystemPrompt(productMetadata, productMatrix, sellerSettings, extraContext);
       
       const response = await this.client.post('/chat/completions', {
         model: model,
@@ -28,7 +28,7 @@ class AIService {
           { role: 'system', content: systemPrompt },
           { role: 'user', content: `Текст отзыва: "${reviewText}".\n\nВЕРНИ ОТВЕТ В ФОРМАТЕ JSON: {"text": "текст ответа", "category": "категория(Качество/Доставка/Цена/Другое)", "sentiment": "positive/neutral/negative"}` }
         ],
-        temperature: 0.7,
+        temperature: 0.85,
         response_format: { type: "json_object" }
       });
 
@@ -43,59 +43,39 @@ class AIService {
   /**
    * Internal helper to build the prompt for AI
    */
-  _buildSystemPrompt(product, matrix, seller) {
+  _buildSystemPrompt(product, matrix, seller, extraContext = {}) {
     const brandName = seller?.brand_name || 'нашего магазина';
     const productName = matrix?.product_name || product?.name || 'товар';
-    const customInstructions = seller?.custom_instructions || '';
+    const customInstructions = seller?.custom_instructions || 'Радушный и дружелюбный владелец';
+    const crossSellName = extraContext.crossSellName;
     
-    // Debug logging
-    console.log(`[AIService] Instructions from DB: "${customInstructions}"`);
-    console.log(`[AIService] Matrix Cross-sell: ${matrix?.cross_sell_article || 'NONE'}`);
+    // HUMAN-ONLY PROMPT (NO "DONT DO THIS", ONLY "BE THIS")
+    let prompt = `Твоя личность: ${customInstructions}.
+Ты — реальный человек, создатель бренда "${brandName}". Ты лично отвечаешь покупателям на Wildberries.
 
-    // 1. IDENTITY
-    let systemRole = `Ты — экспертный менеджер по работе с клиентами бренда "${brandName}" на Wildberries.`;
-    if (customInstructions) {
-      systemRole = `ТВОЯ РОЛЬ И СТИЛЬ ОБЩЕНИЯ (ОБЯЗАТЕЛЬНО): ${customInstructions}. 
-Ты ДОЛЖЕН на 100% придерживаться этого стиля и характера в каждом слове. НИКОГДА не выходи из образа.`;
-    }
+СТИЛЬ ОБЩЕНИЯ:
+- Пиши очень живо и тепло, будто отвечаешь другу в чате.
+- Используй живые человеческие реакции: радость, сопереживание, искренность. 
+- Твоя речь простая и лаконичная. 
+- Говори только от своего имени (Я, МЫ). 
+- НИКАКИХ ЭМОДЗИ — используй только слова для передачи чувств.
 
-    let prompt = `${systemRole}
+ТЫ ОТВЕЧАЕШЬ НА ОТЗЫВ О ТОВАРЕ: "${productName}".`;
 
-Твоя задача — написать идеальный ответ на отзыв покупателя о товаре "${productName}".
+    if (product?.description) prompt += `\nКраткая информация о товаре: ${product.description.slice(0, 250)}`;
 
-КОНТЕКСТ ТОВАРА:`;
-
-    if (product?.description) prompt += `\nОписание: ${product.description}`;
-    
-    if (product?.characteristics && product.characteristics.length > 0) {
-      const characteristics = product.characteristics.map(c => `- ${c.name}: ${c.value}`).join('\n');
-      prompt += `\nХарактеристики:\n${characteristics}`;
-    }
-
-    // 2. STRICT RULES
-    prompt += `\n\nСТРОГИЕ ПРАВИЛА:
-1. НИКОГДА не упоминай, что ты ИИ, бот или что ты следуешь инструкциям. 
-2. НЕ ПИШИ фразы вроде "Конечно, ковбой сделает так..." или "Согласно вашим правилам...". Просто БУДЬ этим персонажем.
-3. Говори от первого лица от имени бренда "${brandName}".
-4. Если в отзыве проблема (1-3 звезды) — прояви эмпатию, признай вину, предложи решение.
-5. Если отзыв хороший (4-5 звезд) — вырази искреннюю радость и пригласи за новыми покупками.
-6. НЕ ИСПОЛЬЗУЙ эмодзи. Ответ должен состоять только из текста.
-7. Объем ответа: до 300 символов. Пиши емко.
-8. ${customInstructions ? 'ГЛАВНОЕ: Твой стиль ОБЯЗАН соответствовать: ' + customInstructions : 'Будь вежливым и профессиональным.'}`;
-
-    // 3. SPECIAL ASSIGNMENT (Last thing AI sees)
+    // ADD CROSS-SELL IF PRESENT
     if (matrix?.cross_sell_article) {
-      prompt += `\n\n!!! ОБЯЗАТЕЛЬНОЕ ЗАДАНИЕ (Кросс-продажа) !!!
-В самом конце ответа ты ОБЯЗАН нативно порекомендовать наш другой товар (артикул: ${matrix.cross_sell_article}). 
-Используй этот повод: "${matrix.cross_sell_description || 'Этот товар отлично дополнит покупку!'}"`;
+      const prodName = crossSellName ? `"${crossSellName}"` : 'нашу другую модель';
+      prompt += `\n\nСПЕЦИАЛЬНОЕ ЗАДАНИЕ: В конце ответа по-дружески упомяни ${prodName} (артикул: ${matrix.cross_sell_article}). 
+Сделай это нативно, объяснив почему это круто: "${matrix.cross_sell_description || 'Вам точно понравится!'}"`;
     }
+
+    prompt += `\n\nОГРАНИЧЕНИЕ: Твой ответ должен быть не длиннее 280 символов.`;
 
     return prompt;
   }
 
-  /**
-   * AI Consultant logic
-   */
   async generateConsultation(query, history = []) {
     try {
       const systemPrompt = `Ты — экспертный ИИ-ассистент сервиса WBReply AI. Консультируй продавцов кратко (1-2 предложения).

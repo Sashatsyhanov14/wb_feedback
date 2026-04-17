@@ -55,11 +55,17 @@ class ReviewService {
         .eq('seller_id', seller.id)
         .eq('nm_id', feedback.nmId)
         .maybeSingle();
-      
+      let crossSellName = null;
+      if (productMatrix?.cross_sell_article) {
+        console.log(`[ReviewService] Fetching metadata for cross-sell article: ${productMatrix.cross_sell_article}`);
+        const crossMetadata = await wbService.getProductMetadata(productMatrix.cross_sell_article, seller.wb_token);
+        crossSellName = crossMetadata?.name || null;
+      }
+
       console.log(`[ReviewService] Processing feedback ${feedback.id} (Matrix: ${productMatrix ? 'YES' : 'NO'})`);
 
       // 2. Generate AI Response
-      const aiData = await aiService.generateResponse(feedback.text, productMetadata, productMatrix, seller);
+      const aiData = await aiService.generateResponse(feedback.text, productMetadata, productMatrix, seller, { crossSellName });
       if (!aiData || !aiData.text) return;
 
       const aiResponse = aiData.text;
