@@ -80,6 +80,12 @@ class ReviewService {
 
       if (!productMetadata) {
         productMetadata = await wbService.getProductMetadata(feedback.nmId, seller.wb_token);
+        
+        // If meta service returns generic name, try to use name from feedback
+        if (productMetadata.name === 'Товар Wildberries' && feedback.productName) {
+          productMetadata.name = feedback.productName;
+        }
+
         if (productMetadata) {
           cacheService.set(cacheKey, productMetadata, 1440); // Cache for 24 hours
         }
@@ -135,7 +141,12 @@ class ReviewService {
         const logStatus = seller.is_auto_reply_enabled ? 'pending_low_rating' : 'pending';
         const logId = await this.logReview(seller.id, feedback, aiResponse, logStatus, aiData.category, aiData.sentiment);
         
-        const telSuccess = await telegramService.sendReviewDraft(seller.telegram_chat_id, logId, aiResponse);
+        const telSuccess = await telegramService.sendReviewDraft(seller.telegram_chat_id, logId, aiResponse, {
+          reviewText: feedback.text,
+          rating: feedback.productValuation,
+          productInfo: productMetadata?.name || matrix?.product_name || 'Товар',
+          nmId: feedback.nmId
+        });
         console.log(`[ReviewService] Telegram delivery result: ${telSuccess}`);
       }
     } catch (error) {

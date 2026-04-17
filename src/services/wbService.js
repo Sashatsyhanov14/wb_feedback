@@ -22,7 +22,7 @@ class WBService {
       // Small request to check if token is valid
       await this.client.get(`${WB_FEEDBACK_API_URL}/api/v1/feedbacks`, {
         headers: this._getHeaders(token),
-        params: { take: 1, skip: 0, isAnswered: false }
+        params: { take: 1, skip: 0, isAnswered: false, order: 'dateDesc' }
       });
       return true;
     } catch (error) {
@@ -78,7 +78,7 @@ class WBService {
     try {
       const response = await this.client.get(`${WB_FEEDBACK_API_URL}/api/v1/feedbacks`, {
         headers: this._getHeaders(token),
-        params: { isAnswered, take, skip, ...params }
+        params: { isAnswered, take, skip, order: 'dateDesc', ...params }
       });
       return response.data;
     } catch (error) {
@@ -100,14 +100,21 @@ class WBService {
     }
 
     try {
+      console.log(`[WBService] Fetching metadata from Content API for nmId: ${nmId}`);
       const response = await this.client.post(`${WB_CONTENT_API_URL}/content/v2/get/cards/list`, {
-        settings: { cursor: { limit: 1 }, filter: { nmIDs: [Number(nmId)] } }
+        settings: { 
+          cursor: { limit: 1 }, 
+          filter: { withNm: [Number(nmId)] } 
+        }
       }, {
         headers: this._getHeaders(token)
       });
 
       const card = response.data?.cards?.[0];
-      if (!card) return null;
+      if (!card) {
+        console.warn(`[WBService] No card found for nmId: ${nmId}`);
+        return null;
+      }
 
       return {
         name: card.title,

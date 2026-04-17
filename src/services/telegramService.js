@@ -226,10 +226,20 @@ class TelegramService {
     }
   }
 
-  async sendReviewDraft(chatId, logId, draftText) {
+  async sendReviewDraft(chatId, logId, draftText, context = {}) {
     try {
+      const { reviewText, rating, productInfo, nmId } = context;
+      
+      let message = `<b>💡 Сгенерирован черновик ответа:</b>\n\n`;
+      
+      if (reviewText) {
+        const escapedReview = this._escapeHtml(reviewText);
+        message += `<b>Отзыв (${rating}⭐):</b>\n<i>"${escapedReview}"</i>\n`;
+        message += `<b>Товар:</b> ${productInfo || nmId}\n\n`;
+      }
+      
       const escapedDraft = this._escapeHtml(draftText);
-      const message = `<b>💡 Сгенерирован черновик ответа:</b>\n\n${escapedDraft}`;
+      message += `<b>Вариант ответа:</b>\n"${escapedDraft}"`;
       
       await this.bot.telegram.sendMessage(chatId, message, {
         parse_mode: 'HTML',
