@@ -166,9 +166,6 @@ function renderSettings() {
             <section class="bg-surface-container-low rounded-xl p-6 border border-outline-variant/5">
                 <div class="flex items-center justify-between mb-4">
                     <label class="text-on-surface font-semibold text-sm">Инструкции для ИИ</label>
-                    <div class="flex gap-2">
-                        <span class="px-2 py-0.5 bg-secondary-container text-on-secondary-container text-[10px] rounded font-medium">Smart Logic</span>
-                    </div>
                 </div>
                 <div class="relative">
                     <textarea id="ai-instructions-input" class="w-full bg-surface-container-lowest border-none rounded-lg p-4 text-on-surface-variant focus:ring-1 focus:ring-primary transition-all text-sm leading-relaxed resize-none placeholder:text-outline/40" 
@@ -217,7 +214,7 @@ function renderMatrix() {
                             <label class="text-[10px] text-on-surface-variant ml-3 uppercase font-semibold">Рекомендация</label>
                             <div class="w-full bg-surface-container-lowest rounded-lg text-sm text-on-surface h-10 px-3 flex items-center font-mono">${item.cross_sell_article}</div>
                         </div>
-                        <button class="pt-5 text-on-surface-variant hover:text-red-500 transition-colors" onclick="handleDeleteMatrix(${item.id || idx})">
+                        <button class="pt-5 text-on-surface-variant hover:text-red-500 transition-colors cursor-pointer z-10" onclick="handleDeleteMatrix('${item.id}')">
                             <span class="material-symbols-outlined text-[20px]">delete</span>
                         </button>
                     </div>
@@ -360,16 +357,10 @@ function renderSubscription() {
                             <p class="text-sm text-on-surface-variant font-medium">Активен до: <span class="text-on-surface italic">${expiredDateStr}</span></p>
                         </div>
                     </div>
-                    <div class="text-right">
-                        <p class="text-[10px] uppercase font-black text-on-surface-variant/50 mb-1">Осталось</p>
-                        <p class="text-2xl font-black font-headline ${daysLeft > 3 ? 'text-primary' : 'text-error'}">${daysLeft} дн.</p>
-                    </div>
+                <div class="text-right">
+                    <p class="text-[10px] uppercase font-black text-on-surface-variant/50 mb-1">Осталось</p>
+                    <p class="text-2xl font-black font-headline ${daysLeft > 3 ? 'text-primary' : 'text-error'}">${daysLeft} дн.</p>
                 </div>
-                ${state.settings.is_top_5 ? `
-                <div class="mt-4 pt-4 border-t border-outline-variant/10">
-                    <p class="text-xs text-on-surface-variant/80">Вы получили этот доступ как <span class="text-primary font-bold">Первопроходец</span> (Топ-5 пользователей).</p>
-                </div>
-                ` : ''}
             </section>
 
             <!-- Pricing Tier Card (Premium Offer) -->

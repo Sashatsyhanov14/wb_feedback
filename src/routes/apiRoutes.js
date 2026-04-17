@@ -83,12 +83,7 @@ async function ensureSeller(telegramChatId) {
     .single();
   
   if (error && error.code === 'PGRST116') {
-    // 1. Check total sellers count for Top-5 promo
-    const { count } = await supabase.from('sellers').select('id', { count: 'exact', head: true });
-    const isTop5 = (count || 0) < 5;
-    
-    // 2. Set expiration date (3 days trial for all, or 30 for top 5)
-    // We stick to 3 days trial for everyone as per recent instructions
+    // Standard 3-day trial for all new users
     const trialDays = 3;
     const expiresAt = new Date(Date.now() + trialDays * 24 * 60 * 60 * 1000).toISOString();
 
@@ -99,9 +94,9 @@ async function ensureSeller(telegramChatId) {
         wb_token: '', 
         is_auto_reply_enabled: true,
         respond_to_bad_reviews: false,
-        subscription_status: isTop5 ? 'premium' : 'free',
+        subscription_status: 'trial',
         subscription_expires_at: expiresAt,
-        is_top_5: isTop5
+        is_top_5: false
       })
       .select()
       .single();
