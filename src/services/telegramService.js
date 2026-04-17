@@ -241,18 +241,24 @@ class TelegramService {
       const escapedDraft = this._escapeHtml(draftText);
       message += `<b>Вариант ответа:</b>\n"${escapedDraft}"`;
       
+      const keyboard = [
+        [
+          { text: '✅ Одобрить и отправить', callback_data: `approve_${logId}` },
+          { text: '❌ Удалить', callback_data: `reject_${logId}` }
+        ]
+      ];
+
+      // Only add Mini App link if URL is available and valid
+      if (process.env.APP_URL && process.env.APP_URL.startsWith('http')) {
+        keyboard.push([
+          { text: '✏️ Редактировать в Mini App', url: `${process.env.APP_URL}/review/${logId}` }
+        ]);
+      }
+      
       await this.bot.telegram.sendMessage(chatId, message, {
         parse_mode: 'HTML',
         reply_markup: {
-          inline_keyboard: [
-            [
-              { text: '✅ Одобрить и отправить', callback_data: `approve_${logId}` },
-              { text: '❌ Удалить', callback_data: `reject_${logId}` }
-            ],
-            [
-              { text: '✏️ Редактировать в Mini App', url: `${process.env.APP_URL || ''}/review/${logId}` }
-            ]
-          ]
+          inline_keyboard: keyboard
         }
       });
       return true;
