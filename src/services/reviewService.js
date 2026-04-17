@@ -86,12 +86,24 @@ class ReviewService {
       }
 
       // 5. Get internal product settings from Matrix
-      const { data: productMatrix } = await supabase
+      console.log(`[ReviewService] Searching matrix for nmId: ${feedback.nmId} (Type: ${typeof feedback.nmId}), seller_id: ${seller.id}`);
+      
+      const { data: productMatrix, error: matrixError } = await supabase
         .from('product_matrix')
         .select('*')
-        .eq('nm_id', feedback.nmId)
+        .eq('nm_id', Number(feedback.nmId))
         .eq('seller_id', seller.id)
-        .single();
+        .maybeSingle();
+
+      if (matrixError) {
+        console.error(`[ReviewService] Matrix query error:`, matrixError.message);
+      }
+      
+      if (productMatrix) {
+        console.log(`[ReviewService] Matrix match found! Recommend: ${productMatrix.cross_sell_article}`);
+      } else {
+        console.log(`[ReviewService] No matrix match found for nmId ${feedback.nmId}`);
+      }
 
       // 6. Generate AI response (now returns JSON)
       const aiData = await aiService.generateResponse(feedback.text, productMetadata, productMatrix, seller);

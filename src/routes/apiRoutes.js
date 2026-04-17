@@ -420,7 +420,7 @@ router.post('/matrix', async (req, res) => {
     
     const { data, error } = await supabase.from('product_matrix').upsert({
       seller_id: seller.id,
-      nm_id,
+      nm_id: Number(nm_id),
       product_name: product_name || 'Товар', // Provide fallback for NOT NULL constraint
       cross_sell_article,
       cross_sell_description: cross_sell_description || ''
