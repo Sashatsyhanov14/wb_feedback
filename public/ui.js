@@ -401,7 +401,7 @@ function renderSubscription() {
                     </div>
                 </div>
 
-                <button onclick="showToast('Оплата временно недоступна')" class="w-full py-5 bg-electric-gradient rounded-2xl font-headline font-black text-on-primary shadow-[0_8px_32px_rgba(173,198,255,0.3)] hover:scale-[1.02] active:scale-[0.97] duration-300 transition-all uppercase tracking-widest text-sm flex items-center justify-center gap-3">
+                <button onclick="handlePayment()" class="w-full py-5 bg-electric-gradient rounded-2xl font-headline font-black text-on-primary shadow-[0_8px_32px_rgba(173,198,255,0.3)] hover:scale-[1.02] active:scale-[0.97] duration-300 transition-all uppercase tracking-widest text-sm flex items-center justify-center gap-3">
                     <span>Оплатить подписку</span>
                     <span class="material-symbols-outlined font-bold">bolt</span>
                 </button>
@@ -529,6 +529,34 @@ async function handleAddMatrixRow() {
             showToast(data.error || 'Ошибка сохранения', true);
         }
     } catch (e) {
+        showToast('Ошибка сети', true);
+    }
+}
+
+async function handlePayment() {
+    try {
+        if (!state.telegramChatId) return showToast('Ошибка авторизации', true);
+        
+        showToast('Генерация ссылки...', false);
+        const res = await fetch('/api/payments/create', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ telegramChatId: state.telegramChatId })
+        });
+        
+        const data = await res.json();
+        if (data.url) {
+            // In TG Mini App, we should use Telegram.WebApp.openLink if available
+            if (window.Telegram && window.Telegram.WebApp) {
+                window.Telegram.WebApp.openLink(data.url);
+            } else {
+                window.location.href = data.url;
+            }
+        } else {
+            showToast(data.error || 'Ошибка платежной системы', true);
+        }
+    } catch (e) {
+        console.error('Payment error:', e);
         showToast('Ошибка сети', true);
     }
 }

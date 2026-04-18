@@ -12,5 +12,11 @@ module.exports = {
   nodeEnv: process.env.NODE_ENV || 'development',
   cronSecret: process.env.CRON_SECRET,
   adminId: '795056847',
-  adminUsername: process.env.TELEGRAM_ADMIN_USERNAME || '@edh4hhr'
+  adminIdUsername: process.env.TELEGRAM_ADMIN_USERNAME || '@edh4hhr',
+  
+  // Robokassa
+  robokassaMerchantLogin: process.env.ROBOKASSA_MERCHANT_LOGIN,
+  robokassaPassword1: process.env.ROBOKASSA_PASSWORD_1,
+  robokassaPassword2: process.env.ROBOKASSA_PASSWORD_2,
+  robokassaIsTest: process.env.ROBOKASSA_IS_TEST === 'true'
 };

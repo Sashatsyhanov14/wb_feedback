@@ -2,6 +2,7 @@ const express = require('express');
 const path = require('path');
 const config = require('./src/config');
 const apiRoutes = require('./src/routes/apiRoutes');
+const paymentRoutes = require('./src/routes/paymentRoutes');
 const telegramService = require('./src/services/telegramService');
 const { initJobs, processAll } = require('./src/jobs/reviewCron');
 require('dotenv').config();
@@ -45,6 +46,7 @@ app.post('/api/bot', (req, res) => telegramService.handleUpdate(req, res));
 
 // Routes
 app.use('/api', apiRoutes);
+app.use('/api/payments', paymentRoutes);
 
 // Initialize background jobs
 initJobs();
