@@ -33,6 +33,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     // 3. Load Data & Update
     await refreshData();
     showView(state.currentView);
+
+    // 4. Handle Payment Redirect Hash
+    if (window.location.hash === '#success') {
+        showToast('Оплата прошла успешно! 🎉');
+        window.location.hash = ''; // Clear hash
+    } else if (window.location.hash === '#fail') {
+        showToast('Ошибка при оплате. Попробуйте снова.', true);
+        window.location.hash = '';
+    }
 });
 
 async function refreshData() {
