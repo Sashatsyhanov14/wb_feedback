@@ -161,27 +161,24 @@ function showView(view) {
 
 function initTelegramWidget() {
     const container = document.getElementById('tg-login-container');
+    const hiddenWidget = document.getElementById('tg-hidden-widget');
+    
     if (!container) return;
     
-    
-    const script = document.createElement('script');
-    script.async = true;
-    script.src = "https://telegram.org/js/telegram-widget.js?22";
-    script.setAttribute('data-telegram-login', 'WBReplyAIbot');
-    script.setAttribute('data-size', 'large');
-    script.setAttribute('data-radius', '12');
-    script.setAttribute('data-onauth', 'onTelegramAuth(user)');
-    script.setAttribute('data-request-access', 'write');
-    
-    // Telegram widget is picky about where it is placed
-    container.appendChild(script);
-    
-    // Fallback: if it doesn't load in 3 seconds, show a manual button or error
-    setTimeout(() => {
-        if (container.innerHTML.includes('animate-pulse')) {
-            container.innerHTML = `<p class="text-[10px] text-red-400 font-bold uppercase">Ошибка загрузки виджета. Проверьте VPN или настройки домена в BotFather.</p>`;
+    if (hiddenWidget && hiddenWidget.children.length > 0) {
+        // Move whatever the script generated (likely an iframe) to our container
+        container.innerHTML = '';
+        while (hiddenWidget.firstChild) {
+            container.appendChild(hiddenWidget.firstChild);
         }
-    }, 4000);
+    } else {
+        // Fallback: if it's already moved, or failed
+        setTimeout(() => {
+            if (container.innerHTML.includes('animate-pulse') || container.innerHTML === '') {
+                container.innerHTML = `<p class="text-[10px] text-red-400 font-bold uppercase text-center mt-2">Ошибка виджета. Проверь домен в @BotFather.</p>`;
+            }
+        }, 2000);
+    }
 }
 
 function renderLogin() {
