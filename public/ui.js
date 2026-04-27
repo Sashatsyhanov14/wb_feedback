@@ -218,10 +218,21 @@ function renderLogin() {
                         <span class="text-base font-bold text-white">Войти через ВКонтакте</span>
                     </button>
 
-                    <!-- Telegram Widget Container -->
-                    <div id="tg-login-container" class="w-full flex justify-center py-2">
-                        <!-- Widget will be injected here -->
-                        <div class="animate-pulse bg-gray-200 h-16 w-full rounded-[12px]"></div>
+                    <!-- Telegram Button (Custom Design with invisible widget overlay) -->
+                    <div class="relative w-full h-16 bg-[#24A1DE] hover:brightness-110 active:scale-[0.97] transition-all rounded-[12px] shadow-lg shadow-[#24A1DE]/30 overflow-hidden cursor-pointer group">
+                        
+                        <!-- Visible Custom Button -->
+                        <div class="absolute inset-0 flex items-center justify-center gap-4 pointer-events-none">
+                            <svg class="w-8 h-8 fill-white" viewBox="0 0 24 24">
+                                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69.01-.03.01-.14-.07-.2-.08-.06-.19-.04-.27-.02-.12.02-1.96 1.25-5.54 3.69-.52.36-1 .53-1.42.52-.47-.01-1.37-.26-2.03-.48-.82-.27-1.47-.42-1.42-.88.03-.24.35-.49.96-.75 3.78-1.65 6.31-2.74 7.58-3.27 3.61-1.51 4.35-1.77 4.84-1.78.11 0 .35.03.5.16.12.1.16.23.18.33.02.11.02.24.01.37z"/>
+                            </svg>
+                            <span class="text-base font-bold text-white tracking-tight">Войти через Telegram</span>
+                        </div>
+
+                        <!-- Invisible Widget Overlay -->
+                        <div id="tg-login-container" class="absolute inset-0 z-10 opacity-[0.01] overflow-hidden flex items-center justify-center" style="transform: scale(4); transform-origin: center;">
+                            <!-- Widget will be injected here -->
+                        </div>
                     </div>
                 </div>
 
