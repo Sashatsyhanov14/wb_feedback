@@ -16,8 +16,13 @@ echo ==============================================
 echo SUCCESS! Changes sent to GitHub.
 echo.
 echo Connecting to server to pull changes and restart...
-echo (You will be prompted to enter the server password)
+echo.
 echo ==============================================
+echo ВНИМАНИЕ: Пароль скопирован в буфер обмена!
+echo Просто нажми ПРАВУЮ КНОПКУ МЫШИ (чтобы вставить) и нажми ENTER
+echo ==============================================
+
+echo|set /p="ooOC8kX%%HeF7" | clip
 
 ssh root@82.202.131.184 "cd /root/wb_feedback && git pull && pm2 restart wb-reply"
 
