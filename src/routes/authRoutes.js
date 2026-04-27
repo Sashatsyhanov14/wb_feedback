@@ -4,6 +4,7 @@ const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const config = require('../config');
 const supabase = require('../db/supabase');
+const axios = require('axios');
 
 // Helper to verify Telegram login hash
 function verifyTelegramHash(data) {
@@ -132,6 +133,101 @@ router.post('/demo', async (req, res) => {
     });
 
     res.json({ success: true, sellerId: seller.id });
+});
+
+// 5. Google Login
+// Redirect to Google OAuth
+router.get('/google', (req, res) => {
+  const rootUrl = 'https://accounts.google.com/o/oauth2/v2/auth';
+  const options = {
+    redirect_uri: config.googleRedirectUri,
+    client_id: config.googleClientId,
+    access_type: 'offline',
+    response_type: 'code',
+    prompt: 'consent',
+    scope: [
+      'https://www.googleapis.com/auth/userinfo.profile',
+      'https://www.googleapis.com/auth/userinfo.email',
+    ].join(' '),
+  };
+
+  const qs = new URLSearchParams(options);
+  res.redirect(`${rootUrl}?${qs.toString()}`);
+});
+
+// Google OAuth Callback
+router.get('/google/callback', async (req, res) => {
+  const code = req.query.code;
+
+  try {
+    // Exchange code for tokens
+    const { data } = await axios.post('https://oauth2.googleapis.com/token', {
+      code,
+      client_id: config.googleClientId,
+      client_secret: config.googleClientSecret,
+      redirect_uri: config.googleRedirectUri,
+      grant_type: 'authorization_code',
+    });
+
+    const { id_token, access_token } = data;
+
+    // Get user profile
+    const { data: profile } = await axios.get(
+      `https://www.googleapis.com/oauth2/v1/userinfo?alt=json&access_token=${access_token}`,
+      {
+        headers: { Authorization: `Bearer ${id_token}` },
+      }
+    );
+
+    // Upsert user in sellers table
+    let { data: seller, error: findError } = await supabase
+      .from('sellers')
+      .select('id')
+      .eq('auth_provider', 'google')
+      .eq('auth_provider_id', profile.id)
+      .maybeSingle();
+
+    if (!seller) {
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 3);
+
+      const { data: newSeller, error: insertError } = await supabase
+        .from('sellers')
+        .insert({
+          auth_provider: 'google',
+          auth_provider_id: profile.id,
+          email: profile.email,
+          display_name: profile.name,
+          avatar_url: profile.picture,
+          subscription_status: 'trial',
+          subscription_expires_at: expiresAt.toISOString()
+        })
+        .select('id')
+        .single();
+      
+      if (insertError) throw insertError;
+      seller = newSeller;
+    }
+
+    // Issue JWT
+    const token = jwt.sign(
+      { sellerId: seller.id },
+      config.jwtSecret,
+      { expiresIn: '30d' }
+    );
+
+    res.cookie('auth_token', token, {
+      httpOnly: true,
+      secure: config.nodeEnv === 'production',
+      maxAge: 30 * 24 * 60 * 60 * 1000
+    });
+
+    // Redirect to dashboard
+    res.redirect('/');
+  } catch (error) {
+    console.error('Google Auth Error:', error.response?.data || error.message);
+    res.redirect('/login?error=google_auth_failed');
+  }
 });
 
 module.exports = router;

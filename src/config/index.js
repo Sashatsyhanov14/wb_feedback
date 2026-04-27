@@ -11,6 +11,9 @@ module.exports = {
   port: process.env.PORT || 3000,
   nodeEnv: process.env.NODE_ENV || 'development',
   cronSecret: process.env.CRON_SECRET,
+  googleClientId: process.env.GOOGLE_CLIENT_ID,
+  googleClientSecret: process.env.GOOGLE_CLIENT_SECRET,
+  googleRedirectUri: process.env.GOOGLE_REDIRECT_URI || 'https://wbreplyai.ru/api/auth/google/callback',
   adminId: '795056847',
   adminIdUsername: process.env.TELEGRAM_ADMIN_USERNAME || '@edh4hhr',
   
