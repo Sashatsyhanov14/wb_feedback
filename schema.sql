@@ -1,43 +1,34 @@
--- Enable UUID extension
+-- Полная структура БД для WBReply AI (без Telegram бота)
 create extension if not exists "uuid-ossp";
 
--- 1. Sellers table
+-- 1. Sellers (Продавцы / Пользователи)
 create table if not exists sellers (
     id uuid default uuid_generate_v4() primary key,
-    telegram_chat_id bigint not null unique,
-    wb_token text not null,
+    auth_provider text not null,      -- 'google', 'vk', 'telegram' (как метод входа)
+    auth_provider_id text not null,   -- ID от провайдера
+    email text,
+    display_name text,
+    avatar_url text,
+    wb_token text default '',
     is_auto_reply_enabled boolean default true,
-    auto_reply_min_rating integer default 4,
     brand_name text,
-    seller_description text,
     custom_instructions text,
     subscription_status text default 'free',
     subscription_expires_at timestamp with time zone,
-    is_top_5 boolean default false,
     respond_to_bad_reviews boolean default false,
     joined_at timestamp with time zone default now(),
     last_active_at timestamp with time zone default now(),
-    created_at timestamp with time zone default now()
-);
-
--- 2. Product matrix table
-create table if not exists product_matrix (
-    id uuid default uuid_generate_v4() primary key,
-    seller_id uuid references sellers(id) on delete cascade,
-    nm_id bigint not null, -- WB Article
-    product_name text,
-    cross_sell_article text, -- Can be multiple or specific format
-    cross_sell_description text,
     created_at timestamp with time zone default now(),
-    unique(seller_id, nm_id)
+    unique(auth_provider, auth_provider_id)
 );
 
--- 3. Review logs table
+-- 2. Review Logs (Отзывы и ответы ИИ)
 create table if not exists review_logs (
     id uuid default uuid_generate_v4() primary key,
     seller_id uuid references sellers(id) on delete cascade,
     review_id text not null,
-    text text,
+    review_text text,
+    product_name text default '',
     rating integer check (rating >= 1 and rating <= 5),
     nm_id bigint not null,
     ai_response_draft text,
@@ -48,23 +39,21 @@ create table if not exists review_logs (
     unique(seller_id, review_id)
 );
 
--- 4. Chat history table (for persistent AI Consultant memory)
+-- 3. Chat History (ИИ-консультант в вебе)
 create table if not exists chat_history (
     id uuid default uuid_generate_v4() primary key,
     seller_id uuid references sellers(id) on delete cascade,
-    role text not null, -- 'user', 'assistant'
+    role text check (role in ('user', 'assistant')),
     content text not null,
     created_at timestamp with time zone default now()
 );
 
--- 5. Indexes for performance
-create index if not exists idx_review_logs_seller_id on review_logs(seller_id);
-create index if not exists idx_product_matrix_seller_id on product_matrix(seller_id);
-create index if not exists idx_sellers_telegram_id on sellers(telegram_chat_id);
-create index if not exists idx_chat_history_seller_id on chat_history(seller_id);
+-- Отключение RLS (Row Level Security), так как мы ходим в базу через Service Role Key с бэкенда
+alter table sellers disable row level security;
+alter table review_logs disable row level security;
+alter table chat_history disable row level security;
 
--- 6. Disable RLS for internal service-role access
-alter table if exists sellers disable row level security;
-alter table if exists product_matrix disable row level security;
-alter table if exists review_logs disable row level security;
-alter table if exists chat_history disable row level security;
+-- Индексы для ускорения запросов
+create index if not exists idx_review_logs_seller_id on review_logs(seller_id);
+create index if not exists idx_chat_history_seller_id on chat_history(seller_id);
+create index if not exists idx_sellers_auth on sellers(auth_provider, auth_provider_id);

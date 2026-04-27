@@ -1,18 +1,20 @@
 <!DOCTYPE html>
-<html lang="ru" class="dark">
+<html lang="ru">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>WBReply AI | Dashboard</title>
+    <title>WB Response AI | Dashboard</title>
+    <meta name="robots" content="noindex, nofollow">
     
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Manrope:wght@700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
     
     <!-- Scripts -->
-    <link href="dist.css" rel="stylesheet">
+    <link href="app.css" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     
     <script id="tailwind-config">
@@ -21,64 +23,17 @@
             theme: {
                 extend: {
                     colors: {
-                        "surface": "#131313",
-                        "tertiary-fixed": "#ffdbcc",
-                        "primary-fixed": "#d8e2ff",
-                        "secondary": "#adc6ff",
-                        "surface-container": "#201f1f",
-                        "on-background": "#e5e2e1",
-                        "error-container": "#93000a",
-                        "on-tertiary": "#571e00",
-                        "on-secondary": "#082f65",
-                        "background": "#131313",
-                        "surface-container-low": "#1c1b1b",
-                        "on-primary": "#002e69",
-                        "inverse-on-surface": "#313030",
-                        "inverse-surface": "#e5e2e1",
-                        "tertiary": "#ffb595",
-                        "on-secondary-fixed": "#001a41",
-                        "inverse-primary": "#005bc1",
-                        "secondary-fixed": "#d8e2ff",
-                        "on-error": "#690005",
-                        "surface-variant": "#353534",
-                        "surface-bright": "#393939",
-                        "on-primary-fixed-variant": "#004493",
-                        "on-surface-variant": "#c1c6d7",
-                        "outline-variant": "#414755",
-                        "surface-container-high": "#2a2a2a",
-                        "on-error-container": "#ffdad6",
-                        "surface-container-highest": "#353534",
-                        "primary-fixed-dim": "#adc6ff",
-                        "outline": "#8b90a0",
-                        "on-primary-fixed": "#001a41",
-                        "secondary-container": "#26467d",
-                        "on-tertiary-fixed-variant": "#7c2e00",
-                        "primary": "#adc6ff",
-                        "surface-tint": "#adc6ff",
-                        "surface-dim": "#131313",
-                        "primary-container": "#4b8eff",
-                        "on-surface": "#e5e2e1",
-                        "on-tertiary-container": "#4c1a00",
-                        "surface-container-lowest": "#0e0e0e",
-                        "on-secondary-container": "#98b5f3",
-                        "tertiary-fixed-dim": "#ffb595",
-                        "tertiary-container": "#ef6719",
-                        "error": "#ffb4ab",
-                        "on-primary-container": "#00285c",
-                        "on-tertiary-fixed": "#351000",
-                        "on-secondary-fixed-variant": "#26467d",
-                        "secondary-fixed-dim": "#adc6ff"
-                    },
-                    borderRadius: {
-                        "DEFAULT": "0.25rem",
-                        "lg": "0.5rem",
-                        "xl": "0.75rem",
-                        "full": "9999px"
+                        "primary": "var(--c-primary)",
+                        "surface": "var(--c-surface)",
+                        "bg-main": "var(--c-bg)",
+                        "outline-variant": "var(--c-border)",
+                        "on-surface-variant": "var(--c-text-dim)",
+                        "text-main": "var(--c-text)",
+                        "wb-purple": "#481173",
                     },
                     fontFamily: {
-                        "headline": ["Manrope"],
-                        "body": ["Inter"],
-                        "label": ["Inter"]
+                        "headline": ["Inter", "sans-serif"],
+                        "body": ["Inter", "sans-serif"]
                     }
                 },
             },
@@ -86,54 +41,256 @@
     </script>
     
     <style>
-        .material-symbols-outlined {
-            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        /* =============================================
+           LIGHT THEME (Default) — Premium Fintech
+           ============================================= */
+        :root {
+            --c-bg: #F0EFEB;
+            --c-surface: #FAF9F6;
+            --c-text: #1C1917;
+            --c-text-dim: #78716C;
+            --c-border: #E7E5E0;
+            --c-primary: #A67C37;
+            --c-sidebar-bg: #F5F4F0;
+            --c-sidebar-text: #57534E;
+            --c-sidebar-hover: #E7E5E0;
+            --c-tab-active-bg: rgba(166,124,55,0.07);
+            --c-input-bg: #F0EFEB;
+            --c-hover-text: #1C1917;
+            --c-card-shadow: 0 1px 3px rgb(0 0 0 / 0.04), 0 1px 2px rgb(0 0 0 / 0.02);
+            --c-toast-bg: #FAF9F6;
+            --c-toast-border: #E7E5E0;
         }
-        .bg-electric-gradient {
-            background: linear-gradient(135deg, #ADC6FF 0%, #4B8EFF 100%);
+
+        /* =============================================
+           DARK THEME — Premium B2B Anthracite
+           ============================================= */
+        .dark {
+            --c-bg: #111111;
+            --c-surface: #1E1E1E;
+            --c-text: #F4F4F5;
+            --c-text-dim: #888888;
+            --c-border: #2A2A2A;
+            --c-primary: #E1AF66;
+            --c-sidebar-bg: #0D0D0D;
+            --c-sidebar-text: #888888;
+            --c-sidebar-hover: #1E1E1E;
+            --c-tab-active-bg: rgba(225,175,102,0.06);
+            --c-input-bg: #171717;
+            --c-hover-text: #FFFFFF;
+            --c-card-shadow: 0 4px 12px rgb(0 0 0 / 0.4);
+            --c-toast-bg: #1E1E1E;
+            --c-toast-border: #333333;
         }
-        .glass-panel {
-            background: rgba(32, 31, 31, 0.7);
-            backdrop-filter: blur(20px);
-        }
-        ::-webkit-scrollbar { width: 4px; }
-        ::-webkit-scrollbar-track { background: #131313; }
-        ::-webkit-scrollbar-thumb { background: #2a2a2a; border-radius: 10px; }
         
-        body { min-height: max(300px, 100dvh); }
-        .tab-item.active { color: #ADC6FF; background: #2A2A2A; border-radius: 0.75rem; }
-        .tab-item.inactive { color: #C1C6D7; }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24;
+        }
+
+        * { transition: background-color 0.25s ease, border-color 0.25s ease, color 0.15s ease; }
+
+        body { 
+            min-height: 100dvh; 
+            background-color: var(--c-bg); 
+            color: var(--c-text); 
+            font-family: 'Inter', sans-serif;
+            letter-spacing: -0.01em;
+        }
+        
+        /* =============================================
+           LAYOUT
+           ============================================= */
+        .app-container {
+            display: flex;
+            min-height: 100dvh;
+        }
+
+        #desktop-sidebar {
+            width: 260px;
+            flex-shrink: 0;
+            display: none;
+            background: var(--c-sidebar-bg);
+            border-right: 1px solid var(--c-border);
+        }
+
+        main {
+            flex-grow: 1;
+            min-width: 0;
+            padding-top: 5rem;
+            padding-bottom: 7rem;
+            background-color: var(--c-bg);
+        }
+
+        @media (min-width: 1024px) {
+            #desktop-sidebar { display: flex; }
+            #main-nav, #mobile-header { display: none !important; }
+            main {
+                padding-top: 3rem;
+                padding-bottom: 3rem;
+            }
+        }
+
+        /* =============================================
+           NAVIGATION TABS
+           ============================================= */
+        .tab-item { 
+            color: var(--c-sidebar-text); 
+            transition: all 0.2s ease; 
+            border-radius: 8px;
+            padding: 8px 12px;
+        }
+        .tab-item.active { 
+            color: var(--c-primary) !important; 
+            background: var(--c-tab-active-bg);
+        }
+        .tab-item:hover:not(.active) { 
+            color: #FFFFFF; 
+            background: var(--c-sidebar-hover);
+        }
+        
+        .nav-text {
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.15em;
+            color: inherit;
+        }
+
+        .material-symbols-outlined {
+            color: inherit;
+        }
+        
+        /* =============================================
+           COMPONENTS
+           ============================================= */
+        .premium-card {
+            background: var(--c-surface);
+            border: 1px solid var(--c-border);
+            border-radius: 8px;
+            box-shadow: var(--c-card-shadow);
+        }
+        
+        .primary-btn {
+            background: var(--c-primary);
+            color: #FFFFFF;
+            font-weight: 800;
+            border-radius: 8px;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .dark .primary-btn { color: #111111; }
+        .primary-btn:hover { 
+            transform: translateY(-1px);
+            box-shadow: 0 8px 20px -8px var(--c-primary);
+            filter: brightness(1.05);
+        }
+
+        input, textarea, select {
+            color: var(--c-text);
+            background-color: var(--c-input-bg);
+            border-radius: 8px;
+        }
+        input::placeholder, textarea::placeholder {
+            color: var(--c-text-dim);
+        }
+        
+        @keyframes toast {
+            0% { transform: translate(-50%, 20px); opacity: 0; }
+            10% { transform: translate(-50%, 0); opacity: 1; }
+            90% { transform: translate(-50%, 0); opacity: 1; }
+            100% { transform: translate(-50%, -20px); opacity: 0; }
+        }
+        .animate-toast {
+            animation: toast 2.5s ease-in-out forwards;
+        }
+        .animate-in {
+            animation: fadeIn 0.3s ease-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
     </style>
+    <script>
+        // Init Theme — default dark
+        const savedTheme = localStorage.getItem('theme') || 'dark';
+        if (savedTheme === 'dark') document.documentElement.classList.add('dark');
+    </script>
 </head>
-<body class="bg-surface text-on-surface font-body selection:bg-primary/30">
-    <header class="fixed top-0 w-full z-50 bg-[#131313] text-[#ADC6FF] flex justify-between items-center px-4 h-14">
-        <div class="flex items-center gap-3">
-            <span class="material-symbols-outlined text-[#ADC6FF]" onclick="toggleSidebar()">menu</span>
-            <h1 class="font-headline font-bold text-lg tracking-tight text-[#E5E2E1]">WBReply AI</h1>
-        </div>
-        <div class="flex items-center gap-2">
-            <div class="w-8 h-8 rounded-full bg-surface-container-high flex items-center justify-center">
-                    <a class="text-[11px] font-bold text-on-surface-variant/50 hover:text-primary transition-colors uppercase tracking-widest" href="offer.html">Оферта</a>
+<body class="bg-bg-main selection:bg-primary/30">
+    <div class="app-container">
+        <!-- Desktop Sidebar -->
+        <aside id="desktop-sidebar" class="fixed lg:sticky top-0 h-[100dvh] flex flex-col p-8 z-50 overflow-y-auto" style="background: var(--c-sidebar-bg); border-right: 1px solid var(--c-border)">
+            <div class="flex items-center font-black tracking-tighter mb-12 px-2 text-2xl cursor-default select-none">
+                <span class="text-white">WR</span>
+                <svg class="w-6 h-6 text-primary mx-1 animate-pulse-slow" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 0C12 6.627 6.627 12 0 12C6.627 12 12 17.373 12 24C12 17.373 17.373 12 24 12C17.373 12 12 6.627 12 0Z"/>
+                </svg>
+                <span class="text-primary">AI</span>
             </div>
-        </div>
-    </header>
+            
+            <nav class="flex flex-col gap-3">
+                <a onclick="showView('settings')" class="tab-item flex items-center gap-4 cursor-pointer">
+                    <span class="material-symbols-outlined text-xl">tune</span>
+                    <span class="nav-text">Бизнес</span>
+                </a>
+                <a onclick="showView('reviews')" class="tab-item flex items-center gap-4 cursor-pointer">
+                    <span class="material-symbols-outlined text-xl">forum</span>
+                    <span class="nav-text">Отзывы</span>
+                </a>
+                <a onclick="showView('subscription')" class="tab-item flex items-center gap-4 cursor-pointer">
+                    <span class="material-symbols-outlined text-xl">account_balance_wallet</span>
+                    <span class="nav-text">Аккаунт</span>
+                </a>
+                <a onclick="showView('interface')" class="tab-item flex items-center gap-4 cursor-pointer">
+                    <span class="material-symbols-outlined text-xl">settings</span>
+                    <span class="nav-text">Система</span>
+                </a>
+            </nav>
+            
+            <div class="mt-auto border-t pt-6 flex flex-col gap-4" style="border-color: var(--c-border)">
+                <a onclick="handleLogout()" class="flex items-center gap-4 cursor-pointer tab-item">
+                    <span class="material-symbols-outlined text-sm">logout</span>
+                    <span class="nav-text">Выход</span>
+                </a>
+            </div>
+        </aside>
 
-    <main id="content-view" class="pt-20 pb-32 px-4 max-w-xl mx-auto">
-        <!-- Content injected by app.js -->
-    </main>
+        <!-- Main Content Area -->
+        <main class="w-full">
+            <header id="mobile-header" class="fixed top-0 w-full z-40 flex justify-between items-center px-6 h-16 lg:hidden" style="background: var(--c-bg); border-bottom: 1px solid var(--c-border)">
+                <div class="flex items-center font-black tracking-tighter text-lg cursor-default text-text-main">
+                    <span>WR</span>
+                    <svg class="w-4 h-4 text-[#E1AF66] mx-0.5" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 0C12 6.627 6.627 12 0 12C6.627 12 12 17.373 12 24C12 17.373 17.373 12 24 12C17.373 12 12 6.627 12 0Z"/>
+                    </svg>
+                    <span class="text-[#E1AF66]">AI</span>
+                </div>
+                <span class="material-symbols-outlined" style="color: var(--c-text-dim)">menu</span>
+            </header>
 
-    <nav class="fixed bottom-0 w-full flex justify-around items-center px-6 pb-6 pt-2 bg-[#131313]/70 backdrop-blur-xl rounded-t-2xl z-50 border-t border-[#414755]/15 shadow-[0_-4px_24px_0_rgba(173,198,255,0.06)]">
-        <a id="nav-settings" class="tab-item flex flex-col items-center justify-center px-3 py-1 transition-all active:scale-95" href="javascript:showView('settings')">
-            <span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">settings</span>
-            <span class="text-[11px] font-medium mt-1">Настройки</span>
+            <div id="content-view" class="max-w-4xl mx-auto px-6 py-12 lg:py-20 w-full">
+                <!-- Content injected by ui.js -->
+            </div>
+        </main>
+    </div>
+
+    <!-- Mobile Navigation -->
+    <nav id="main-nav" class="fixed bottom-0 w-full flex justify-between items-center px-2 py-4 z-40 lg:hidden" style="background: var(--c-bg); border-top: 1px solid var(--c-border); backdrop-filter: blur(10px);">
+        <a id="nav-settings" class="tab-item flex-1 flex flex-col items-center justify-center transition-all active:scale-95" onclick="showView('settings')">
+            <span class="material-symbols-outlined text-xl">tune</span>
+            <span class="text-[10px] font-black uppercase tracking-[0.2em] mt-1.5">Бизнес</span>
         </a>
-        <a id="nav-matrix" class="tab-item flex flex-col items-center justify-center p-2 transition-all active:scale-95" href="javascript:showView('matrix')">
-            <span class="material-symbols-outlined">grid_view</span>
-            <span class="text-[11px] font-medium mt-1">Матрица</span>
+        <a id="nav-reviews" class="tab-item flex-1 flex flex-col items-center justify-center transition-all active:scale-95" onclick="showView('reviews')">
+            <span class="material-symbols-outlined text-xl">forum</span>
+            <span class="text-[10px] font-black uppercase tracking-[0.2em] mt-1.5">Отзывы</span>
         </a>
-        <a id="nav-subscription" class="tab-item flex flex-col items-center justify-center p-2 transition-all active:scale-95" href="javascript:showView('subscription')">
-            <span class="material-symbols-outlined">person</span>
-            <span class="text-[11px] font-medium mt-1">Аккаунт</span>
+        <a id="nav-subscription" class="tab-item flex-1 flex flex-col items-center justify-center transition-all active:scale-95" onclick="showView('subscription')">
+            <span class="material-symbols-outlined text-xl">account_balance_wallet</span>
+            <span class="text-[10px] font-black uppercase tracking-[0.2em] mt-1.5">Аккаунт</span>
+        </a>
+        <a id="nav-interface" class="tab-item flex-1 flex flex-col items-center justify-center transition-all active:scale-95" onclick="showView('interface')">
+            <span class="material-symbols-outlined text-xl">settings</span>
+            <span class="text-[10px] font-black uppercase tracking-[0.2em] mt-1.5">Система</span>
         </a>
     </nav>
 

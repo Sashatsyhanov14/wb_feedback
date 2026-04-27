@@ -17,16 +17,30 @@ class AIService {
 
   /**
    * Generate an answer to a review
+   * @param {object|string} reviewInput - review context {text, pros, cons, rating} or plain text
    */
-  async generateResponse(reviewText, productMetadata, productMatrix, sellerSettings = {}, extraContext = {}, model = 'nex-agi/deepseek-v3.1-nex-n1') {
+  async generateResponse(reviewInput, productMetadata, productMatrix, sellerSettings = {}, extraContext = {}, model = 'nex-agi/deepseek-v3.1-nex-n1') {
     try {
+      // Support both old (string) and new (object) format
+      const reviewText = typeof reviewInput === 'string' ? reviewInput : reviewInput.text;
+      const reviewPros = typeof reviewInput === 'object' ? reviewInput.pros : '';
+      const reviewCons = typeof reviewInput === 'object' ? reviewInput.cons : '';
+      const reviewRating = typeof reviewInput === 'object' ? reviewInput.rating : null;
+
       const systemPrompt = this._buildSystemPrompt(productMetadata, productMatrix, sellerSettings, extraContext);
       
+      // Build user message with full review context
+      let userMessage = `Текст отзыва: "${reviewText}".`;
+      if (reviewPros) userMessage += `\nДостоинства (от покупателя): "${reviewPros}".`;
+      if (reviewCons) userMessage += `\nНедостатки (от покупателя): "${reviewCons}".`;
+      if (reviewRating) userMessage += `\nОценка: ${reviewRating} из 5.`;
+      userMessage += `\n\nВЕРНИ ОТВЕТ В ФОРМАТЕ JSON: {"text": "текст ответа", "category": "категория(Качество/Доставка/Цена/Другое)", "sentiment": "positive/neutral/negative"}`;
+
       const response = await this.client.post('/chat/completions', {
         model: model,
         messages: [
           { role: 'system', content: systemPrompt },
-          { role: 'user', content: `Текст отзыва: "${reviewText}".\n\nВЕРНИ ОТВЕТ В ФОРМАТЕ JSON: {"text": "текст ответа", "category": "категория(Качество/Доставка/Цена/Другое)", "sentiment": "positive/neutral/negative"}` }
+          { role: 'user', content: userMessage }
         ],
         temperature: 0.85,
         response_format: { type: "json_object" }
@@ -62,7 +76,17 @@ class AIService {
 
 ТЫ ОТВЕЧАЕШЬ НА ОТЗЫВ О ТОВАРЕ: "${productName}".`;
 
-    if (product?.description) prompt += `\nКраткая информация о товаре: ${product.description.slice(0, 250)}`;
+    // Add product description from Content API
+    if (product?.description) prompt += `\nОписание товара: ${product.description.slice(0, 300)}`;
+
+    // Add product characteristics from Content API
+    if (product?.characteristics && product.characteristics.length > 0) {
+      const charsList = product.characteristics
+        .slice(0, 8) // Limit to avoid overly long prompts
+        .map(c => `${c.name}: ${Array.isArray(c.value) ? c.value.join(', ') : c.value}`)
+        .join('; ');
+      prompt += `\nХарактеристики товара: ${charsList}`;
+    }
 
     // ADD CROSS-SELL IF PRESENT
     if (matrix?.cross_sell_article) {

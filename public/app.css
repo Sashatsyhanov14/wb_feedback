@@ -28,7 +28,6 @@ body {
   color: var(--text);
   line-height: 1.5;
   overflow-x: hidden;
-  height: 100vh;
 }
 
 /* Background Aura Elements */
@@ -49,7 +48,6 @@ body {
 
 .app-container {
   display: flex;
-  height: 100vh;
   background: transparent;
 }
 

@@ -59,15 +59,31 @@ class WBService {
             {
               id: `mock_rev_1_${timestamp}`,
               text: 'Очень классное платье! Цвет как на фото, размер подошел.',
+              pros: 'Красивый цвет, приятная ткань',
+              cons: '',
               productValuation: 5,
               nmId: 123456,
+              productDetails: {
+                productName: 'Платье вечернее Silk',
+                nmId: 123456,
+                brandName: 'TestBrand',
+                supplierArticle: 'DRESS-001'
+              },
               createdDate: new Date().toISOString()
             },
             {
               id: `mock_rev_2_${timestamp}`,
               text: 'Приехал рваный пакет, товар испачкан. Ужасно!',
+              pros: '',
+              cons: 'Плохая упаковка, пятна на ткани',
               productValuation: 1,
               nmId: 123456,
+              productDetails: {
+                productName: 'Платье вечернее Silk',
+                nmId: 123456,
+                brandName: 'TestBrand',
+                supplierArticle: 'DRESS-001'
+              },
               createdDate: new Date().toISOString()
             }
           ]
@@ -80,7 +96,7 @@ class WBService {
         headers: this._getHeaders(token),
         params: { isAnswered, take, skip, order: 'dateDesc', ...params }
       });
-      return response.data;
+      return { data: response.data };
     } catch (error) {
       console.error('Error fetching WB reviews:', error.response?.data || error.message);
       throw error;
@@ -143,7 +159,7 @@ class WBService {
       }, {
         headers: this._getHeaders(token)
       });
-      return response.status === 204;
+      return response.status === 200 || response.status === 204;
     } catch (error) {
       console.error('Error sending WB answer:', error.response?.data || error.message);
       throw error;

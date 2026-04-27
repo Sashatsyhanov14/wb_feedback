@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="ru" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WB Response AI | Революция в управлении отзывами Wildberries</title>
+    <meta name="description" content="Автоматизируйте ответы на отзывы Wildberries с помощью самого продвинутого ИИ. Увеличивайте продажи и рейтинг на автопилоте.">
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#E1AF66',
+                        'primary-dark': '#C69752',
+                        'wb-purple': '#481173',
+                        bg: '#050505',
+                        surface: '#111111',
+                        border: '#1F1F1F',
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        display: ['Outfit', 'sans-serif'],
+                    },
+                    animation: {
+                        'pulse-slow': 'pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'float': 'float 6s ease-in-out infinite',
+                    },
+                    keyframes: {
+                        float: {
+                            '0%, 100%': { transform: 'translateY(0)' },
+                            '50%': { transform: 'translateY(-20px)' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        :root {
+            --primary: #E1AF66;
+            --bg: #050505;
+        }
+        
+        body { 
+            background-color: var(--bg); 
+            color: #FFFFFF; 
+            font-family: 'Inter', sans-serif; 
+            overflow-x: hidden;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .glass {
+            background: rgba(17, 17, 17, 0.7);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .text-gradient {
+            background: linear-gradient(135deg, #FFF 0%, #E1AF66 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .hero-glow {
+            position: absolute;
+            width: 60vw;
+            height: 60vw;
+            background: radial-gradient(circle, rgba(225, 175, 102, 0.08) 0%, transparent 70%);
+            top: -20vw;
+            left: 20vw;
+            z-index: -1;
+            pointer-events: none;
+        }
+
+        .reveal {
+            opacity: 0;
+            transform: translateY(30px);
+            transition: all 0.8s cubic-bezier(0.22, 1, 0.36, 1);
+        }
+
+        .reveal.active {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .card-hover {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .card-hover:hover {
+            transform: translateY(-8px);
+            border-color: rgba(225, 175, 102, 0.3);
+            background: rgba(225, 175, 102, 0.02);
+        }
+
+        .nav-link {
+            position: relative;
+            transition: color 0.3s ease;
+        }
+
+        .nav-link::after {
+            content: '';
+            position: absolute;
+            width: 0;
+            height: 1px;
+            bottom: -4px;
+            left: 0;
+            background-color: var(--primary);
+            transition: width 0.3s ease;
+        }
+
+        .nav-link:hover::after {
+            width: 100%;
+        }
+
+        .btn-premium {
+            background: linear-gradient(135deg, #E1AF66 0%, #C69752 100%);
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 20px rgba(225, 175, 102, 0.2);
+        }
+
+        .btn-premium:hover {
+            box-shadow: 0 8px 30px rgba(225, 175, 102, 0.4);
+            transform: translateY(-2px);
+            filter: brightness(1.1);
+        }
+
+        .grid-pattern {
+            background-image: radial-gradient(rgba(255,255,255,0.05) 1px, transparent 1px);
+            background-size: 40px 40px;
+        }
+    </style>
+</head>
+<body class="selection:bg-primary/20">
+
+    <div class="hero-glow"></div>
+    <div class="fixed inset-0 grid-pattern pointer-events-none z-[-2]"></div>
+
+    <!-- Navigation -->
+    <nav class="fixed top-0 w-full z-50 transition-all duration-300 py-4" id="navbar">
+        <div class="max-w-7xl mx-auto px-6 md:px-12 flex justify-between items-center">
+            <div class="flex items-center font-display font-black tracking-tighter text-2xl cursor-pointer group">
+                <span class="text-white">WB</span>
+                <div class="relative mx-1">
+                    <svg class="w-6 h-6 text-primary animate-pulse-slow" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 0C12 6.627 6.627 12 0 12C6.627 12 12 17.373 12 24C12 17.373 17.373 12 24 12C17.373 12 12 6.627 12 0Z"/>
+                    </svg>
+                </div>
+                <span class="text-primary">AI</span>
+            </div>
+
+            <div class="hidden md:flex items-center gap-12 text-[11px] font-bold uppercase tracking-[0.2em] text-gray-400">
+                <a href="#features" class="nav-link hover:text-white">Сравнение</a>
+                <a href="#how-it-works" class="nav-link hover:text-white">Как начать</a>
+                <a href="#pricing" class="nav-link hover:text-white">Тарифы</a>
+            </div>
+
+            <div class="flex items-center gap-6">
+                <a href="/login" class="text-[11px] font-bold uppercase tracking-[0.2em] text-white/70 hover:text-white transition-colors hidden sm:block">Вход</a>
+                <a href="/login" class="btn-premium text-bg px-8 py-3 rounded-full font-bold text-[11px] uppercase tracking-[0.15em]">
+                    Начать работу
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="relative pt-32 pb-12 md:pt-48 md:pb-16 px-6 overflow-hidden">
+        <div class="max-w-7xl mx-auto text-center relative z-10">
+            <h1 class="font-display text-5xl md:text-7xl lg:text-8xl font-extrabold text-white leading-[1.05] tracking-tight mb-6 reveal" style="transition-delay: 100ms">
+                Нейросеть закроет <span class="text-gradient">100% отзывов</span><br/>на WB без твоего участия.
+            </h1>
+            
+            <p class="text-lg md:text-xl text-gray-400 max-w-2xl mx-auto mb-10 leading-relaxed font-light reveal" style="transition-delay: 200ms">
+                Защищает рейтинг, гасит негатив и работает точно по твоей инструкции. Настройка занимает ровно 1 минуту.
+            </p>
+
+            <div class="flex flex-col sm:flex-row items-center justify-center gap-4 reveal" style="transition-delay: 300ms">
+                <a href="/login" class="btn-premium w-full sm:w-auto text-bg px-12 py-5 rounded-2xl font-black text-xs uppercase tracking-[0.2em]">
+                    Запустить 3 дня бесплатно
+                </a>
+            </div>
+            <p class="mt-6 text-gray-500 text-[10px] font-bold uppercase tracking-widest reveal" style="transition-delay: 400ms">Без привязки карты • Отмена в 1 клик</p>
+        </div>
+    </section>
+
+    <!-- Live Demo / Proof Section -->
+    <section class="pb-24 md:pb-32 px-6 relative z-10">
+        <div class="max-w-4xl mx-auto reveal">
+            <div class="text-center mb-12">
+                <p class="text-primary text-[10px] font-black uppercase tracking-[0.4em] mb-4">В действии</p>
+                <h2 class="text-3xl md:text-4xl font-display font-bold text-white tracking-tight">
+                    Как это выглядит на самом деле?
+                </h2>
+            </div>
+            
+            <div class="glass p-6 md:p-8 rounded-[2rem] border border-border relative overflow-hidden">
+                <!-- User Review -->
+                <div class="mb-8 relative z-10">
+                    <div class="flex items-center gap-4 mb-3">
+                        <div class="w-10 h-10 shrink-0 rounded-full bg-surface border border-border flex items-center justify-center font-bold text-gray-400">Е</div>
+                        <div>
+                            <div class="text-white font-bold text-sm">Екатерина</div>
+                            <div class="flex text-primary text-xs">
+                                ★★☆☆☆ <span class="text-gray-500 ml-2">Вчера, 14:30</span>
+                            </div>
+                        </div>
+                    </div>
+                    <p class="text-gray-300 text-sm leading-relaxed bg-surface/50 p-4 rounded-2xl rounded-tl-sm border border-white/5 inline-block">
+                        Швы кривые, нитки торчат. Ожидала лучшего качества за такие деньги. Оставила только потому что срочно нужно было платье.
+                    </p>
+                </div>
+                
+                <!-- AI Response -->
+                <div class="flex justify-end relative z-10">
+                    <div class="w-10 h-10 shrink-0 rounded-full bg-primary/20 border border-primary/30 flex items-center justify-center font-bold text-primary ml-4 order-2 shadow-[0_0_15px_rgba(225,175,102,0.3)]">AI</div>
+                    <div class="order-1 text-right">
+                        <div class="text-primary font-bold text-sm mb-1">Ваш бренд</div>
+                        <p class="text-gray-300 text-sm leading-relaxed bg-primary/10 p-5 rounded-3xl rounded-tr-sm border border-primary/20 text-left max-w-2xl shadow-lg">
+                            Екатерина, здравствуйте! Приносим искренние извинения за то, что качество товара вас огорчило. Мы уже передали информацию на производство, чтобы усилить контроль качества пошива и исключить подобные ситуации в будущем.<br><br>
+                            Надеемся, что в использовании платье окажется комфортным. Спасибо за обратную связь, она помогает нам стать лучше!
+                        </p>
+                    </div>
+                </div>
+                
+                <!-- Glow effects -->
+                <div class="absolute -right-20 -bottom-20 w-64 h-64 bg-primary/10 blur-3xl rounded-full z-0 pointer-events-none"></div>
+            </div>
+            
+            <p class="text-center text-gray-500 text-xs mt-6 font-medium">
+                * Пример <span class="text-white">безупречной отработки негатива</span> без участия живого менеджера.
+            </p>
+        </div>
+    </section>
+
+
+
+    <!-- Features Section -->
+    <section id="features" class="py-32 px-6">
+        <div class="max-w-7xl mx-auto">
+            <div class="flex flex-col md:flex-row justify-between items-end gap-8 mb-20 reveal">
+                <div class="max-w-2xl">
+                    <h2 class="text-4xl md:text-5xl font-display font-bold text-white tracking-tight">
+                        Забудь про рутину <br/> и <span class="text-primary">шаблонные отписки.</span>
+                    </h2>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <!-- Comparison 1 -->
+                <div class="glass p-10 rounded-[2rem] border border-border card-hover reveal" style="transition-delay: 100ms">
+                    <div class="w-14 h-14 bg-red-500/10 rounded-2xl flex items-center justify-center mb-8">
+                        <span class="material-symbols-outlined text-red-500 text-3xl">person_cancel</span>
+                    </div>
+                    <h3 class="text-xl font-bold text-white mb-4">Живой менеджер</h3>
+                    <p class="text-gray-500 leading-relaxed font-light text-sm">
+                        Просит от 30 000 ₽/мес, спит по ночам, выгорает и может нахамить клиенту на эмоциях.
+                    </p>
+                </div>
+
+                <!-- Comparison 2 -->
+                <div class="glass p-10 rounded-[2rem] border border-border card-hover reveal" style="transition-delay: 200ms">
+                    <div class="w-14 h-14 bg-orange-500/10 rounded-2xl flex items-center justify-center mb-8">
+                        <span class="material-symbols-outlined text-orange-500 text-3xl">smart_toy</span>
+                    </div>
+                    <h3 class="text-xl font-bold text-white mb-4">Обычный бот</h3>
+                    <p class="text-gray-500 leading-relaxed font-light text-sm">
+                        Отвечает как тупой робот. Спамит фразой «Спасибо за покупку!», бесит покупателей и убивает лояльность к бренду.
+                    </p>
+                </div>
+
+                <!-- Comparison 3 -->
+                <div class="glass p-10 rounded-[2rem] border border-primary/30 bg-primary/5 card-hover reveal" style="transition-delay: 300ms">
+                    <div class="w-14 h-14 bg-primary/20 rounded-2xl flex items-center justify-center mb-8">
+                        <span class="material-symbols-outlined text-primary text-3xl">bolt</span>
+                    </div>
+                    <h3 class="text-xl font-bold text-white mb-4">Wbreply AI</h3>
+                    <p class="text-gray-400 leading-relaxed font-light text-sm">
+                        Работает 24/7. Отвечает как живой человек, анализирует текст отзыва и строго соблюдает твой стиль (извиняется за брак, шутит или отвечает сухо — всё по твоей инструкции).
+                    </p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+
+
+    <!-- How it works -->
+    <section id="how-it-works" class="py-32 px-6 bg-surface/20">
+        <div class="max-w-7xl mx-auto">
+            <div class="text-center mb-20 reveal">
+                <h2 class="text-4xl md:text-5xl font-display font-bold text-white mb-6">3 шага к свободе</h2>
+                <p class="text-gray-500">Запуск системы занимает не более 5 минут.</p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-16 relative">
+                <div class="hidden md:block absolute top-10 left-1/4 right-1/4 h-px bg-border z-0"></div>
+                
+                <div class="relative z-10 text-center reveal">
+                    <div class="w-20 h-20 bg-bg border border-border rounded-full flex items-center justify-center mx-auto mb-8 text-2xl font-black text-primary">01</div>
+                    <h4 class="text-white font-bold mb-4">Подключите API</h4>
+                    <p class="text-gray-500 text-sm font-light">Добавьте стандартный API-ключ Wildberries в личном кабинете.</p>
+                </div>
+
+                <div class="relative z-10 text-center reveal" style="transition-delay: 100ms">
+                    <div class="w-20 h-20 bg-bg border border-border rounded-full flex items-center justify-center mx-auto mb-8 text-2xl font-black text-primary">02</div>
+                    <h4 class="text-white font-bold mb-4">Настройте ИИ</h4>
+                    <p class="text-gray-500 text-sm font-light">Опишите ваш Tone of Voice и укажите, как реагировать на негатив.</p>
+                </div>
+
+                <div class="relative z-10 text-center reveal" style="transition-delay: 200ms">
+                    <div class="w-20 h-20 bg-primary rounded-full flex items-center justify-center mx-auto mb-8 text-2xl font-black text-bg">03</div>
+                    <h4 class="text-white font-bold mb-4">Готово!</h4>
+                    <p class="text-gray-500 text-sm font-light">Система начнет обрабатывать отзывы в режиме реального времени.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Pricing Section -->
+    <section id="pricing" class="py-32 px-6">
+        <div class="max-w-4xl mx-auto text-center">
+            <div class="reveal mb-16">
+                <h2 class="text-4xl md:text-5xl font-display font-bold text-white mb-6">Полный автопилот <span class="text-primary">за копейки.</span></h2>
+            </div>
+
+            <div class="glass p-8 md:p-20 rounded-[3rem] relative border border-primary/20 overflow-hidden reveal max-w-2xl mx-auto">
+                <div class="mb-12">
+                    <div class="flex items-center justify-center gap-2">
+                        <span class="text-7xl font-display font-extrabold text-white">749</span>
+                        <div class="text-left">
+                            <p class="text-2xl font-bold text-primary">₽</p>
+                            <p class="text-gray-500 text-xs font-bold uppercase">/ месяц</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="text-center mb-12">
+                    <p class="text-gray-300 text-lg">
+                        Никаких лимитов на количество отзывов и скрытых платежей.<br>Первые 3 дня — бесплатно.
+                    </p>
+                </div>
+
+                <a href="/login" class="btn-premium inline-block w-full sm:w-auto text-bg px-16 py-6 rounded-2xl font-black text-sm uppercase tracking-[0.2em]">
+                    Начать бесплатный триал
+                </a>
+                
+                <p class="mt-8 text-gray-500 text-[10px] font-bold uppercase tracking-[0.2em]">Без привязки карты • Отмена в 1 клик</p>
+            </div>
+        </div>
+    </section>
+
+
+
+    <!-- Footer -->
+    <footer class="py-20 px-6 border-t border-border">
+        <div class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-12">
+            <div>
+                <div class="flex items-center font-display font-black tracking-tighter text-2xl mb-4">
+                    <span class="text-white">WB</span>
+                    <span class="text-primary">AI</span>
+                </div>
+                <p class="text-gray-600 text-sm font-light">Масштабируйте бизнес, а не штат менеджеров.</p>
+            </div>
+
+            <div class="flex flex-wrap justify-center gap-10 text-[10px] font-bold uppercase tracking-[0.2em] text-gray-500">
+                <a href="/offer.html" class="hover:text-primary transition-colors">Оферта</a>
+                <a href="mailto:support@wbreply.ai" class="hover:text-primary transition-colors">support@wbreply.ai</a>
+            </div>
+
+            <div class="text-right">
+                <p class="text-[10px] text-gray-700 font-bold tracking-[0.4em] uppercase mb-2">© 2025 WB REPLY AI</p>
+                <div class="flex justify-end gap-4 opacity-50">
+                    <!-- Social icons placeholder -->
+                    <div class="w-8 h-8 rounded-full border border-border flex items-center justify-center hover:text-primary transition-colors cursor-pointer">
+                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0c-6.627 0-12 5.373-12 12s5.373 12 12 12 12-5.373 12-12-5.373-12-12-12zm-2 16h-2v-6h2v6zm-1-6.891c-.607 0-1.1-.496-1.1-1.109 0-.612.492-1.109 1.1-1.109s1.1.497 1.1 1.109c0 .613-.493 1.109-1.1 1.109zm8 6.891h-2v-3.861c0-2.105-2.435-1.948-2.435 0v3.861h-2v-6h2v1.093c.969-1.794 4.435-1.92 4.435 1.543v3.364z"/></svg>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // Navbar scroll effect
+        window.addEventListener('scroll', () => {
+            const nav = document.getElementById('navbar');
+            if (window.scrollY > 50) {
+                nav.classList.add('glass', 'py-2');
+                nav.classList.remove('py-4');
+            } else {
+                nav.classList.remove('glass', 'py-2');
+                nav.classList.add('py-4');
+            }
+        });
+
+        // Reveal on scroll
+        const observerOptions = {
+            threshold: 0.1
+        };
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('active');
+                }
+            });
+        }, observerOptions);
+
+        document.querySelectorAll('.reveal').forEach((el) => observer.observe(el));
+    </script>
+</body>
+</html>

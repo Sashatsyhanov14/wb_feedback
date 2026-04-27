@@ -8,8 +8,12 @@ const { initJobs, processAll } = require('./src/jobs/reviewCron');
 require('dotenv').config();
 
 const app = express();
+const cookieParser = require('cookie-parser');
+const authRoutes = require('./src/routes/authRoutes');
+
 app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(cookieParser());
+app.use(express.static(path.join(__dirname, 'public'), { index: false }));
 
 // Vercel Cron Trigger
 app.get('/api/cron', async (req, res) => {
@@ -45,8 +49,27 @@ app.get('/api/setup', async (req, res) => {
 app.post('/api/bot', (req, res) => telegramService.handleUpdate(req, res));
 
 // Routes
+app.use('/api/auth', authRoutes);
 app.use('/api', apiRoutes);
 app.use('/api/payments', paymentRoutes);
+
+// Page Routing
+app.get('/', (req, res) => {
+  if (req.cookies.token) {
+    res.redirect('/app');
+  } else {
+    res.sendFile(path.join(__dirname, 'public', 'landing.html'));
+  }
+});
+
+app.get('/login', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+app.get('/app', (req, res) => {
+  // We check for token, but the UI will handle the actual view redirect if missing
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
 
 // Initialize background jobs
 initJobs();

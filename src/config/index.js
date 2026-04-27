@@ -18,5 +18,6 @@ module.exports = {
   robokassaMerchantLogin: process.env.ROBOKASSA_MERCHANT_LOGIN,
   robokassaPassword1: process.env.ROBOKASSA_PASSWORD_1,
   robokassaPassword2: process.env.ROBOKASSA_PASSWORD_2,
-  robokassaIsTest: process.env.ROBOKASSA_IS_TEST === 'true'
+  robokassaIsTest: process.env.ROBOKASSA_IS_TEST === 'true',
+  jwtSecret: process.env.JWT_SECRET || 'your_fallback_secret_change_me'
 };

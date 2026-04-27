@@ -1,39 +1,98 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="ru" class="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Публичная оферта — WBReply AI</title>
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@600;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: { 
+                        primary: '#E1AF66', 
+                        bg: '#050505', 
+                        surface: '#111111',
+                        border: '#1F1F1F'
+                    },
+                    fontFamily: { 
+                        sans: ['Inter', 'sans-serif'], 
+                        display: ['Outfit', 'sans-serif'] 
+                    }
+                }
+            }
+        }
+    </script>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 800px; margin: 40px auto; padding: 0 20px; }
-        h1 { color: #000; border-bottom: 2px solid #eee; padding-bottom: 10px; }
-        h2 { margin-top: 30px; color: #444; }
-        p { margin-bottom: 15px; }
-        .footer { margin-top: 50px; font-size: 0.9em; color: #777; border-top: 1px solid #eee; pt: 20px; }
+        body { background-color: #050505; color: #D1D5DB; }
+        .glass { background: rgba(17, 17, 17, 0.7); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.05); }
     </style>
 </head>
-<body>
-    <h1>Публичная оферта на оказание услуг</h1>
-    <p>Настоящий документ является официальным предложением (публичной офертой) сервиса <strong>WBReply AI</strong> и содержит все существенные условия предоставления доступа к программному обеспечению для автоматизации ответов на отзывы.</p>
+<body class="font-sans antialiased selection:bg-primary/20">
+    <div class="max-w-3xl mx-auto px-6 py-12 md:py-20">
+        <div class="mb-16">
+            <a href="/" class="inline-flex items-center gap-2 text-primary hover:text-white transition-all font-bold text-[10px] uppercase tracking-widest mb-10">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+                Вернуться на главную
+            </a>
+            <h1 class="font-display text-4xl md:text-5xl font-extrabold text-white tracking-tight leading-tight">Публичная оферта <br/><span class="text-primary text-2xl uppercase tracking-widest font-black">на оказание услуг</span></h1>
+        </div>
 
-    <h2>1. Предмет оферты</h2>
-    <p>1.1. Исполнитель предоставляет Заказчику доступ к облачному сервису WBReply AI для автоматической генерации ответов на отзывы маркетплейса Wildberries с использованием искусственного интеллекта.</p>
+        <div class="space-y-12 text-gray-400 leading-relaxed font-light">
+            <p class="text-lg">Настоящий документ является официальным предложением (публичной офертой) сервиса <strong class="text-white font-bold">WBReply AI</strong> и содержит все существенные условия предоставления доступа к программному обеспечению для автоматизации ответов на отзывы.</p>
 
-    <h2>2. Стоимость услуг и порядок оплаты</h2>
-    <p>2.1. Стоимость доступа составляет <strong>749 рублей в месяц</strong>.</p>
-    <p>2.2. Оплата производится в форме 100% предоплаты через платежную систему Robokassa.</p>
-    <p>2.3. Первые 3 дня доступа предоставляются бесплатно в ознакомительных целях.</p>
+            <section>
+                <h2 class="text-xl font-display font-bold text-white mb-6 uppercase tracking-widest border-l-2 border-primary pl-4">1. Предмет оферты</h2>
+                <p>1.1. Исполнитель предоставляет Заказчику доступ к облачному сервису WBReply AI для автоматической генерации ответов на отзывы маркетплейса Wildberries с использованием искусственного интеллекта.</p>
+            </section>
 
-    <h2>3. Права и обязанности</h2>
-    <p>3.1. Заказчик обязуется использовать сервис в соответствии с правилами маркетплейса Wildberries.</p>
-    <p>3.2. Исполнитель не несет ответственности за блокировки аккаунтов, вызванные нарушением правил площадки со стороны Заказчика.</p>
+            <section>
+                <h2 class="text-xl font-display font-bold text-white mb-6 uppercase tracking-widest border-l-2 border-primary pl-4">2. Стоимость и порядок оплаты</h2>
+                <ul class="space-y-4">
+                    <li class="flex items-start gap-4">
+                        <span class="text-primary font-bold">2.1.</span>
+                        <span>Стоимость доступа составляет <strong class="text-white">749 рублей в месяц</strong>.</span>
+                    </li>
+                    <li class="flex items-start gap-4">
+                        <span class="text-primary font-bold">2.2.</span>
+                        <span>Оплата производится в форме 100% предоплаты через интегрированные платежные системы.</span>
+                    </li>
+                    <li class="flex items-start gap-4">
+                        <span class="text-primary font-bold">2.3.</span>
+                        <span>Первые 3 дня доступа предоставляются бесплатно в ознакомительных целях.</span>
+                    </li>
+                </ul>
+            </section>
 
-    <h2>4. Реквизиты и контакты</h2>
-    <p>Техническая поддержка: @edh4hhr (Telegram)</p>
-    <p>Email: alexandertsyhanov@gmail.com</p>
+            <section>
+                <h2 class="text-xl font-display font-bold text-white mb-6 uppercase tracking-widest border-l-2 border-primary pl-4">3. Ответственность</h2>
+                <p class="mb-4">3.1. Заказчик обязуется использовать сервис в соответствии с правилами маркетплейса Wildberries.</p>
+                <p>3.2. Исполнитель не несет ответственности за блокировки аккаунтов, вызванные нарушением правил площадки со стороны Заказчика.</p>
+            </section>
 
-    <div class="footer">
-        <p>&copy; 2024 WBReply AI. Все права защищены.</p>
+            <section class="glass p-8 rounded-3xl border border-white/5 mt-16">
+                <h2 class="text-sm font-display font-black text-white mb-6 uppercase tracking-widest opacity-50">Контакты и реквизиты</h2>
+                <div class="space-y-4 text-sm font-medium">
+                    <div class="flex items-center gap-3">
+                        <span class="text-primary">TG:</span>
+                        <a href="https://t.me/edh4hhr" class="text-white hover:text-primary transition-colors">@edh4hhr</a>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <span class="text-primary">Mail:</span>
+                        <a href="mailto:alexandertsyhanov@gmail.com" class="text-white hover:text-primary transition-colors">alexandertsyhanov@gmail.com</a>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <footer class="mt-24 pt-8 border-t border-white/5 text-center">
+            <p class="text-[9px] text-gray-700 font-bold tracking-[0.4em] uppercase">&copy; 2025 WBReply AI. Все права защищены.</p>
+        </footer>
     </div>
 </body>
 </html>

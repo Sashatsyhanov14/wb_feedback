@@ -1,5 +1,5 @@
 let state = {
-    telegramChatId: null,
+    sellerId: null,
     settings: {
         wb_token: '',
         custom_instructions: '',
@@ -10,52 +10,75 @@ let state = {
     },
     reviews: [],
     matrix: [],
-    currentView: 'settings',
+    currentView: 'reviews',
     stats: { approved: 0, pending: 0, total: 0, approvedToday: 0 },
     adminStats: { totalSellers: 0, totalApproved: 0, newToday: 0, activeToday: 0, withoutToken: 0 },
     adminUsers: []
 };
 
 document.addEventListener('DOMContentLoaded', async () => {
-    // 1. Initialize TG WebApp
-    if (window.Telegram && window.Telegram.WebApp) {
-        const tg = window.Telegram.WebApp;
-        tg.expand();
-        tg.ready();
-        state.telegramChatId = tg.initDataUnsafe.user?.id || 795056847;
+    // 1. Check Auth (Web or Mini App)
+    await checkAuth();
+
+    // 2. Initial View
+    if (!state.sellerId) {
+        showView('login');
     } else {
-        state.telegramChatId = 795056847;
+        showView('reviews');
+        await refreshData();
+        showView(state.currentView);
     }
 
-    // 2. Initial View (Immediate render)
-    showView('settings');
-
-    // 3. Load Data & Update
-    await refreshData();
-    showView(state.currentView);
-
-    // 4. Handle Payment Redirect Hash
+    // 3. Handle Payment Redirect Hash
     if (window.location.hash === '#success') {
-        showToast('Оплата прошла успешно! 🎉');
-        window.location.hash = ''; // Clear hash
+        showToast('Оплата прошла успешно');
+        window.location.hash = '';
     } else if (window.location.hash === '#fail') {
-        showToast('Ошибка при оплате. Попробуйте снова.', true);
+        showToast('Ошибка оплаты. Попробуйте снова.', true);
         window.location.hash = '';
     }
 });
 
+async function checkAuth() {
+    try {
+        const res = await fetch('/api/auth/me');
+        if (res.ok) {
+            const data = await res.json();
+            state.sellerId = data.sellerId;
+        } else if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initData) {
+            // Automatic login for Mini App
+            const tg = window.Telegram.WebApp;
+            tg.expand();
+            tg.ready();
+            
+            const rawData = tg.initDataUnsafe;
+            const resAuth = await fetch('/api/auth/tg-callback', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(rawData.user)
+            });
+            if (resAuth.ok) {
+                const data = await resAuth.json();
+                state.sellerId = data.sellerId;
+            }
+        }
+    } catch (e) {
+        console.error('Auth check error:', e);
+    }
+}
+
 async function refreshData() {
+    if (!state.sellerId) return;
     try {
         const adminId = '795056847';
         const requests = [
-            fetch(`/api/settings/${state.telegramChatId}`).then(r => r.status === 200 ? r.json() : null),
-            fetch(`/api/matrix/${state.telegramChatId}`).then(r => r.status === 200 ? r.json() : null),
-            fetch(`/api/stats/${state.telegramChatId}`).then(r => r.status === 200 ? r.json() : null),
-            fetch(`/api/reviews/${state.telegramChatId}`).then(r => r.status === 200 ? r.json() : null)
+            fetch(`/api/settings`).then(r => r.status === 200 ? r.json() : null),
+            fetch(`/api/matrix`).then(r => r.status === 200 ? r.json() : null),
+            fetch(`/api/stats`).then(r => r.status === 200 ? r.json() : null),
+            fetch(`/api/reviews`).then(r => r.status === 200 ? r.json() : null)
         ];
 
-        // Conditional Admin Data Fetch
-        if (state.telegramChatId.toString() === adminId) {
+        if (state.sellerId.toString() === adminId) {
             requests.push(fetch(`/api/admin/stats/${adminId}`).then(r => r.status === 200 ? r.json() : null));
             requests.push(fetch(`/api/admin/users/${adminId}`).then(r => r.status === 200 ? r.json() : null));
         }
@@ -73,177 +96,310 @@ async function refreshData() {
     }
 }
 
-async function handleSaveSettings() {
-    state.settings.wb_token = document.getElementById('wb-token-input').value;
-    state.settings.custom_instructions = document.getElementById('ai-instructions-input').value;
-    await saveSettings();
-}
-
-async function saveSettings() {
-    try {
-        const res = await fetch(`/api/settings/${state.telegramChatId}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(state.settings)
-        });
-        const data = await res.json();
-        if (data.settings) state.settings = data.settings;
-        showToast('Конфигурация сохранена');
-    } catch (e) {
-        console.error('Save settings error:', e);
-        showToast('Ошибка сохранения', true);
-    }
-}
-
-async function handleSync() {
-    try {
-        if (!state.settings.wb_token) {
-            showToast('Сначала введите WB Токен в настройках', true);
-            return;
-        }
-        showToast('Запуск синхронизации...', false);
-        const res = await fetch(`/api/sync/${state.telegramChatId}`, { method: 'POST' });
-        const data = await res.json();
-        if (data.success) {
-            showToast(data.message);
-            await refreshData();
-            showView('subscription');
-        } else {
-            showToast(data.error || 'Ошибка синхронизации', true);
-        }
-    } catch (e) {
-        console.error('Sync error:', e);
-        showToast('Ошибка сети', true);
-    }
+async function handleLogout() {
+    await fetch('/api/auth/logout', { method: 'POST' });
+    window.location.href = '/';
 }
 
 function showView(view) {
     state.currentView = view;
     const content = document.getElementById('content-view');
+    const nav = document.getElementById('main-nav');
+    const sidebar = document.getElementById('desktop-sidebar');
+    const mobileHeader = document.getElementById('mobile-header');
     if (!content) return;
 
-    // Update Nav active classes
-    document.querySelectorAll('.tab-item').forEach(item => {
-        item.classList.remove('active', 'bg-[#2A2A2A]', 'text-[#ADC6FF]');
-        item.classList.add('text-[#C1C6D7]');
+    // Hide chrome on login, show on everything else
+    if (view === 'login') {
+        if (nav) nav.style.display = 'none';
+        if (sidebar) sidebar.style.display = 'none';
+        if (mobileHeader) mobileHeader.style.display = 'none';
+    } else {
+        if (nav) nav.style.display = '';
+        if (sidebar) sidebar.style.display = '';
+        if (mobileHeader) mobileHeader.style.display = '';
+    }
+
+    // Update Nav active classes (Mobile & Desktop)
+    const navItems = document.querySelectorAll('.tab-item');
+    navItems.forEach(item => {
+        item.classList.remove('active');
         const icon = item.querySelector('.material-symbols-outlined');
         if (icon) icon.style.fontVariationSettings = "'FILL' 0";
     });
     
-    const activeNav = document.getElementById(`nav-${view}`);
-    if (activeNav) {
-        activeNav.classList.add('active', 'bg-[#2A2A2A]', 'text-[#ADC6FF]');
-        activeNav.classList.remove('text-[#C1C6D7]');
-        const icon = activeNav.querySelector('.material-symbols-outlined');
+    // Highlight matching elements in both navs
+    const activeElements = document.querySelectorAll(`[onclick="showView('${view}')"]`);
+    activeElements.forEach(el => {
+        el.classList.add('active');
+        const icon = el.querySelector('.material-symbols-outlined');
         if (icon) icon.style.fontVariationSettings = "'FILL' 1";
-    }
+    });
 
     if (view === 'settings') {
         content.innerHTML = renderSettings();
-    } else if (view === 'matrix') {
-        content.innerHTML = renderMatrix();
+    } else if (view === 'reviews') {
+        content.innerHTML = renderReviews();
     } else if (view === 'subscription') {
         content.innerHTML = renderSubscription();
+    } else if (view === 'interface') {
+        content.innerHTML = renderInterface();
+    } else if (view === 'login') {
+        content.innerHTML = renderLogin();
+    }
+}
+
+function renderLogin() {
+    return `
+        <div class="flex flex-col items-center justify-center min-h-[85vh] animate-in px-4">
+            <div class="w-full max-w-[380px] space-y-10">
+                <div class="space-y-3 text-center">
+                    <h2 class="flex items-center justify-center font-headline text-3xl sm:text-4xl font-black tracking-tight leading-tight mb-2">
+                        <span class="text-text-main">WBREPLY</span>
+                        <svg class="w-6 h-6 sm:w-8 sm:h-8 text-[#E1AF66] mx-1 sm:mx-1.5" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M12 0C12 6.627 6.627 12 0 12C6.627 12 12 17.373 12 24C12 17.373 17.373 12 24 12C17.373 12 12 6.627 12 0Z"/>
+                        </svg>
+                        <span class="text-[#E1AF66]">AI</span>
+                    </h2>
+                    <p class="text-on-surface-variant text-sm font-medium tracking-wide">
+                        В один клик, без паролей и регистраций
+                    </p>
+                </div>
+                
+                <div class="flex flex-col gap-4">
+                    <!-- Google Button -->
+                    <button onclick="handleTestLogin('Google')" class="w-full h-16 flex items-center justify-center gap-4 bg-white hover:bg-gray-100 active:scale-[0.97] transition-all rounded-[12px] shadow-lg shadow-black/10 border border-gray-200">
+                        <svg class="w-6 h-6" viewBox="0 0 48 48">
+                            <path fill="#FFC107" d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12c0-6.627,5.373-12,12-12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C12.955,4,4,12.955,4,24c0,11.045,8.955,20,20,20c11.045,0,20-8.955,20-20C44,22.659,43.862,21.35,43.611,20.083z"></path>
+                            <path fill="#FF3D00" d="M6.306,14.691l6.571,4.819C14.655,15.108,18.961,12,24,12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C16.318,4,9.656,8.337,6.306,14.691z"></path>
+                            <path fill="#4CAF50" d="M24,44c5.166,0,9.86-1.977,13.409-5.192l-6.19-5.238C29.211,35.091,26.715,36,24,36c-5.202,0-9.619-3.317-11.283-7.946l-6.522,5.025C9.505,39.556,16.227,44,24,44z"></path>
+                            <path fill="#1976D2" d="M43.611,20.083H42V20H24v8h11.303c-0.792,2.237-2.231,4.166-4.087,5.571c0.001-0.001,0.002-0.001,0.003-0.002l6.19,5.238C36.971,39.205,44,34,44,24C44,22.659,43.862,21.35,43.611,20.083z"></path>
+                        </svg>
+                        <span class="text-base font-bold text-gray-900">Войти через Google</span>
+                    </button>
+
+                    <!-- VK Button -->
+                    <button onclick="handleTestLogin('VK')" class="w-full h-16 flex items-center justify-center gap-4 bg-[#0077FF] hover:brightness-110 active:scale-[0.97] transition-all rounded-[12px] shadow-lg shadow-[#0077FF]/30">
+                        <svg class="w-8 h-8" viewBox="0 0 24 24" fill="white">
+                            <path d="M12 0c-6.627 0-12 5.373-12 12s5.373 12 12 12 12-5.373 12-12-5.373-12-12-12zm5.833 17.333h-1.75c-.53 0-.7-.42-1.66-1.38-.84-.8-1.21-.9-1.42-.9-.3 0-.38.08-.38.51v1.1c0 .4-.13.67-1.17.67-1.72 0-3.62-1.04-4.96-2.95-2-2.85-2.57-5.01-2.57-5.44 0-.25.1-.48.58-.48h1.75c.43 0 .59.19.75.62.86 2.5 2.31 4.7 2.91 4.7.22 0 .32-.1.32-.65V10c0-.7-.41-.76-.41-1.01 0-.12.1-.24.26-.24h2.74c.23 0 .33.11.33.36v3.7c0 .4.18.54.34.54.26 0 .47-.14.94-.61 1.05-1.18 1.84-3.5 1.84-3.5.12-.3.29-.49.72-.49h1.75c.53 0 .65.27.53.67-.38 1.4-2.5 4.36-2.5 4.36-.2.33-.27.46 0 .82.2.26.85.83 1.28 1.34.78.93 1.37 1.7 1.53 2.23.16.53-.1.82-.63.82z"/>
+                        </svg>
+                        <span class="text-base font-bold text-white">Войти через ВКонтакте</span>
+                    </button>
+
+                    <!-- Telegram Button -->
+                    <button onclick="handleTestLogin('Telegram')" class="w-full h-16 flex items-center justify-center gap-4 bg-[#24A1DE] hover:brightness-110 active:scale-[0.97] transition-all rounded-[12px] shadow-lg shadow-[#24A1DE]/30">
+                        <svg class="w-8 h-8 fill-white" viewBox="0 0 24 24">
+                            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69.01-.03.01-.14-.07-.2-.08-.06-.19-.04-.27-.02-.12.02-1.96 1.25-5.54 3.69-.52.36-1 .53-1.42.52-.47-.01-1.37-.26-2.03-.48-.82-.27-1.47-.42-1.42-.88.03-.24.35-.49.96-.75 3.78-1.65 6.31-2.74 7.58-3.27 3.61-1.51 4.35-1.77 4.84-1.78.11 0 .35.03.5.16.12.1.16.23.18.33.02.11.02.24.01.37z"/>
+                        </svg>
+                        <span class="text-base font-bold text-white tracking-tight">Войти через Telegram</span>
+                    </button>
+                </div>
+
+                <div class="flex flex-col items-center gap-6 pt-8 opacity-30">
+                    <div class="flex items-center gap-2">
+                        <span class="material-symbols-outlined text-sm">verified_user</span>
+                        <p class="text-[9px] font-bold uppercase tracking-[0.3em]">Secure Auth System</p>
+                    </div>
+                    <p class="text-[10px] font-medium tracking-[0.1em]">© 2025 WB RESPONSE AI</p>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+async function handleTestLogin(provider) {
+    showToast(`Вход через ${provider} (Тестовый режим)...`);
+    try {
+        const res = await fetch('/api/auth/demo', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+        
+        if (res.ok) {
+            const data = await res.json();
+            state.sellerId = data.sellerId;
+            showToast('Успешный вход!', false);
+            setTimeout(() => {
+                showView('reviews');
+                refreshData();
+            }, 800);
+        } else {
+            // Fallback for UI-only testing if backend is not ready
+            state.sellerId = '795056847';
+            showToast('Вход (UI-Demo режим)', false);
+            setTimeout(() => {
+                showView('reviews');
+                refreshData();
+            }, 800);
+        }
+    } catch (err) {
+        // Even on network error, allow entering for UI demonstration
+        state.sellerId = '795056847';
+        showToast('Вход (Offline-Demo)', false);
+        setTimeout(() => {
+            showView('reviews');
+            refreshData();
+        }, 800);
+    }
+}
+
+async function handleGoogleLogin() {
+    // Replaced by handleTestLogin for testing
+}
+
+async function handleVkLogin() {
+    // Replaced by handleTestLogin for testing
+}
+
+
+window.onTelegramAuth = async function(user) {
+    try {
+        const res = await fetch('/api/auth/tg-callback', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(user)
+        });
+        
+        if (res.ok) {
+            const data = await res.json();
+            state.sellerId = data.sellerId;
+            showToast('Успешный вход');
+            showView('reviews');
+            await refreshData();
+            showView(state.currentView);
+        } else {
+            const data = await res.json();
+            showToast(data.error || 'Ошибка входа', true);
+        }
+    } catch (e) {
+        console.error('Auth callback error:', e);
+        showToast('Ошибка сети', true);
     }
 }
 
 function renderSettings() {
     return `
-        <div class="space-y-6">
-            <div class="mb-8">
-                <span class="text-primary text-xs font-bold tracking-widest uppercase opacity-70">Workspace</span>
-                <h2 class="font-headline text-3xl font-extrabold text-on-surface tracking-tight mt-1">Настройки</h2>
-            </div>
+        <div class="max-w-2xl mx-auto space-y-10 animate-in pb-10">
+            <header class="text-left">
+                <p class="text-primary text-[10px] font-black uppercase tracking-[0.3em] mb-2">Конфигурация</p>
+                <h2 class="font-headline text-3xl sm:text-4xl font-bold text-text-main tracking-tight">Бизнес-настройка</h2>
+            </header>
 
-            <section class="bg-surface-container-low rounded-xl p-6 border border-outline-variant/5">
-                <div class="flex items-center justify-between mb-4">
-                    <label class="text-on-surface font-semibold text-sm">API Токен WB</label>
-                    <span class="material-symbols-outlined text-outline text-lg">key</span>
-                </div>
-                <div class="relative group">
-                    <input id="wb-token-input" class="w-full bg-surface-container-lowest border-none rounded-lg py-4 px-4 text-on-surface-variant focus:ring-1 focus:ring-primary transition-all text-sm font-mono" 
-                        type="password" value="${state.settings.wb_token || ''}" placeholder="••••••••••••••••••••••••">
-                    <button class="absolute right-4 top-1/2 -translate-y-1/2 text-outline hover:text-primary transition-colors" onclick="toggleTokenVisibility()">
-                        <span id="token-visibility-icon" class="material-symbols-outlined">visibility</span>
-                    </button>
-                </div>
-                <p class="mt-3 text-[11px] text-on-surface-variant/60 leading-relaxed">
-                    Используйте API-ключ типа «Стандартный» для обеспечения корректной работы автоматических ответов.
-                </p>
-            </section>
+            <div class="space-y-5">
+                <section class="premium-card p-5 sm:p-8 space-y-5">
+                    <div class="space-y-2">
+                        <label class="text-xs font-bold uppercase tracking-widest text-on-surface-variant">API Токен Wildberries</label>
+                        <div class="relative">
+                            <input id="wb-token-input" class="w-full bg-bg-main border border-outline-variant outline-none py-4 px-5 pr-12 text-text-main text-sm font-mono focus:border-primary transition-colors rounded-lg" 
+                                type="password" value="${state.settings.wb_token || ''}" placeholder="Вставьте ваш Standard API ключ">
+                            <button class="absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-primary transition-colors" onclick="toggleTokenVisibility()">
+                                <span id="token-visibility-icon" class="material-symbols-outlined text-lg">visibility</span>
+                            </button>
+                        </div>
+                        <p class="text-[10px] text-on-surface-variant leading-relaxed">
+                            Используйте ключ типа "Стандартный". Мы не имеем доступа к вашим продажам и финансам.
+                        </p>
+                    </div>
 
-            <section class="bg-surface-container-low rounded-xl p-6 border border-outline-variant/5">
-                <div class="flex items-center justify-between mb-4">
-                    <label class="text-on-surface font-semibold text-sm">Инструкции для ИИ</label>
-                </div>
-                <div class="relative">
-                    <textarea id="ai-instructions-input" class="w-full bg-surface-container-lowest border-none rounded-lg p-4 text-on-surface-variant focus:ring-1 focus:ring-primary transition-all text-sm leading-relaxed resize-none placeholder:text-outline/40" 
-                        placeholder="Например: Пиши вежливо, обращайся на Вы, в конце предлагай новинки..." rows="8">${state.settings.custom_instructions || ''}</textarea>
-                </div>
-            </section>
+                    <div class="space-y-2">
+                        <label class="text-xs font-bold uppercase tracking-widest text-on-surface-variant">Инструкции для ИИ</label>
+                        <textarea id="ai-instructions-input" class="w-full bg-bg-main border border-outline-variant outline-none p-5 text-text-main text-sm leading-relaxed h-40 sm:h-48 focus:border-primary transition-colors resize-none rounded-lg" 
+                            placeholder="Пример: Будь профессионален, обращайся на Вы, упоминай наш бренд...">${state.settings.custom_instructions || ''}</textarea>
+                        <div class="flex gap-2 flex-wrap">
+                            <span class="text-[9px] font-black text-primary uppercase border border-primary/20 px-2 py-0.5 rounded">Tone of Voice</span>
+                            <span class="text-[9px] font-black text-on-surface-variant uppercase border border-outline-variant px-2 py-0.5 rounded">Умная логика</span>
+                        </div>
+                    </div>
+                </section>
 
-            <div class="pt-4">
-                <button onclick="handleSaveSettings()" class="w-full bg-electric-gradient py-4 rounded-xl text-on-primary font-bold text-base shadow-[0_4px_24px_0_rgba(173,198,255,0.2)] active:scale-[0.98] transition-transform flex items-center justify-center gap-2 relative overflow-hidden group">
-                    <span class="material-symbols-outlined text-xl" style="font-variation-settings: 'FILL' 1;">save</span>
-                    Сохранить конфигурацию
+                <button onclick="handleSaveSettings()" class="primary-btn w-full py-4 sm:py-5 text-xs uppercase tracking-[0.2em] shadow-lg active:scale-[0.99] transition-all">
+                    Применить настройки
                 </button>
             </div>
         </div>
     `;
 }
 
-function renderMatrix() {
-    return `
-        <div class="space-y-6">
-            <section class="mb-8">
-                <h2 class="text-3xl font-headline font-extrabold tracking-tight text-on-surface mb-2">Матрица допродаж</h2>
-                <p class="text-sm text-on-surface-variant leading-relaxed">
-                    Настройте связки товаров для автоматических рекомендаций в отзывах.
-                </p>
-            </section>
+function renderReviews() {
+    if (!state.reviews || state.reviews.length === 0) {
+        return `
+            <div class="flex flex-col items-center justify-center py-24 text-center animate-in opacity-40">
+                <span class="material-symbols-outlined text-5xl mb-4 font-light">inventory_2</span>
+                <p class="text-xs font-bold uppercase tracking-widest">Нет данных об активности</p>
+            </div>
+        `;
+    }
 
-            <div class="grid grid-cols-1 gap-3 mb-8">
-                <div class="bg-surface-container-low p-4 rounded-xl flex items-center justify-between">
-                    <div class="text-on-surface-variant text-[10px] uppercase tracking-wider">Активных пар в матрице</div>
-                    <div class="text-2xl font-headline font-bold text-primary">${state.matrix.length}</div>
-                </div>
+    return `
+        <div class="w-full space-y-8 animate-in pb-10">
+            <header>
+                <p class="text-primary text-[10px] font-black uppercase tracking-[0.3em] mb-2">Активность</p>
+                <h2 class="font-headline text-2xl sm:text-3xl font-bold text-text-main tracking-tight">Лента ответов</h2>
+            </header>
+
+            <!-- Mobile card layout -->
+            <div class="sm:hidden space-y-3">
+                ${state.reviews.map(review => {
+                    const isAuto = review.status === 'auto_posted';
+                    return `
+                        <div class="premium-card p-4 space-y-3 relative overflow-hidden">
+                            ${isAuto ? '<div class="absolute left-0 top-0 bottom-0 w-1 bg-wb-purple"></div>' : ''}
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center gap-2 min-w-0">
+                                    <span class="flex items-center gap-0.5 text-primary font-bold text-xs">
+                                        ${review.rating}
+                                        <svg class="w-2.5 h-2.5 fill-current" viewBox="0 0 24 24">
+                                            <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/>
+                                        </svg>
+                                    </span>
+                                    <span class="text-text-main font-bold text-[11px] truncate uppercase tracking-tight">${review.product_name || 'WB Product'}</span>
+                                </div>
+                                <span class="w-2 h-2 rounded-full ${isAuto ? 'bg-wb-purple shadow-[0_0_8px_rgba(124,58,237,0.5)]' : 'bg-outline-variant'}"></span>
+                            </div>
+                            <p class="text-[11px] text-on-surface-variant italic font-light leading-relaxed line-clamp-2">"${review.review_text}"</p>
+                            <p class="text-[11px] text-text-main leading-relaxed line-clamp-2">${review.ai_response_draft}</p>
+                        </div>
+                    `;
+                }).join('')}
             </div>
 
-            <div class="space-y-3">
-                ${state.matrix.map((item, idx) => `
-                    <div class="bg-surface-container-high p-4 rounded-xl flex items-center gap-3">
-                        <div class="flex-1 space-y-1">
-                            <label class="text-[10px] text-on-surface-variant ml-3 uppercase font-semibold">Артикул товара</label>
-                            <div class="w-full bg-surface-container-lowest rounded-lg text-sm text-on-surface h-10 px-3 flex items-center font-mono">${item.nm_id}</div>
-                        </div>
-                        <div class="flex items-center pt-5">
-                            <span class="material-symbols-outlined text-primary">arrow_forward</span>
-                        </div>
-                        <div class="flex-1 space-y-1">
-                            <label class="text-[10px] text-on-surface-variant ml-3 uppercase font-semibold">Рекомендация</label>
-                            <div class="w-full bg-surface-container-lowest rounded-lg text-sm text-on-surface h-10 px-3 flex items-center font-mono">${item.cross_sell_article}</div>
-                        </div>
-                        <button class="pt-5 text-on-surface-variant hover:text-red-500 transition-colors cursor-pointer z-10" onclick="handleDeleteMatrix('${item.id}')">
-                            <span class="material-symbols-outlined text-[20px]">delete</span>
-                        </button>
-                    </div>
-                `).join('')}
-
-                <div class="bg-surface-container-high p-4 rounded-xl flex items-center gap-3 border border-primary/20">
-                    <div class="flex-1 space-y-1">
-                        <label class="text-[10px] text-on-surface-variant ml-3 uppercase font-semibold">Артикул товара</label>
-                        <input id="new-nm-id" class="w-full bg-surface-container-lowest border-none rounded-lg text-sm text-on-surface focus:ring-1 focus:ring-primary h-10 px-3 transition-all" placeholder="Введите SKU" type="text">
-                    </div>
-                    <div class="flex items-center pt-5">
-                        <span class="material-symbols-outlined text-primary/40">arrow_forward</span>
-                    </div>
-                    <div class="flex-1 space-y-1">
-                        <label class="text-[10px] text-on-surface-variant ml-3 uppercase font-semibold">Рекомендация</label>
-                        <input id="new-cross-id" class="w-full bg-surface-container-lowest border-none rounded-lg text-sm text-on-surface focus:ring-1 focus:ring-primary h-10 px-3 transition-all" placeholder="Введите SKU" type="text">
-                    </div>
-                    <button class="pt-5 text-primary hover:scale-110 transition-transform" onclick="handleAddMatrixRow()">
-                        <span class="material-symbols-outlined text-[28px]">add_box</span>
-                    </button>
+            <!-- Desktop table layout -->
+            <div class="hidden sm:block border border-outline-variant rounded-lg overflow-hidden">
+                <div class="grid grid-cols-12 gap-4 px-6 py-4 bg-bg-main border-b border-outline-variant text-[10px] font-black uppercase tracking-widest text-on-surface-variant">
+                    <div class="col-span-1">Рейтинг</div>
+                    <div class="col-span-3">Товар</div>
+                    <div class="col-span-3">Отзыв</div>
+                    <div class="col-span-4">Ответ ИИ</div>
+                    <div class="col-span-1 text-right">Статус</div>
+                </div>
+                <div class="divide-y divide-outline-variant">
+                    ${state.reviews.map(review => {
+                        const isAuto = review.status === 'auto_posted';
+                        return `
+                            <div class="grid grid-cols-12 gap-4 px-6 py-5 items-center hover:bg-bg-main transition-colors relative overflow-hidden">
+                                ${isAuto ? '<div class="absolute left-0 top-0 bottom-0 w-1 bg-wb-purple"></div>' : ''}
+                                <div class="col-span-1 flex items-center gap-1 text-primary font-bold text-xs">
+                                    ${review.rating}
+                                    <svg class="w-3 h-3 fill-current" viewBox="0 0 24 24">
+                                        <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/>
+                                    </svg>
+                                </div>
+                                <div class="col-span-3 min-w-0">
+                                    <div class="text-text-main font-bold text-[11px] truncate uppercase tracking-tight">${review.product_name || 'WB Product'}</div>
+                                    <div class="text-[9px] text-on-surface-variant font-mono">SKU: ${review.nm_id}</div>
+                                </div>
+                                <div class="col-span-3 text-[11px] text-on-surface-variant line-clamp-2 italic font-light leading-relaxed">
+                                    "${review.review_text}"
+                                </div>
+                                <div class="col-span-4 text-[11px] text-text-main line-clamp-2 leading-relaxed">
+                                    ${review.ai_response_draft}
+                                </div>
+                                <div class="col-span-1 flex justify-end">
+                                    <span class="w-2 h-2 rounded-full ${isAuto ? 'bg-wb-purple' : 'bg-outline-variant'} shadow-[0_0_8px_rgba(124,58,237,0.5)]"></span>
+                                </div>
+                            </div>
+                        `;
+                    }).join('')}
                 </div>
             </div>
         </div>
@@ -252,361 +408,181 @@ function renderMatrix() {
 
 function renderSubscription() {
     const expiresAt = state.settings.subscription_expires_at;
-    let daysLeft = 0;
-    if (expiresAt) {
-        const diff = new Date(expiresAt) - new Date();
-        daysLeft = Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
-    }
-
+    const diff = expiresAt ? new Date(expiresAt) - new Date() : 0;
+    const daysLeft = Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
     const expiredDateStr = expiresAt ? new Date(expiresAt).toLocaleDateString() : '—';
     
     return `
-        <div class="animate-in space-y-8 pb-12">
-            <!-- Analytics Dashboard (Simplified for Users) -->
-            <section class="grid grid-cols-2 gap-3">
-                <div class="bg-surface-container-low p-5 rounded-2xl border border-outline-variant/10 shadow-sm relative overflow-hidden group hover:border-primary/30 transition-all">
-                    <div class="absolute -top-6 -right-6 w-16 h-16 bg-primary/5 rounded-full blur-xl group-hover:bg-primary/10 transition-colors"></div>
-                    <div class="flex items-center gap-2 mb-2">
-                        <span class="material-symbols-outlined text-primary text-sm" style="font-variation-settings: 'FILL' 1">auto_awesome</span>
-                        <span class="text-[10px] font-black uppercase tracking-widest text-on-surface-variant/60">За сегодня</span>
-                    </div>
-                    <p class="text-3xl font-black font-headline text-on-surface">${state.stats?.approvedToday || 0}</p>
-                    <p class="text-[9px] text-on-surface-variant/40 mt-1">умных ответов</p>
-                </div>
+        <div class="max-w-2xl mx-auto space-y-8 animate-in pb-8">
+            <header>
+                <p class="text-primary text-[10px] font-black uppercase tracking-[0.3em] mb-2">Финансы и показатели</p>
+                <h2 class="font-headline text-2xl sm:text-3xl font-bold text-text-main tracking-tight">Обзор аккаунта</h2>
+            </header>
 
-                <div class="bg-surface-container-low p-5 rounded-2xl border border-outline-variant/10 shadow-sm relative overflow-hidden group hover:border-primary/30 transition-all">
-                    <div class="absolute -top-6 -right-6 w-16 h-16 bg-secondary/5 rounded-full blur-xl group-hover:bg-secondary/10 transition-colors"></div>
-                    <div class="flex items-center gap-2 mb-2">
-                        <span class="material-symbols-outlined text-secondary text-sm" style="font-variation-settings: 'FILL' 1">done_all</span>
-                        <span class="text-[10px] font-black uppercase tracking-widest text-on-surface-variant/60">Всего</span>
-                    </div>
-                    <p class="text-3xl font-black font-headline text-on-surface">${state.stats?.approved || 0}</p>
-                    <p class="text-[9px] text-on-surface-variant/40 mt-1">за всё время</p>
+            <div class="grid grid-cols-2 gap-3 sm:gap-4">
+                <div class="premium-card p-5 sm:p-8">
+                    <p class="text-[9px] font-black uppercase tracking-[0.3em] text-on-surface-variant mb-3">Сегодня</p>
+                    <p class="text-3xl sm:text-4xl font-bold text-text-main tracking-tighter">${state.stats?.approvedToday || 0}</p>
+                </div>
+                <div class="premium-card p-5 sm:p-8">
+                    <p class="text-[9px] font-black uppercase tracking-[0.3em] text-on-surface-variant mb-3">Всего ответов</p>
+                    <p class="text-3xl sm:text-4xl font-bold text-text-main tracking-tighter">${state.stats?.approved || 0}</p>
+                </div>
+            </div>
+
+            <section class="premium-card p-5 sm:p-8 flex items-center justify-between gap-4">
+                <div class="space-y-1 min-w-0">
+                    <h3 class="text-text-main font-bold text-xs sm:text-sm uppercase tracking-widest">Тарифный план</h3>
+                    <p class="text-xs text-on-surface-variant">Истекает: <span class="text-text-main font-mono">${expiredDateStr}</span></p>
+                </div>
+                <div class="text-right flex-shrink-0">
+                    <p class="text-[9px] uppercase font-black text-on-surface-variant mb-1">Осталось</p>
+                    <p class="text-2xl sm:text-3xl font-bold ${daysLeft > 3 ? 'text-primary' : 'text-red-400'}">${daysLeft} дн.</p>
                 </div>
             </section>
 
-            ${state.telegramChatId.toString() === '795056847' ? `
-            <!-- Admin Console (Visible only to Owner) -->
-            <section class="mt-4 p-6 rounded-3xl bg-electric-gradient text-on-primary shadow-2xl shadow-primary/20">
-                <div class="flex items-center gap-3 mb-6">
-                    <div class="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center backdrop-blur-md">
-                        <span class="material-symbols-outlined text-white text-xl">admin_panel_settings</span>
-                    </div>
-                    <div>
-                        <h3 class="font-headline font-black text-lg tracking-tight leading-none">Админ-панель</h3>
-                        <p class="text-[10px] uppercase font-bold tracking-widest opacity-60 mt-1">Growth & Retention</p>
+            <section class="premium-card p-6 sm:p-10 space-y-6">
+                <div class="space-y-3">
+                    <h2 class="font-headline text-2xl sm:text-3xl font-bold text-text-main tracking-tighter">Premium Доступ</h2>
+                    <div class="flex items-baseline gap-2">
+                        <span class="text-3xl sm:text-4xl font-bold text-primary">₽749</span>
+                        <span class="text-sm font-medium text-on-surface-variant">/ месяц</span>
                     </div>
                 </div>
                 
-                <div class="grid grid-cols-2 gap-3">
-                    <div class="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/10">
-                        <p class="text-[9px] uppercase font-black tracking-widest opacity-60 mb-1">Всего юзеров</p>
-                        <p class="text-2xl font-black font-headline">${state.adminStats?.totalSellers || 0}</p>
-                    </div>
-                    <div class="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/10 bg-green-500/10">
-                        <p class="text-[9px] uppercase font-black tracking-widest opacity-60 mb-1">Новых сегодня</p>
-                        <p class="text-2xl font-black font-headline">${state.adminStats?.newToday || 0}</p>
-                    </div>
-                    <div class="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/10">
-                        <p class="text-[9px] uppercase font-black tracking-widest opacity-60 mb-1">Активных (24ч)</p>
-                        <p class="text-2xl font-black font-headline">${state.adminStats?.activeToday || 0}</p>
-                    </div>
-                    <div class="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/10 bg-red-500/10">
-                        <p class="text-[9px] uppercase font-black tracking-widest opacity-60 mb-1">Без токена (Drop)</p>
-                        <p class="text-2xl font-black font-headline">${state.adminStats?.withoutToken || 0}</p>
-                    </div>
-                    <div class="col-span-2 bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/10 flex justify-between items-center">
-                        <div>
-                            <p class="text-[9px] uppercase font-black tracking-widest opacity-60 mb-1">Глобально ответов</p>
-                            <p class="text-2xl font-black font-headline">${state.adminStats?.totalApproved || 0}</p>
-                        </div>
-                        <span class="material-symbols-outlined opacity-30 text-3xl">auto_graph</span>
-                    </div>
-                </div>
-
-                <!-- Recent Activity Feed -->
-                <div class="mt-8 space-y-3">
-                    <p class="text-[9px] uppercase font-black tracking-[0.2em] opacity-40">Последние регистрации</p>
-                    ${state.adminUsers?.map(user => `
-                        <div class="bg-white/5 border border-white/10 rounded-xl p-3 flex items-center justify-between backdrop-blur-sm">
-                            <div class="flex items-center gap-3">
-                                <div class="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center text-[10px] font-black">${user.telegram_chat_id.toString().slice(0,2)}</div>
-                                <div>
-                                    <p class="text-xs font-bold font-headline">ID: ${user.telegram_chat_id}</p>
-                                    <p class="text-[8px] opacity-40 uppercase tracking-tighter">${new Date(user.joined_at).toLocaleDateString()}</p>
-                                </div>
-                            </div>
-                            <span class="px-2 py-0.5 rounded text-[8px] font-black uppercase ${user.wb_token ? 'bg-green-500/20 text-green-300' : 'bg-red-500/20 text-red-300'}">
-                                ${user.wb_token ? 'TOKEN OK' : 'NO TOKEN'}
-                            </span>
-                        </div>
-                    `).join('')}
-                </div>
-            </section>
-            ` : ''}
-
-            <button onclick="handleSync()" class="w-full bg-surface-container-high border border-outline-variant/10 text-on-surface py-5 rounded-2xl font-black font-headline flex items-center justify-center gap-3 active:scale-[0.98] transition-all mb-8 shadow-lg group">
-                <span class="material-symbols-outlined text-primary group-hover:rotate-180 transition-transform duration-500">sync</span>
-                Синхронизировать отзывы
-            </button>
-
-            <!-- Subscription Status Card -->
-            <section class="relative overflow-hidden p-6 rounded-2xl bg-surface-container-high border-2 ${daysLeft > 3 ? 'border-primary/30' : 'border-error/30'} shadow-xl shadow-primary/5">
-                <div class="relative z-10 flex items-center justify-between">
-                    <div class="flex items-start gap-4">
-                        <div class="w-12 h-12 rounded-xl ${daysLeft > 3 ? 'bg-primary/20' : 'bg-error/20'} flex items-center justify-center flex-shrink-0">
-                            <span class="material-symbols-outlined ${daysLeft > 3 ? 'text-primary' : 'text-error'} text-2xl" style="font-variation-settings: 'FILL' 1;">
-                                ${daysLeft > 0 ? 'workspace_premium' : 'lock'}
-                            </span>
-                        </div>
-                        <div>
-                            <h3 class="font-headline font-bold text-on-surface text-base mb-1">
-                                ${state.settings.subscription_status === 'premium' ? 'Premium Доступ' : 'Бесплатный план'}
-                            </h3>
-                            <p class="text-sm text-on-surface-variant font-medium">Активен до: <span class="text-on-surface italic">${expiredDateStr}</span></p>
-                        </div>
-                    </div>
-                <div class="text-right">
-                    <p class="text-[10px] uppercase font-black text-on-surface-variant/50 mb-1">Осталось</p>
-                    <p class="text-2xl font-black font-headline ${daysLeft > 3 ? 'text-primary' : 'text-error'}">${daysLeft} дн.</p>
-                </div>
-            </section>
-
-            <!-- Pricing Tier Card (Premium Offer) -->
-            <section class="p-8 rounded-[2rem] bg-surface-container-lowest relative border border-outline-variant/20 shadow-2xl overflow-hidden group">
-                <div class="mb-8">
-                    <span class="text-[10px] font-black tracking-[0.3em] text-primary/60 uppercase mb-3 block">WBReply AI • Premium</span>
-                    <h2 class="font-headline text-3xl font-extrabold text-on-surface leading-tight mb-4">Первые 3 дня — бесплатно</h2>
-                    
-                    <div class="flex items-baseline gap-3 mb-2">
-                        <span class="text-5xl font-black font-headline text-on-surface tracking-tighter">749 ₽</span>
-                    </div>
-                    <p class="text-xs text-on-surface-variant/60 font-semibold mb-4 uppercase tracking-wider">в месяц после завершения триала</p>
-                    
-                    <div class="py-2 px-4 bg-primary/10 rounded-xl inline-flex items-center gap-2 border border-primary/20">
-                        <span class="material-symbols-outlined text-primary text-sm">schedule</span>
-                        <p class="text-[11px] font-bold text-primary">Автопродление каждые 30 дней.</p>
-                    </div>
-                </div>
-
-                <div class="space-y-5 mb-10">
-                    <div class="flex items-center gap-4 group/item">
-                        <div class="w-10 h-10 rounded-xl bg-surface-container-high flex items-center justify-center transition-colors group-hover/item:bg-primary/20">
-                            <span class="material-symbols-outlined text-xl text-primary" style="font-variation-settings: 'FILL' 1;">check_circle</span>
-                        </div>
-                        <span class="text-sm font-semibold text-on-surface/90">Безлимитные ИИ-ответы на отзывы</span>
-                    </div>
-                    <div class="flex items-center gap-4 group/item">
-                        <div class="w-10 h-10 rounded-xl bg-surface-container-high flex items-center justify-center transition-colors group-hover/item:bg-primary/20">
-                            <span class="material-symbols-outlined text-xl text-primary" style="font-variation-settings: 'FILL' 1;">check_circle</span>
-                        </div>
-                        <span class="text-sm font-semibold text-on-surface/90">Умная матрица кросс-сейл допродаж</span>
-                    </div>
-                    <div class="flex items-center gap-4 group/item">
-                        <div class="w-10 h-10 rounded-xl bg-surface-container-high flex items-center justify-center transition-colors group-hover/item:bg-primary/20">
-                            <span class="material-symbols-outlined text-xl text-primary" style="font-variation-settings: 'FILL' 1;">check_circle</span>
-                        </div>
-                        <span class="text-sm font-semibold text-on-surface/90">Tone of Voice: персональные инструкции</span>
-                    </div>
-                </div>
-
-                <button onclick="handlePayment()" class="w-full py-5 bg-electric-gradient rounded-2xl font-headline font-black text-on-primary shadow-[0_8px_32px_rgba(173,198,255,0.3)] hover:scale-[1.02] active:scale-[0.97] duration-300 transition-all uppercase tracking-widest text-sm flex items-center justify-center gap-3">
-                    <span>Оплатить подписку</span>
-                    <span class="material-symbols-outlined font-bold">bolt</span>
+                <button onclick="handlePayment()" class="primary-btn w-full py-4 sm:py-5 text-xs uppercase tracking-[0.2em] shadow-lg active:scale-[0.99] transition-all">
+                    Активировать безлимит
                 </button>
                 
-                <p class="text-[9px] text-center text-on-surface-variant/40 mt-6 leading-relaxed uppercase font-bold tracking-widest">
-                    Безопасная оплата • Отмена в любой момент
+                <p class="text-[10px] text-center text-on-surface-variant uppercase font-bold tracking-widest">
+                    Безопасная оплата • Мгновенная активация
                 </p>
             </section>
-            
-            <!-- Footer Links -->
-            <footer class="pt-8 pb-12 flex flex-col items-center gap-6">
-                <div class="flex gap-8">
-                    <a class="text-[11px] font-bold text-on-surface-variant/50 hover:text-primary transition-colors uppercase tracking-widest" href="offer.html">Оферта</a>
-                    <a class="text-[11px] font-bold text-on-surface-variant/50 hover:text-primary transition-colors uppercase tracking-widest" href="https://t.me/edh4hhr" target="_blank">Поддержка</a>
-                </div>
-                <div class="flex flex-col items-center gap-1 opacity-30">
-                    <p class="text-[10px] text-on-surface font-black uppercase tracking-[0.5em]">WBReply AI</p>
-                    <p class="text-[8px] text-on-surface font-bold">PRODUCTION BUILD • v2.4.0</p>
-                </div>
-            </footer>
         </div>
     `;
 }
 
+// Actions
 async function handleSaveSettings() {
-    const tokenInput = document.getElementById('wb-token-input');
-    const instructionsInput = document.getElementById('ai-instructions-input');
+    state.settings.wb_token = document.getElementById('wb-token-input').value;
+    state.settings.custom_instructions = document.getElementById('ai-instructions-input').value;
     
-    if (tokenInput) state.settings.wb_token = tokenInput.value;
-    if (instructionsInput) state.settings.custom_instructions = instructionsInput.value;
-    
-    // Auto-reply is forced to true globally
-    state.settings.is_auto_reply_enabled = true;
-    state.settings.auto_reply_min_rating = 1;
-    
-    await saveSettings();
-}
-
-async function saveSettings() {
     try {
-        const res = await fetch(`/api/settings/${state.telegramChatId}`, {
+        const res = await fetch('/api/settings', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(state.settings)
         });
-        const data = await res.json();
-        if (data.settings) state.settings = data.settings;
-        showToast('Конфигурация сохранена');
-    } catch (e) {
-        console.error('Save settings error:', e);
-        showToast('Ошибка сохранения', true);
+        if (res.ok) {
+            showToast('Конфигурация сохранена');
+            await refreshData();
+        } else {
+            showToast('Ошибка сохранения', true);
+        }
+    } catch (e) { showToast('Ошибка сети', true); }
+}
+
+function setTheme(theme) {
+    if (theme === 'dark') {
+        document.documentElement.classList.add('dark');
+        localStorage.setItem('theme', 'dark');
+    } else {
+        document.documentElement.classList.remove('dark');
+        localStorage.setItem('theme', 'light');
     }
+    showView('interface'); 
+    showToast(`Тема: ${theme === 'dark' ? 'Темная' : 'Светлая'}`);
+}
+
+function renderInterface() {
+    const isDark = document.documentElement.classList.contains('dark');
+    
+    return `
+        <div class="max-w-2xl mx-auto space-y-8 animate-in pb-10">
+            <header>
+                <p class="text-primary text-[10px] font-black uppercase tracking-[0.3em] mb-2">Система</p>
+                <h2 class="font-headline text-2xl sm:text-3xl font-bold text-text-main tracking-tight">Параметры интерфейса</h2>
+            </header>
+
+            <div class="space-y-5">
+                <section class="premium-card p-5 sm:p-8 space-y-6">
+                    <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                        <div>
+                            <h4 class="text-text-main font-bold text-xs sm:text-sm uppercase tracking-widest">Цветовая тема</h4>
+                            <p class="text-xs text-on-surface-variant">Выберите оформление приложения</p>
+                        </div>
+                        <div class="flex border border-outline-variant p-1 rounded-lg bg-bg-main">
+                            <button onclick="setTheme('dark')" class="px-4 py-2 ${isDark ? 'bg-primary text-bg-main shadow-lg' : 'text-on-surface-variant'} rounded-md text-[10px] font-black uppercase tracking-widest transition-all">Темная</button>
+                            <button onclick="setTheme('light')" class="px-4 py-2 ${!isDark ? 'bg-primary text-white shadow-lg' : 'text-on-surface-variant'} rounded-md text-[10px] font-black uppercase tracking-widest transition-all">Светлая</button>
+                        </div>
+                    </div>
+
+
+                </section>
+
+                <section class="premium-card p-5 sm:p-8 border-primary/20 bg-primary/5">
+                    <div class="flex items-start gap-4">
+                        <span class="material-symbols-outlined text-primary">info</span>
+                        <div class="space-y-1">
+                            <h4 class="text-text-main font-bold text-xs sm:text-sm uppercase tracking-widest">Версия ПО</h4>
+                            <p class="text-xs text-on-surface-variant">WB Response v2.4.0 (Стабильная сборка). Система готова к работе.</p>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </div>
+    `;
 }
 
 async function handleSync() {
+    if (!state.settings.wb_token) return showToast('Сначала добавьте API токен', true);
+    showToast('Синхронизация...');
     try {
-        if (!state.settings.wb_token) {
-            showToast('Сначала введите WB Токен в настройках', true);
-            return;
-        }
-        showToast('Запуск синхронизации...', false);
-        const res = await fetch(`/api/sync/${state.telegramChatId}`, { method: 'POST' });
-        const data = await res.json();
-        if (data.success) {
-            showToast(data.message);
-            await refreshData();
-            showView('subscription');
-        } else {
-            showToast(data.error || 'Ошибка синхронизации', true);
-        }
-    } catch (e) {
-        console.error('Sync error:', e);
-        showToast('Ошибка сети', true);
-    }
-}
-
-function showView(view) {
-    state.currentView = view;
-    const content = document.getElementById('content-view');
-    if (!content) return;
-
-    // Update Nav active classes
-    document.querySelectorAll('.tab-item').forEach(item => {
-        item.classList.remove('active', 'bg-[#2A2A2A]', 'text-[#ADC6FF]');
-        item.classList.add('text-[#C1C6D7]');
-        const icon = item.querySelector('.material-symbols-outlined');
-        if (icon) icon.style.fontVariationSettings = "'FILL' 0";
-    });
-    
-    const activeNav = document.getElementById(`nav-${view}`);
-    if (activeNav) {
-        activeNav.classList.add('active', 'bg-[#2A2A2A]', 'text-[#ADC6FF]');
-        activeNav.classList.remove('text-[#C1C6D7]');
-        const icon = activeNav.querySelector('.material-symbols-outlined');
-        if (icon) icon.style.fontVariationSettings = "'FILL' 1";
-    }
-
-    if (view === 'settings') {
-        content.innerHTML = renderSettings();
-    } else if (view === 'matrix') {
-        content.innerHTML = renderMatrix();
-    } else if (view === 'subscription') {
-        content.innerHTML = renderSubscription();
-    }
-}
-
-async function handleAddMatrixRow() {
-    const nm_id = document.getElementById('new-nm-id').value;
-    const cross_sell_article = document.getElementById('new-cross-id').value;
-    if (!nm_id || !cross_sell_article) return showToast('Заполните оба поля', true);
-
-    try {
-        const res = await fetch('/api/matrix', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ telegram_chat_id: state.telegramChatId, nm_id, cross_sell_article })
-        });
-        
-        const data = await res.json();
+        const res = await fetch('/api/sync', { method: 'POST' });
         if (res.ok) {
+            showToast('Готово');
             await refreshData();
-            showView('matrix');
-            showToast('Пара добавлена');
-        } else {
-            showToast(data.error || 'Ошибка сохранения', true);
-        }
-    } catch (e) {
-        showToast('Ошибка сети', true);
-    }
+            showView('reviews');
+        } else { showToast('Ошибка синхронизации', true); }
+    } catch (e) { showToast('Ошибка сети', true); }
 }
+
+
 
 async function handlePayment() {
+    showToast('Обработка...');
     try {
-        if (!state.telegramChatId) return showToast('Ошибка авторизации', true);
-        
-        showToast('Генерация ссылки...', false);
-        const res = await fetch('/api/payments/create', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ telegramChatId: state.telegramChatId })
-        });
-        
+        const res = await fetch('/api/payments/create', { method: 'POST' });
         const data = await res.json();
         if (data.url) {
-            // In TG Mini App, we should use Telegram.WebApp.openLink if available
-            if (window.Telegram && window.Telegram.WebApp) {
-                window.Telegram.WebApp.openLink(data.url);
-            } else {
-                window.location.href = data.url;
-            }
-        } else {
-            showToast(data.error || 'Ошибка платежной системы', true);
-        }
-    } catch (e) {
-        console.error('Payment error:', e);
-        showToast('Ошибка сети', true);
-    }
+            window.location.href = data.url;
+        } else { showToast('Ошибка платежа', true); }
+    } catch (e) { showToast('Ошибка сети', true); }
 }
 
-async function handleDeleteMatrix(id) {
-    try {
-        await fetch(`/api/matrix/${id}`, { method: 'DELETE' });
-        await refreshData();
-        showView('matrix');
-        showToast('Пара удалена');
-    } catch (e) {
-        showToast('Ошибка удаления', true);
-    }
-}
-
+// Utils
 function toggleTokenVisibility() {
     const input = document.getElementById('wb-token-input');
     const icon = document.getElementById('token-visibility-icon');
-    if (input.type === 'password') {
-        input.type = 'text';
-        icon.innerText = 'visibility_off';
-    } else {
-        input.type = 'password';
-        icon.innerText = 'visibility';
-    }
+    input.type = input.type === 'password' ? 'text' : 'password';
+    icon.innerText = input.type === 'password' ? 'visibility' : 'visibility_off';
 }
 
 function showToast(message, isError = false) {
     const toast = document.createElement('div');
-    toast.className = `fixed bottom-24 left-1/2 -translate-x-1/2 px-6 py-3 rounded-full text-white text-xs font-bold z-[100] transition-all transform scale-90 opacity-0 ${isError ? 'bg-error-container text-on-error-container border border-error' : 'bg-primary text-on-primary'}`;
+    toast.className = `fixed bottom-24 left-1/2 -translate-x-1/2 px-8 py-4 text-xs font-bold z-[100] uppercase tracking-widest animate-toast rounded-lg ${
+        isError 
+            ? 'bg-red-50 text-red-700 border border-red-200' 
+            : ''
+    }`;
+    toast.style.background = isError ? '' : 'var(--c-toast-bg)';
+    toast.style.color = isError ? '' : 'var(--c-primary)';
+    toast.style.border = isError ? '' : '1px solid var(--c-toast-border)';
+    toast.style.boxShadow = '0 10px 25px -5px rgb(0 0 0 / 0.15)';
     toast.innerText = message;
     document.body.appendChild(toast);
-    
-    requestAnimationFrame(() => {
-        toast.classList.remove('scale-90', 'opacity-0');
-        toast.classList.add('scale-100', 'opacity-100');
-    });
-
     setTimeout(() => {
-        toast.classList.remove('scale-100', 'opacity-100');
-        toast.classList.add('scale-90', 'opacity-0');
+        toast.classList.add('opacity-0');
         setTimeout(() => toast.remove(), 300);
-    }, 2000);
+    }, 2500);
 }

@@ -36,7 +36,7 @@ class ReviewService {
       const response = await wbService.getReviews(false, 30, 0, { token: seller.wb_token });
       const reviews = response?.data?.feedbacks || [];
       
-      console.log(`[ReviewService] Found ${reviews.length} new reviews`);
+      console.log(`[ReviewService] Found ${reviews.length} unanswered reviews`);
 
       for (const review of reviews) {
         // Skip if already processed in this state (no update needed if auto_posted)
@@ -51,6 +51,9 @@ class ReviewService {
         }
 
         await this.processSingleReview(seller, review, existing?.id);
+        
+        // Rate limit: delay between processing reviews (WB allows 3 req/s)
+        await this._delay(400);
       }
     } catch (error) {
       console.error(`[ReviewService] Sync error for ${seller.telegram_chat_id}:`, error.message);
@@ -62,47 +65,64 @@ class ReviewService {
    */
   async processSingleReview(seller, feedback, existingLogId = null) {
     try {
-      // 1. Get Product Data
-      const { data: productMetadata } = await supabase
-        .from('products')
-        .select('*')
-        .eq('nm_id', feedback.nmId)
-        .maybeSingle();
+      // 1. Get Product Data from WB Content API (real metadata: name, description, characteristics)
+      let productMetadata = null;
+      try {
+        productMetadata = await wbService.getProductMetadata(feedback.nmId, seller.wb_token);
+      } catch (metaErr) {
+        console.warn(`[ReviewService] Could not fetch product metadata for nmId ${feedback.nmId}:`, metaErr.message);
+      }
 
+      // 2. Get product matrix (seller's custom config for this product)
       const { data: productMatrix } = await supabase
         .from('product_matrix')
         .select('*')
         .eq('seller_id', seller.id)
         .eq('nm_id', feedback.nmId)
         .maybeSingle();
+
       let crossSellName = null;
       if (productMatrix?.cross_sell_article) {
         console.log(`[ReviewService] Fetching metadata for cross-sell article: ${productMatrix.cross_sell_article}`);
         const crossMetadata = await wbService.getProductMetadata(productMatrix.cross_sell_article, seller.wb_token);
         crossSellName = crossMetadata?.name || null;
+        // Rate limit: small delay after Content API call
+        await this._delay(350);
       }
 
-      console.log(`[ReviewService] Processing feedback ${feedback.id} (Matrix: ${productMatrix ? 'YES' : 'NO'})`);
+      // Extract product name from WB API response (productDetails.productName)
+      const wbProductName = feedback.productDetails?.productName || '';
 
-      // 2. Generate AI Response
-      const aiData = await aiService.generateResponse(feedback.text, productMetadata, productMatrix, seller, { crossSellName });
+      console.log(`[ReviewService] Processing feedback ${feedback.id} | Product: "${wbProductName}" | Matrix: ${productMatrix ? 'YES' : 'NO'} | Metadata: ${productMetadata ? 'YES' : 'NO'}`);
+
+      // 3. Generate AI Response (pass pros, cons, and full review context)
+      const reviewContext = {
+        text: feedback.text,
+        pros: feedback.pros || '',
+        cons: feedback.cons || '',
+        rating: feedback.productValuation
+      };
+      const aiData = await aiService.generateResponse(reviewContext, productMetadata, productMatrix, seller, { crossSellName });
       if (!aiData || !aiData.text) return;
 
       const aiResponse = aiData.text;
 
-      // 3. AUTO-POST ALWAYS
+      // 4. AUTO-POST ALWAYS
       console.log(`[ReviewService] Auto-posting to ${feedback.id}`);
       const posted = await wbService.sendAnswer(feedback.id, aiResponse, seller.wb_token);
+      
+      // Rate limit: delay after posting answer
+      await this._delay(350);
       
       if (posted) {
         await this.saveReviewLog(seller.id, feedback, aiResponse, 'auto_posted', aiData, existingLogId);
         
-        // 4. Notify User in requested format
-        const productLabel = productMatrix?.product_name || productMetadata?.name || feedback.nmId;
+        // 5. Notify User in requested format
+        const productLabel = productMatrix?.product_name || productMetadata?.name || wbProductName || feedback.nmId;
         const notification = `Отзыв (${feedback.productValuation}⭐️):\n` +
           `"${this._escapeHtml(feedback.text)}"\n` +
-          `Товар: ${this._escapeHtml(productLabel)}\n\n` +
-          ` ответ:\n` +
+          `Товар: ${this._escapeHtml(String(productLabel))}\n\n` +
+          `Ответ ИИ:\n` +
           `"${this._escapeHtml(aiResponse)}"`;
 
         await telegramService.sendMessage(seller.telegram_chat_id, notification);
@@ -110,6 +130,10 @@ class ReviewService {
     } catch (error) {
       console.error(`[ReviewService] Error in single review ${feedback.id}:`, error.message);
     }
+  }
+
+  _delay(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
   }
 
   _escapeHtml(text) {
@@ -127,7 +151,7 @@ class ReviewService {
       seller_id: sellerId,
       review_id: feedback.id,
       review_text: feedback.text,
-      product_name: feedback.productName || '',
+      product_name: feedback.productDetails?.productName || '',
       nm_id: feedback.nmId,
       rating: feedback.productValuation,
       ai_response_draft: response,

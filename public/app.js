@@ -1,5 +1,5 @@
 let state = {
-    telegramChatId: null,
+    sellerId: null,
     settings: {
         wb_token: '',
         custom_instructions: '',
@@ -20,9 +20,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         const tg = window.Telegram.WebApp;
         tg.expand();
         tg.ready();
-        state.telegramChatId = tg.initDataUnsafe.user?.id || 795056847;
+        state.sellerId = tg.initDataUnsafe.user?.id || 795056847;
     } else {
-        state.telegramChatId = 795056847;
+        state.sellerId = 795056847;
     }
 
     // 2. Initial View (Immediate render)
@@ -36,10 +36,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 async function refreshData() {
     try {
         const [settings, matrix, stats, reviews] = await Promise.all([
-            fetch(`/api/settings/${state.telegramChatId}`).then(r => r.status === 200 ? r.json() : null),
-            fetch(`/api/matrix/${state.telegramChatId}`).then(r => r.status === 200 ? r.json() : null),
-            fetch(`/api/stats/${state.telegramChatId}`).then(r => r.status === 200 ? r.json() : null),
-            fetch(`/api/reviews/${state.telegramChatId}`).then(r => r.status === 200 ? r.json() : null)
+            fetch(`/api/settings/${state.sellerId}`).then(r => r.status === 200 ? r.json() : null),
+            fetch(`/api/matrix/${state.sellerId}`).then(r => r.status === 200 ? r.json() : null),
+            fetch(`/api/stats/${state.sellerId}`).then(r => r.status === 200 ? r.json() : null),
+            fetch(`/api/reviews/${state.sellerId}`).then(r => r.status === 200 ? r.json() : null)
         ]);
 
         if (settings) state.settings = { ...state.settings, ...settings };
@@ -60,7 +60,7 @@ async function handleSaveSettings() {
         if (tokenInput) state.settings.wb_token = tokenInput.value;
         if (instructionsInput) state.settings.custom_instructions = instructionsInput.value;
 
-        const res = await fetch(`/api/settings/${state.telegramChatId}`, {
+        const res = await fetch(`/api/settings/${state.sellerId}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(state.settings)
@@ -81,7 +81,7 @@ async function handleSync() {
             return;
         }
         showToast('Запуск синхронизации...', false);
-        const res = await fetch(`/api/sync/${state.telegramChatId}`, { method: 'POST' });
+        const res = await fetch(`/api/sync/${state.sellerId}`, { method: 'POST' });
         const data = await res.json();
         if (data.success) {
             showToast(data.message);
@@ -257,11 +257,11 @@ function renderSubscription() {
             <section class="flex items-center justify-between p-5 rounded-2xl bg-surface-container-low border border-outline-variant/10">
                 <div class="flex items-center gap-4">
                     <div class="w-14 h-14 rounded-2xl premium-gradient flex items-center justify-center text-on-primary font-bold text-xl shadow-lg shadow-primary/20">
-                        ${state.telegramChatId.toString().slice(0, 2)}
+                        ${(state.settings?.display_name || "US").slice(0, 2).toUpperCase()}
                     </div>
                     <div>
-                        <p class="text-[10px] font-extrabold tracking-widest text-on-surface-variant/50 uppercase mb-1">Telegram User</p>
-                        <p class="text-lg font-bold font-headline tracking-wide text-on-surface">ID: ${state.telegramChatId}</p>
+                        <p class="text-[10px] font-extrabold tracking-widest text-on-surface-variant/50 uppercase mb-1">Аккаунт</p>
+                        <p class="text-lg font-bold font-headline tracking-wide text-on-surface">ID: ${state.sellerId ? state.sellerId.toString().slice(0, 8) : "demo"}</p>
                     </div>
                 </div>
                 <div class="flex flex-col items-end">
@@ -388,7 +388,7 @@ async function handleAddMatrixRow() {
         await fetch('/api/matrix', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ telegram_chat_id: state.telegramChatId, nm_id, cross_sell_article })
+            body: JSON.stringify({ nm_id, cross_sell_article })
         });
         await refreshData();
         showView('matrix');

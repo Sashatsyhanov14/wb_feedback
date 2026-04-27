@@ -4,13 +4,14 @@ const crypto = require('crypto');
 const config = require('../config');
 const supabase = require('../db/supabase');
 const telegramService = require('../services/telegramService');
+const authMiddleware = require('../middleware/authMiddleware');
+
+const SUBSCRIPTION_PRICE = 749; // Fixed price
 
 // 1. Create Payment URL
-router.post('/create', async (req, res) => {
+router.post('/create', authMiddleware, async (req, res) => {
   try {
-    const { telegramChatId, amount = 749 } = req.body;
-    
-    if (!telegramChatId) return res.status(400).json({ error: 'Missing telegramChatId' });
+    const sellerId = req.user.sellerId;
 
     const invId = Date.now(); // Unique ID for this transaction
     const mLogin = config.robokassaMerchantLogin;
@@ -19,16 +20,16 @@ router.post('/create', async (req, res) => {
     
     // shp_userId is a custom parameter defined by Robokassa to track the user
     const signature = crypto.createHash('md5')
-      .update(`${mLogin}:${amount}:${invId}:${p1}:shp_userId=${telegramChatId}`)
+      .update(`${mLogin}:${SUBSCRIPTION_PRICE}:${invId}:${p1}:shp_userId=${sellerId}`)
       .digest('hex');
 
     const url = `https://auth.robokassa.ru/Merchant/Index.aspx?` + 
       `MerchantLogin=${mLogin}` +
-      `&OutSum=${amount}` +
+      `&OutSum=${SUBSCRIPTION_PRICE}` +
       `&InvId=${invId}` +
       `&Description=${encodeURIComponent('Подписка WBReply AI - 30 дней')}` +
       `&SignatureValue=${signature}` +
-      `&shp_userId=${telegramChatId}` +
+      `&shp_userId=${sellerId}` +
       (isTest ? `&IsTest=1` : '');
 
     res.json({ url });
@@ -61,7 +62,7 @@ router.post('/robokassa/result', async (req, res) => {
     const { data: seller, error: sellerError } = await supabase
       .from('sellers')
       .select('subscription_expires_at')
-      .eq('telegram_chat_id', shp_userId)
+      .eq('id', shp_userId)
       .single();
 
     if (!sellerError) {
@@ -75,13 +76,12 @@ router.post('/robokassa/result', async (req, res) => {
           subscription_status: 'premium', 
           subscription_expires_at: newExpiry 
         })
-        .eq('telegram_chat_id', shp_userId);
+        .eq('id', shp_userId);
 
-      // Notify User
-      await telegramService.sendMessage(shp_userId, `🎉 <b>Оплата прошла успешно!</b>\nВаша подписка продлена до <b>${new Date(newExpiry).toLocaleDateString()}</b>. Спасибо, что вы с нами! 🚀`);
-      
       // Notify Admin
-      await telegramService.sendMessage(config.adminId, `💰 <b>Поступление оплаты!</b>\nЮзер: <code>${shp_userId}</code>\nСумма: ${OutSum} руб.`);
+      if (config.adminId) {
+        await telegramService.sendMessage(config.adminId, `💰 <b>Поступление оплаты!</b>\nЮзер: <code>${shp_userId}</code>\nСумма: ${OutSum} руб.`);
+      }
     }
 
     res.send(`OK${InvId}`); // Robokassa requirement
