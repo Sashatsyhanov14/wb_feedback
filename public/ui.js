@@ -163,19 +163,27 @@ function initTelegramWidget() {
     const container = document.getElementById('tg-login-container');
     if (!container) return;
     
-    // Clear previous if any
+    // Clear previous
     container.innerHTML = '';
     
     const script = document.createElement('script');
+    script.async = true;
     script.src = "https://telegram.org/js/telegram-widget.js?22";
     script.setAttribute('data-telegram-login', 'WBReplyAIbot');
     script.setAttribute('data-size', 'large');
     script.setAttribute('data-radius', '12');
     script.setAttribute('data-onauth', 'onTelegramAuth(user)');
     script.setAttribute('data-request-access', 'write');
-    script.async = true;
     
+    // Telegram widget is picky about where it is placed
     container.appendChild(script);
+    
+    // Fallback: if it doesn't load in 3 seconds, show a manual button or error
+    setTimeout(() => {
+        if (container.innerHTML.includes('animate-pulse')) {
+            container.innerHTML = `<p class="text-[10px] text-red-400 font-bold uppercase">Ошибка загрузки виджета. Проверьте VPN или настройки домена в BotFather.</p>`;
+        }
+    }, 4000);
 }
 
 function renderLogin() {
