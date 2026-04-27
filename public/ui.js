@@ -155,7 +155,27 @@ function showView(view) {
         content.innerHTML = renderInterface();
     } else if (view === 'login') {
         content.innerHTML = renderLogin();
+        initTelegramWidget();
     }
+}
+
+function initTelegramWidget() {
+    const container = document.getElementById('tg-login-container');
+    if (!container) return;
+    
+    // Clear previous if any
+    container.innerHTML = '';
+    
+    const script = document.createElement('script');
+    script.src = "https://telegram.org/js/telegram-widget.js?22";
+    script.setAttribute('data-telegram-login', 'WBReplyAIbot');
+    script.setAttribute('data-size', 'large');
+    script.setAttribute('data-radius', '12');
+    script.setAttribute('data-onauth', 'onTelegramAuth(user)');
+    script.setAttribute('data-request-access', 'write');
+    script.async = true;
+    
+    container.appendChild(script);
 }
 
 function renderLogin() {
@@ -195,13 +215,11 @@ function renderLogin() {
                         <span class="text-base font-bold text-white">Войти через ВКонтакте</span>
                     </button>
 
-                    <!-- Telegram Button -->
-                    <button onclick="handleTestLogin('Telegram')" class="w-full h-16 flex items-center justify-center gap-4 bg-[#24A1DE] hover:brightness-110 active:scale-[0.97] transition-all rounded-[12px] shadow-lg shadow-[#24A1DE]/30">
-                        <svg class="w-8 h-8 fill-white" viewBox="0 0 24 24">
-                            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69.01-.03.01-.14-.07-.2-.08-.06-.19-.04-.27-.02-.12.02-1.96 1.25-5.54 3.69-.52.36-1 .53-1.42.52-.47-.01-1.37-.26-2.03-.48-.82-.27-1.47-.42-1.42-.88.03-.24.35-.49.96-.75 3.78-1.65 6.31-2.74 7.58-3.27 3.61-1.51 4.35-1.77 4.84-1.78.11 0 .35.03.5.16.12.1.16.23.18.33.02.11.02.24.01.37z"/>
-                        </svg>
-                        <span class="text-base font-bold text-white tracking-tight">Войти через Telegram</span>
-                    </button>
+                    <!-- Telegram Widget Container -->
+                    <div id="tg-login-container" class="w-full flex justify-center py-2">
+                        <!-- Widget will be injected here -->
+                        <div class="animate-pulse bg-gray-200 h-16 w-full rounded-[12px]"></div>
+                    </div>
                 </div>
 
                 <div class="flex flex-col items-center gap-6 pt-8 opacity-30">
