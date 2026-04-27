@@ -17,6 +17,15 @@ let state = {
 };
 
 document.addEventListener('DOMContentLoaded', async () => {
+    // Fast path: if no token cookie exists and not in Telegram, show login immediately
+    const hasToken = document.cookie.includes('auth_token=');
+    const isTelegram = window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initData;
+    
+    if (!hasToken && !isTelegram) {
+        showView('login');
+        return; // Skip API check
+    }
+
     // 1. Check Auth (Web or Mini App)
     await checkAuth();
 
@@ -25,7 +34,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         showView('login');
     } else {
         showView('reviews');
-        await refreshData();
+        refreshData(); // Don't await to render faster
         showView(state.currentView);
     }
 
