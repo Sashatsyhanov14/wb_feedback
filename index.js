@@ -55,7 +55,7 @@ app.use('/api/payments', paymentRoutes);
 
 // Page Routing
 app.get('/', (req, res) => {
-  if (req.cookies.token) {
+  if (req.cookies.auth_token) {
     res.redirect('/app');
   } else {
     res.sendFile(path.join(__dirname, 'public', 'landing.html'));

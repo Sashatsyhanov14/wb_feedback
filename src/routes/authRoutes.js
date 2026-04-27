@@ -69,7 +69,7 @@ router.post('/tg-callback', async (req, res) => {
 
     // Set secure cookie
     res.cookie('auth_token', token, {
-      httpOnly: true,
+      httpOnly: false,
       secure: config.nodeEnv === 'production',
       maxAge: 30 * 24 * 60 * 60 * 1000 // 30 days
     });
@@ -127,7 +127,7 @@ router.post('/demo', async (req, res) => {
     );
 
     res.cookie('auth_token', token, {
-        httpOnly: true,
+        httpOnly: false,
         secure: config.nodeEnv === 'production',
         maxAge: 30 * 24 * 60 * 60 * 1000
     });
@@ -217,7 +217,7 @@ router.get('/google/callback', async (req, res) => {
     );
 
     res.cookie('auth_token', token, {
-      httpOnly: true,
+      httpOnly: false,
       secure: config.nodeEnv === 'production',
       maxAge: 30 * 24 * 60 * 60 * 1000
     });
