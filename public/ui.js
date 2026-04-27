@@ -163,8 +163,6 @@ function initTelegramWidget() {
     const container = document.getElementById('tg-login-container');
     if (!container) return;
     
-    // Clear previous
-    container.innerHTML = '';
     
     const script = document.createElement('script');
     script.async = true;
