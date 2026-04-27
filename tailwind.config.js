@@ -7,11 +7,17 @@ module.exports = {
   darkMode: 'class',
   theme: {
     extend: {
-      colors: {
-        "surface": "#131313",
-        "tertiary-fixed": "#ffdbcc",
-        "primary-fixed": "#d8e2ff",
-        "secondary": "#adc6ff",
+        colors: {
+          "primary": "var(--c-primary, #E1AF66)",
+          "surface": "var(--c-surface, #111111)",
+          "bg-main": "var(--c-bg, #050505)",
+          "bg": "#050505",
+          "border": "#1F1F1F",
+          "outline-variant": "var(--c-border, #1F1F1F)",
+          "on-surface-variant": "var(--c-text-dim, #94a3b8)",
+          "text-main": "var(--c-text, #ffffff)",
+          "wb-purple": "#481173",
+          "tertiary-fixed": "#ffdbcc",
         "surface-container": "#201f1f",
         "on-background": "#e5e2e1",
         "error-container": "#93000a",

@@ -428,6 +428,15 @@ function renderSubscription() {
                 <h2 class="font-headline text-2xl sm:text-3xl font-bold text-text-main tracking-tight">Обзор аккаунта</h2>
             </header>
 
+            <!-- User Profile Card -->
+            <section class="premium-card p-5 sm:p-8 flex items-center gap-5">
+                <img src="${state.settings.avatar_url || 'https://api.dicebear.com/7.x/avataaars/svg?seed=' + state.sellerId}" alt="Avatar" class="w-16 h-16 rounded-full border border-outline-variant object-cover bg-surface/50">
+                <div class="space-y-1 min-w-0">
+                    <h3 class="text-text-main font-bold text-lg truncate">${state.settings.display_name || 'Пользователь'}</h3>
+                    <p class="text-xs text-on-surface-variant truncate">${state.settings.email || 'Нет Email'}</p>
+                </div>
+            </section>
+
             <div class="grid grid-cols-2 gap-3 sm:gap-4">
                 <div class="premium-card p-5 sm:p-8">
                     <p class="text-[9px] font-black uppercase tracking-[0.3em] text-on-surface-variant mb-3">Сегодня</p>
