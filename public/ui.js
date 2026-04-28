@@ -165,12 +165,6 @@ function showView(view) {
         content.innerHTML = renderInterface();
     } else if (view === 'login') {
         content.innerHTML = renderLogin();
-        // Delay slightly to ensure DOM is ready
-        setTimeout(() => {
-            initVkOneTap();
-            initVkFloatingOneTap();
-            initVkOAuthList();
-        }, 100);
     }
 }
 
@@ -207,8 +201,11 @@ function renderLogin() {
                         <span class="text-sm font-bold text-gray-900">Войти через Google</span>
                     </button>
 
-                    <!-- VK Section (One Tap Only) -->
-    <div id="vk-onetap-container" class="w-full min-h-[56px] py-2"></div>
+                    <!-- VK Button -->
+                    <button onclick="handleVkLogin()" class="w-full h-14 flex items-center justify-center gap-4 bg-[#0077FF] hover:bg-[#0066DD] active:scale-[0.97] transition-all rounded-[12px] shadow-sm">
+                        <svg style="width: 24px; height: 24px;" viewBox="0 0 28 28" fill="none"><path d="M4.54 4.54C3 6.08 3 8.52 3 13.4v1.2c0 4.88 0 7.32 1.54 8.86C6.08 25 8.52 25 13.4 25h1.2c4.88 0 7.32 0 8.86-1.54C25 21.92 25 19.48 25 14.6v-1.2c0-4.88 0-7.32-1.54-8.86C21.92 3 19.48 3 14.6 3h-1.2C8.52 3 6.08 3 4.54 4.54z" fill="#0077FF"/><path d="M7.56 9.85h1.58c.25 0 .41.16.49.48.73 2.7 2.01 5.06 2.52 5.06.18 0 .26-.08.26-.54v-2.78c-.05-1-.58-1.08-.58-1.44 0-.18.15-.35.39-.35h2.49c.21 0 .29.11.29.46v3.74c0 .21.09.29.15.29.18 0 .33-.08.67-.43a14.22 14.22 0 001.94-3.31c.09-.21.24-.4.51-.4h1.58c.33 0 .41.17.33.46-.14.54-1.54 3.03-2.44 4.31-.14.21-.19.32 0 .57.14.18.59.57.89.91.56.63 1 1.16 1.11 1.53.12.37-.07.56-.44.56h-1.58c-.34 0-.5-.14-.75-.44-.61-.67-1.13-1.31-1.35-1.31-.13 0-.19.05-.19.31v1.01c0 .34-.11.43-.39.43-1.18 0-3.76-.07-5.63-2.72a19.7 19.7 0 01-2.47-5.17c-.09-.25 0-.42.33-.42z" fill="white"/></svg>
+                        <span class="text-sm font-bold text-white">Войти через VK ID</span>
+                    </button>
 
     <div class="relative py-2">
                         <div class="absolute inset-0 flex items-center"><div class="w-full border-t border-outline-variant/20"></div></div>
