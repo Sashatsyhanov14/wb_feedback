@@ -162,14 +162,14 @@ async function refreshData() {
 
         if (state.sellerId.toString() === adminId) {
             requests.push(fetch(`/api/admin/stats`).then(r => r.status === 200 ? r.json() : null));
-            // Removed admin/users fetch to keep it simple, or kept if needed
             requests.push(fetch(`/api/admin/support`).then(r => r.status === 200 ? r.json() : null));
+            requests.push(fetch(`/api/admin/users`).then(r => r.status === 200 ? r.json() : null));
             
             // Show Admin tab in UI if not visible
             document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'flex');
         }
 
-        const [settings, matrix, stats, reviews, tickets, adminStats, adminTickets] = await Promise.all(requests);
+        const [settings, matrix, stats, reviews, tickets, adminStats, adminTickets, adminUsers] = await Promise.all(requests);
 
         if (settings) state.settings = { ...state.settings, ...settings };
         if (matrix) state.matrix = matrix;
@@ -178,6 +178,7 @@ async function refreshData() {
         if (tickets) state.tickets = tickets;
         if (adminStats) state.adminStats = adminStats;
         if (adminTickets) state.adminTickets = adminTickets;
+        if (adminUsers) state.adminUsers = adminUsers;
     } catch (e) {
         console.error('Refresh data error:', e);
     }
@@ -1005,61 +1006,214 @@ async function adminReply(ticketId) {
 
 function renderAdmin() {
     const s = state.adminStats || {};
-    const tkts = state.adminTickets || [];
+    let tkts = state.adminTickets || [];
+    let users = state.adminUsers || [];
     
+    // Sort users: those with open tickets first, then by last_active_at
+    const usersWithOpenTickets = new Set(tkts.filter(t => t.status === 'open').map(t => t.seller_id));
+    users.sort((a, b) => {
+        const aOpen = usersWithOpenTickets.has(a.id);
+        const bOpen = usersWithOpenTickets.has(b.id);
+        if (aOpen && !bOpen) return -1;
+        if (!aOpen && bOpen) return 1;
+        return new Date(b.last_active_at) - new Date(a.last_active_at);
+    });
+
+    const tokenCount = (s.totalSellers || 0) - (s.withoutToken || 0);
+
     return `
-        <div class="max-w-4xl mx-auto space-y-10 animate-in pb-20">
+        <div class="max-w-5xl mx-auto space-y-8 sm:space-y-10 animate-in pb-20">
             <header>
-                <p class="text-primary text-[10px] font-black uppercase tracking-[0.3em] mb-2">Админ-панель</p>
-                <h2 class="font-headline text-3xl font-bold text-text-main tracking-tight">Управление</h2>
+                <p class="text-primary text-[10px] sm:text-xs font-black uppercase tracking-[0.3em] mb-2">Админ-панель</p>
+                <h2 class="font-headline text-2xl sm:text-3xl font-bold text-text-main tracking-tight">Управление платформой</h2>
             </header>
 
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <!-- Global Stats -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6">
                 <div class="premium-card p-5">
-                    <p class="text-[9px] font-black uppercase tracking-widest text-on-surface-variant mb-2">Юзеры</p>
-                    <p class="text-3xl font-bold text-text-main">${s.totalSellers || 0}</p>
+                    <p class="text-[9px] sm:text-[10px] font-black uppercase tracking-widest text-on-surface-variant mb-2">Всего юзеров</p>
+                    <p class="text-2xl sm:text-3xl font-bold text-text-main">${s.totalSellers || 0}</p>
                 </div>
                 <div class="premium-card p-5">
-                    <p class="text-[9px] font-black uppercase tracking-widest text-on-surface-variant mb-2">Ответов</p>
-                    <p class="text-3xl font-bold text-text-main">${s.totalApproved || 0}</p>
+                    <p class="text-[9px] sm:text-[10px] font-black uppercase tracking-widest text-on-surface-variant mb-2">Вставили токен</p>
+                    <p class="text-2xl sm:text-3xl font-bold text-primary">${tokenCount}</p>
                 </div>
                 <div class="premium-card p-5">
-                    <p class="text-[9px] font-black uppercase tracking-widest text-on-surface-variant mb-2">Без токена</p>
-                    <p class="text-3xl font-bold text-red-500">${s.withoutToken || 0}</p>
+                    <p class="text-[9px] sm:text-[10px] font-black uppercase tracking-widest text-on-surface-variant mb-2">С подпиской</p>
+                    <p class="text-2xl sm:text-3xl font-bold text-green-500">${s.totalSubscribed || 0}</p>
                 </div>
                 <div class="premium-card p-5">
-                    <p class="text-[9px] font-black uppercase tracking-widest text-on-surface-variant mb-2">Тикеты</p>
-                    <p class="text-3xl font-bold text-primary">${tkts.filter(t => t.status === 'open').length}</p>
+                    <p class="text-[9px] sm:text-[10px] font-black uppercase tracking-widest text-on-surface-variant mb-2">Ответов ИИ</p>
+                    <p class="text-2xl sm:text-3xl font-bold text-text-main">${s.totalApproved || 0}</p>
                 </div>
             </div>
 
+            <!-- Users List -->
             <section class="premium-card overflow-hidden">
-                <div class="p-5 border-b border-outline-variant bg-surface/50">
-                    <h3 class="font-bold text-sm uppercase tracking-widest">Обращения и Отзывы</h3>
+                <div class="p-5 sm:p-6 border-b border-outline-variant bg-surface">
+                    <h3 class="font-bold text-sm uppercase tracking-widest">Список пользователей</h3>
                 </div>
-                <div class="divide-y divide-outline-variant">
-                    ${tkts.length === 0 ? '<div class="p-8 text-center text-on-surface-variant text-sm">Нет обращений</div>' : 
-                    tkts.map(t => `
-                        <div class="p-5 space-y-3 ${t.status === 'open' ? 'bg-primary/5' : ''}">
-                            <div class="flex justify-between items-start">
+                <div class="divide-y divide-outline-variant/50">
+                    ${users.length === 0 ? '<div class="p-8 text-center text-on-surface-variant text-sm">Нет пользователей</div>' : 
+                    users.map(u => {
+                        const hasOpenTicket = usersWithOpenTickets.has(u.id);
+                        const hasToken = u.wb_token && u.wb_token.trim() !== '';
+                        const hasSub = u.subscription_status !== 'free' && u.subscription_status !== 'trial';
+                        
+                        return `
+                        <div class="p-4 sm:p-6 hover:bg-surface/30 transition-colors ${hasOpenTicket ? 'bg-primary/5 border-l-4 border-l-primary' : ''}">
+                            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                                 <div>
-                                    <span class="text-[10px] font-black uppercase tracking-widest ${t.type === 'support' ? 'text-blue-500' : 'text-purple-500'}">${t.type}</span>
-                                    <span class="text-xs text-on-surface-variant ml-3">${new Date(t.created_at).toLocaleString()}</span>
-                                    <p class="text-xs font-bold text-text-main mt-1">${t.sellers?.display_name || t.sellers?.email || 'Юзер'}</p>
+                                    <div class="flex items-center gap-3 mb-1">
+                                        <h4 class="font-bold text-sm text-text-main">${u.display_name || 'Аноним'}</h4>
+                                        ${hasOpenTicket ? '<span class="bg-primary text-white text-[8px] px-2 py-0.5 rounded uppercase tracking-widest font-bold animate-pulse">Ждет ответа</span>' : ''}
+                                    </div>
+                                    <p class="text-[11px] text-on-surface-variant">${u.email || u.id}</p>
+                                    
+                                    <div class="flex flex-wrap items-center gap-2 mt-3">
+                                        <span class="text-[9px] px-2 py-1 rounded-md border ${hasToken ? 'border-primary/30 text-primary bg-primary/5' : 'border-outline-variant text-on-surface-variant'} font-black uppercase tracking-widest">
+                                            ${hasToken ? 'Токен вставлен' : 'Нет токена'}
+                                        </span>
+                                        <span class="text-[9px] px-2 py-1 rounded-md border ${hasSub ? 'border-green-500/30 text-green-500 bg-green-500/5' : 'border-outline-variant text-on-surface-variant'} font-black uppercase tracking-widest">
+                                            ${hasSub ? 'Подписка' : 'Free/Trial'}
+                                        </span>
+                                        <span class="text-[9px] px-2 py-1 rounded-md border border-outline-variant text-on-surface-variant font-black uppercase tracking-widest">
+                                            ${u.auth_provider || 'unknown'}
+                                        </span>
+                                    </div>
                                 </div>
-                                ${t.status === 'open' ? 
-                                  `<button onclick="adminReply('${t.id}')" class="text-xs bg-primary text-white px-3 py-1 rounded font-bold">Ответить</button>` : 
-                                  `<span class="text-[10px] font-black uppercase text-green-500">Отвечено</span>`
-                                }
+                                
+                                <div class="flex items-center gap-2 w-full sm:w-auto">
+                                    <button onclick="openAdminChat('${u.id}')" class="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-bg-main border border-primary text-primary px-4 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-colors hover:bg-primary/10">
+                                        <span class="material-symbols-outlined text-sm">chat</span> Чат
+                                    </button>
+                                    <button onclick="showToast('Просмотр отзывов юзера в разработке')" class="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-surface border border-outline-variant text-text-main px-4 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-colors hover:border-text-main">
+                                        <span class="material-symbols-outlined text-sm">visibility</span> Отзывы
+                                    </button>
+                                </div>
                             </div>
-                            <p class="text-sm text-text-main bg-bg-main p-3 rounded border border-outline-variant/30">${t.message}</p>
-                            ${t.admin_reply ? `<div class="ml-4 pl-4 border-l-2 border-primary space-y-1"><p class="text-[10px] font-black uppercase text-primary">Ваш ответ</p><p class="text-sm text-text-main">${t.admin_reply}</p></div>` : ''}
                         </div>
-                    `).join('')}
+                        `;
+                    }).join('')}
                 </div>
             </section>
         </div>
     `;
+}
+
+function openAdminChat(userId) {
+    const userTickets = (state.adminTickets || [])
+        .filter(t => t.seller_id === userId)
+        .sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+        
+    const user = state.adminUsers.find(u => u.id === userId);
+
+    const modal = document.createElement('div');
+    modal.id = 'admin-chat-modal';
+    modal.className = 'fixed inset-0 z-50 flex items-center justify-center sm:p-4 bg-black/80 backdrop-blur-sm animate-in';
+    modal.onclick = () => modal.remove();
+
+    let messagesHtml = '';
+    if (userTickets.length === 0) {
+        messagesHtml = '<div class="text-center opacity-50 mt-10 text-xs uppercase tracking-widest">Нет сообщений</div>';
+    } else {
+        userTickets.forEach(t => {
+            const time = new Date(t.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+            
+            // User message
+            messagesHtml += \`
+                <div class="flex justify-start mb-4">
+                    <div class="bg-surface-container-highest border border-outline-variant/30 text-text-main px-4 py-3 rounded-2xl rounded-tl-none max-w-[80%] min-w-[70px] text-sm shadow-sm relative leading-relaxed" style="overflow-wrap: anywhere; word-break: break-word;">
+                        <span class="absolute -top-3 left-2 text-[8px] font-black uppercase tracking-widest text-on-surface-variant bg-bg-main px-2 py-0.5 rounded border border-outline-variant/30 z-10 shadow-sm">\${t.type}</span>
+                        <div class="mt-1">\${t.message}</div>
+                        <div class="text-[9px] text-on-surface-variant/70 text-right mt-1.5 font-bold tabular-nums">\${time}</div>
+                    </div>
+                </div>
+            \`;
+            
+            // Admin reply
+            if (t.admin_reply) {
+                messagesHtml += \`
+                    <div class="flex justify-end mb-4">
+                        <div class="bg-primary text-white px-4 py-3 rounded-2xl rounded-tr-none max-w-[80%] min-w-[70px] text-sm shadow-lg shadow-primary/10 relative" style="overflow-wrap: anywhere; word-break: break-word;">
+                            <div class="leading-relaxed">\${t.admin_reply}</div>
+                            <div class="text-[9px] text-white/80 text-right mt-1.5 font-bold tabular-nums">Вы</div>
+                        </div>
+                    </div>
+                \`;
+            } else {
+                // Input form for this specific ticket
+                messagesHtml += \`
+                    <div class="flex justify-end mb-6">
+                        <div class="w-[80%] flex flex-col gap-2">
+                            <textarea id="reply-\${t.id}" class="w-full bg-bg-main border border-outline-variant rounded-xl p-3 text-sm text-text-main outline-none focus:border-primary resize-none h-20" placeholder="Напишите ответ..."></textarea>
+                            <button onclick="submitAdminReply('\${t.id}')" class="self-end bg-primary text-white px-6 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest shadow-md shadow-primary/20 hover:brightness-110 active:scale-95 transition-all">Отправить ответ</button>
+                        </div>
+                    </div>
+                \`;
+            }
+        });
+    }
+
+    modal.innerHTML = \`
+        <div class="bg-bg-main w-full h-[100dvh] sm:h-[85vh] sm:max-h-[700px] sm:rounded-2xl flex flex-col relative overflow-hidden shadow-2xl" style="max-width: 600px;" onclick="event.stopPropagation()">
+            <div class="flex justify-between items-center border-b border-outline-variant/30 p-4 shrink-0 bg-surface">
+                <div class="flex items-center gap-3">
+                    <span class="material-symbols-outlined text-primary text-3xl">admin_panel_settings</span>
+                    <div>
+                        <h3 class="font-headline text-sm font-bold tracking-tight text-text-main uppercase tracking-widest">Чат с юзером</h3>
+                        <p class="text-[9px] text-on-surface-variant mt-0.5">\${user?.display_name || user?.email || userId}</p>
+                    </div>
+                </div>
+                <button onclick="document.getElementById('admin-chat-modal').remove()" class="text-on-surface-variant hover:text-text-main transition-colors p-2 rounded-lg bg-bg-main border border-outline-variant/30 flex items-center justify-center">
+                    <span class="material-symbols-outlined">close</span>
+                </button>
+            </div>
+            <div id="admin-chat-messages" class="flex-1 overflow-y-auto p-4 sm:p-6 bg-bg-main/50 relative">
+                \${messagesHtml}
+            </div>
+        </div>
+    \`;
+    document.body.appendChild(modal);
+    
+    // Auto-scroll to bottom
+    const messagesArea = document.getElementById('admin-chat-messages');
+    messagesArea.scrollTop = messagesArea.scrollHeight;
+}
+
+async function submitAdminReply(ticketId) {
+    const input = document.getElementById('reply-' + ticketId);
+    if (!input || !input.value.trim()) return;
+    
+    const reply = input.value.trim();
+    input.disabled = true;
+    
+    try {
+        const res = await fetch(\`/api/admin/support/\${ticketId}/reply\`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': \`Bearer \${localStorage.getItem('auth_token')}\`
+            },
+            body: JSON.stringify({ reply })
+        });
+        
+        if (res.ok) {
+            showToast('Ответ отправлен');
+            await refreshData();
+            document.getElementById('admin-chat-modal').remove();
+            
+            // Re-open chat for the same user if we can figure out who they are
+            const ticket = state.adminTickets.find(t => t.id === ticketId);
+            if (ticket) openAdminChat(ticket.seller_id);
+        } else {
+            showToast('Ошибка при отправке', true);
+            input.disabled = false;
+        }
+    } catch (e) {
+        showToast('Ошибка сети', true);
+        input.disabled = false;
+    }
 }
 
 // Utils

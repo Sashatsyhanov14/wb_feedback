@@ -216,7 +216,7 @@ router.get('/admin/stats', authMiddleware, async (req, res) => {
   try {
     const sellerId = req.user.sellerId;
     // VERY BASIC ADMIN CHECK (should use roles in DB ideally)
-    if (sellerId !== process.env.ADMIN_SELLER_ID) {
+    if (sellerId !== process.env.ADMIN_SELLER_ID && sellerId !== config.adminId) {
       return res.status(403).json({ error: 'Access denied' });
     }
 
@@ -234,6 +234,11 @@ router.get('/admin/stats', authMiddleware, async (req, res) => {
       const { count: tsCount } = await supabase.from('sellers').select('id', { count: 'exact', head: true });
       totalSellers = tsCount || 0;
       
+      const { count: subCount } = await supabase.from('sellers')
+        .select('id', { count: 'exact', head: true })
+        .not('subscription_status', 'in', '("free","trial")');
+      const totalSubscribed = subCount || 0;
+
       const { count: ntCount } = await supabase.from('sellers')
         .select('id', { count: 'exact', head: true })
         .gte('joined_at', todayISO);
@@ -244,28 +249,46 @@ router.get('/admin/stats', authMiddleware, async (req, res) => {
         .gte('last_active_at', todayISO);
       activeToday = atCount || 0;
 
+      // Note: check for NULL or empty string
       const { count: wtCount } = await supabase.from('sellers')
         .select('id', { count: 'exact', head: true })
-        .filter('wb_token', 'eq', '');
+        .or('wb_token.eq."",wb_token.is.null');
       withoutToken = wtCount || 0;
 
       const { count: taCount } = await supabase.from('review_logs')
         .select('id', { count: 'exact', head: true })
         .in('status', ['approved', 'auto_posted']);
       totalApproved = taCount || 0;
-    } catch (dbError) {
-      console.error('[AdminStats] Database query error:', dbError);
-    }
 
-    res.json({
-      totalSellers,
-      newToday,
-      activeToday,
-      withoutToken,
-      totalApproved
-    });
+      res.json({
+        totalSellers,
+        newToday,
+        activeToday,
+        withoutToken,
+        totalApproved,
+        totalSubscribed
+      });
   } catch (error) {
     res.status(500).json({ error: error.message || 'Internal Server Error' });
+  }
+});
+
+// Admin: Get all users
+router.get('/admin/users', authMiddleware, async (req, res) => {
+  try {
+    const sellerId = req.user.sellerId;
+    if (sellerId !== process.env.ADMIN_SELLER_ID && sellerId !== config.adminId) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+    const { data, error } = await supabase
+      .from('sellers')
+      .select('id, email, display_name, auth_provider, subscription_status, wb_token, joined_at, last_active_at')
+      .order('last_active_at', { ascending: false });
+      
+    if (error) throw error;
+    res.json(data || []);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
 });
 
