@@ -1121,48 +1121,48 @@ function openAdminChat(userId) {
             const time = new Date(t.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
             
             // User message
-            messagesHtml += \`
+            messagesHtml += `
                 <div class="flex justify-start mb-4">
                     <div class="bg-surface-container-highest border border-outline-variant/30 text-text-main px-4 py-3 rounded-2xl rounded-tl-none max-w-[80%] min-w-[70px] text-sm shadow-sm relative leading-relaxed" style="overflow-wrap: anywhere; word-break: break-word;">
-                        <span class="absolute -top-3 left-2 text-[8px] font-black uppercase tracking-widest text-on-surface-variant bg-bg-main px-2 py-0.5 rounded border border-outline-variant/30 z-10 shadow-sm">\${t.type}</span>
-                        <div class="mt-1">\${t.message}</div>
-                        <div class="text-[9px] text-on-surface-variant/70 text-right mt-1.5 font-bold tabular-nums">\${time}</div>
+                        <span class="absolute -top-3 left-2 text-[8px] font-black uppercase tracking-widest text-on-surface-variant bg-bg-main px-2 py-0.5 rounded border border-outline-variant/30 z-10 shadow-sm">${t.type}</span>
+                        <div class="mt-1">${t.message}</div>
+                        <div class="text-[9px] text-on-surface-variant/70 text-right mt-1.5 font-bold tabular-nums">${time}</div>
                     </div>
                 </div>
-            \`;
+            `;
             
             // Admin reply
             if (t.admin_reply) {
-                messagesHtml += \`
+                messagesHtml += `
                     <div class="flex justify-end mb-4">
                         <div class="bg-primary text-white px-4 py-3 rounded-2xl rounded-tr-none max-w-[80%] min-w-[70px] text-sm shadow-lg shadow-primary/10 relative" style="overflow-wrap: anywhere; word-break: break-word;">
-                            <div class="leading-relaxed">\${t.admin_reply}</div>
+                            <div class="leading-relaxed">${t.admin_reply}</div>
                             <div class="text-[9px] text-white/80 text-right mt-1.5 font-bold tabular-nums">Вы</div>
                         </div>
                     </div>
-                \`;
+                `;
             } else {
                 // Input form for this specific ticket
-                messagesHtml += \`
+                messagesHtml += `
                     <div class="flex justify-end mb-6">
                         <div class="w-[80%] flex flex-col gap-2">
-                            <textarea id="reply-\${t.id}" class="w-full bg-bg-main border border-outline-variant rounded-xl p-3 text-sm text-text-main outline-none focus:border-primary resize-none h-20" placeholder="Напишите ответ..."></textarea>
-                            <button onclick="submitAdminReply('\${t.id}')" class="self-end bg-primary text-white px-6 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest shadow-md shadow-primary/20 hover:brightness-110 active:scale-95 transition-all">Отправить ответ</button>
+                            <textarea id="reply-${t.id}" class="w-full bg-bg-main border border-outline-variant rounded-xl p-3 text-sm text-text-main outline-none focus:border-primary resize-none h-20" placeholder="Напишите ответ..."></textarea>
+                            <button onclick="submitAdminReply('${t.id}')" class="self-end bg-primary text-white px-6 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest shadow-md shadow-primary/20 hover:brightness-110 active:scale-95 transition-all">Отправить ответ</button>
                         </div>
                     </div>
-                \`;
+                `;
             }
         });
     }
 
-    modal.innerHTML = \`
+    modal.innerHTML = `
         <div class="bg-bg-main w-full h-[100dvh] sm:h-[85vh] sm:max-h-[700px] sm:rounded-2xl flex flex-col relative overflow-hidden shadow-2xl" style="max-width: 600px;" onclick="event.stopPropagation()">
             <div class="flex justify-between items-center border-b border-outline-variant/30 p-4 shrink-0 bg-surface">
                 <div class="flex items-center gap-3">
                     <span class="material-symbols-outlined text-primary text-3xl">admin_panel_settings</span>
                     <div>
                         <h3 class="font-headline text-sm font-bold tracking-tight text-text-main uppercase tracking-widest">Чат с юзером</h3>
-                        <p class="text-[9px] text-on-surface-variant mt-0.5">\${user?.display_name || user?.email || userId}</p>
+                        <p class="text-[9px] text-on-surface-variant mt-0.5">${user?.display_name || user?.email || userId}</p>
                     </div>
                 </div>
                 <button onclick="document.getElementById('admin-chat-modal').remove()" class="text-on-surface-variant hover:text-text-main transition-colors p-2 rounded-lg bg-bg-main border border-outline-variant/30 flex items-center justify-center">
@@ -1170,10 +1170,10 @@ function openAdminChat(userId) {
                 </button>
             </div>
             <div id="admin-chat-messages" class="flex-1 overflow-y-auto p-4 sm:p-6 bg-bg-main/50 relative">
-                \${messagesHtml}
+                ${messagesHtml}
             </div>
         </div>
-    \`;
+    `;
     document.body.appendChild(modal);
     
     // Auto-scroll to bottom
