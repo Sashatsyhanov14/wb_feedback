@@ -196,9 +196,13 @@ router.post('/demo', async (req, res) => {
 
 // 5. Google Login (Manual Flow)
 router.get('/google', (req, res) => {
+  const host = req.headers.host;
+  const protocol = req.headers['x-forwarded-proto'] || req.protocol;
+  const redirectUri = `${protocol}://${host}/api/auth/google/callback`;
+
   const rootUrl = 'https://accounts.google.com/o/oauth2/v2/auth';
   const options = {
-    redirect_uri: config.googleRedirectUri,
+    redirect_uri: redirectUri,
     client_id: config.googleClientId,
     access_type: 'offline',
     response_type: 'code',
@@ -222,12 +226,16 @@ router.get('/google/callback', async (req, res) => {
   }
 
   try {
+    const host = req.headers.host;
+    const protocol = req.headers['x-forwarded-proto'] || req.protocol;
+    const redirectUri = `${protocol}://${host}/api/auth/google/callback`;
+    
     // Exchange code for tokens
     const { data } = await axios.post('https://oauth2.googleapis.com/token', {
       code,
       client_id: config.googleClientId,
       client_secret: config.googleClientSecret,
-      redirect_uri: config.googleRedirectUri,
+      redirect_uri: redirectUri,
       grant_type: 'authorization_code',
     });
 
