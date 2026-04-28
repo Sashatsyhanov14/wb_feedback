@@ -259,15 +259,18 @@ router.get('/admin/stats', authMiddleware, async (req, res) => {
         .select('id', { count: 'exact', head: true })
         .in('status', ['approved', 'auto_posted']);
       totalApproved = taCount || 0;
+    } catch (dbError) {
+      console.error('[AdminStats] Database query error:', dbError);
+    }
 
-      res.json({
-        totalSellers,
-        newToday,
-        activeToday,
-        withoutToken,
-        totalApproved,
-        totalSubscribed
-      });
+    res.json({
+      totalSellers,
+      newToday,
+      activeToday,
+      withoutToken,
+      totalApproved,
+      totalSubscribed
+    });
   } catch (error) {
     res.status(500).json({ error: error.message || 'Internal Server Error' });
   }
