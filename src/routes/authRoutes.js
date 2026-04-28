@@ -312,7 +312,8 @@ router.get('/google/callback', async (req, res) => {
 // 6. VK Login (Manual Flow)
 router.get('/vk', (req, res) => {
   const host = req.headers.host;
-  const protocol = req.headers['x-forwarded-proto'] || req.protocol;
+  // Force https for production domain
+  const protocol = host.includes('wbreplyai.ru') ? 'https' : (req.headers['x-forwarded-proto'] || req.protocol);
   const redirectUri = `${protocol}://${host}/api/auth/vk/callback`;
 
   const rootUrl = 'https://oauth.vk.com/authorize';
@@ -340,7 +341,7 @@ router.get('/vk/callback', async (req, res) => {
 
   try {
     const host = req.headers.host;
-    const protocol = req.headers['x-forwarded-proto'] || req.protocol;
+    const protocol = host.includes('wbreplyai.ru') ? 'https' : (req.headers['x-forwarded-proto'] || req.protocol);
     const redirectUri = config.vkRedirectUri || `${protocol}://${host}/api/auth/vk/callback`;
     
     // Exchange code for access token
