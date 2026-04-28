@@ -795,28 +795,7 @@ function renderInterface() {
                     </div>
                 </section>
 
-                ${state.tickets && state.tickets.length > 0 ? `
-                <section class="premium-card p-5 sm:p-8 space-y-4">
-                    <h4 class="text-text-main font-bold text-xs sm:text-sm uppercase tracking-widest border-b border-outline-variant/30 pb-4 mb-4">История обращений</h4>
-                    <div class="space-y-4">
-                        ${state.tickets.map(t => `
-                            <div class="p-4 bg-bg-main border border-outline-variant rounded-lg space-y-2">
-                                <div class="flex justify-between items-center">
-                                    <span class="text-[10px] font-black uppercase tracking-widest ${t.type === 'support' ? 'text-blue-500' : 'text-purple-500'}">${t.type === 'support' ? 'Поддержка' : 'Отзыв'}</span>
-                                    <span class="text-[10px] text-on-surface-variant">${new Date(t.created_at).toLocaleDateString()}</span>
-                                </div>
-                                <p class="text-xs text-text-main">${t.message}</p>
-                                ${t.admin_reply ? `
-                                    <div class="mt-3 pl-3 border-l-2 border-primary space-y-1">
-                                        <p class="text-[9px] font-black uppercase tracking-widest text-primary">Ответ поддержки</p>
-                                        <p class="text-xs text-text-main">${t.admin_reply}</p>
-                                    </div>
-                                ` : '<p class="text-[9px] font-bold uppercase text-on-surface-variant mt-2">Ожидает ответа...</p>'}
-                            </div>
-                        `).join('')}
-                    </div>
-                </section>
-                ` : ''}
+
 
                 <section class="premium-card p-5 sm:p-8 border-primary/20 bg-primary/5">
                     <div class="flex items-start gap-4">
@@ -865,31 +844,119 @@ function openSupportModal(type) {
     const existing = document.getElementById('support-modal');
     if (existing) existing.remove();
 
-    const title = type === 'support' ? 'Служба поддержки' : 'Оставить отзыв';
-    const placeholder = type === 'support' ? 'Опишите вашу проблему или задайте вопрос...' : 'Что вам нравится в сервисе? Чего не хватает?';
-
     const modal = document.createElement('div');
     modal.id = 'support-modal';
-    modal.className = 'fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in';
-    modal.innerHTML = `
-        <div class="premium-card w-full max-w-md p-6 space-y-5" onclick="event.stopPropagation()">
-            <div class="flex justify-between items-center">
-                <h3 class="font-headline text-xl font-bold tracking-tight text-text-main">${title}</h3>
-                <button onclick="document.getElementById('support-modal').remove()" class="text-on-surface-variant hover:text-text-main transition-colors">
-                    <span class="material-symbols-outlined">close</span>
-                </button>
-            </div>
-            <textarea id="support-message" class="w-full h-32 bg-bg-main border border-outline-variant outline-none p-4 text-text-main text-sm rounded-lg focus:border-primary resize-none" placeholder="${placeholder}"></textarea>
-            <button onclick="submitSupport('${type}')" class="primary-btn w-full py-3 text-xs uppercase tracking-widest">Отправить</button>
-        </div>
-    `;
+    modal.className = 'fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/60 backdrop-blur-sm animate-in';
     modal.onclick = () => modal.remove();
+
+    if (type === 'support') {
+        const supportTickets = (state.tickets || [])
+            .filter(t => t.type === 'support')
+            .sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+
+        let messagesHtml = '';
+        if (supportTickets.length === 0) {
+            messagesHtml = `
+                <div class="flex flex-col items-center justify-center h-full text-center opacity-50 space-y-3 pb-10">
+                    <span class="material-symbols-outlined text-4xl">support_agent</span>
+                    <p class="text-xs font-bold uppercase tracking-widest">Напишите нам</p>
+                    <p class="text-[10px]">Мы ответим в ближайшее время</p>
+                </div>
+            `;
+        } else {
+            supportTickets.forEach(t => {
+                const time = new Date(t.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                messagesHtml += `
+                    <div class="flex justify-end mb-4 animate-in">
+                        <div class="bg-primary text-white p-3 sm:p-4 rounded-2xl rounded-tr-sm max-w-[85%] text-sm shadow-md shadow-primary/10">
+                            ${t.message}
+                            <div class="text-[9px] text-white/70 text-right mt-1.5 font-bold">${time}</div>
+                        </div>
+                    </div>
+                `;
+                if (t.admin_reply) {
+                    messagesHtml += `
+                        <div class="flex justify-start mb-4 animate-in">
+                            <div class="bg-surface-container-highest border border-outline-variant/30 text-text-main p-3 sm:p-4 rounded-2xl rounded-tl-sm max-w-[85%] text-sm shadow-sm relative">
+                                <span class="absolute -top-2.5 left-3 text-[9px] font-black uppercase tracking-widest text-primary bg-bg-main px-2 py-0.5 rounded border border-outline-variant/30">Поддержка</span>
+                                <div class="mt-1">${t.admin_reply}</div>
+                            </div>
+                        </div>
+                    `;
+                }
+            });
+        }
+
+        modal.innerHTML = `
+            <div class="premium-card w-full h-[85vh] max-h-[700px] flex flex-col relative overflow-hidden" style="max-width: 480px;" onclick="event.stopPropagation()">
+                <!-- Header -->
+                <div class="flex justify-between items-center border-b border-outline-variant/30 p-4 sm:p-6 bg-surface shrink-0">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center border border-primary/30">
+                            <span class="material-symbols-outlined text-primary">support_agent</span>
+                        </div>
+                        <div>
+                            <h3 class="font-headline text-sm font-bold tracking-tight text-text-main uppercase tracking-widest">Чат с поддержкой</h3>
+                            <p class="text-[10px] text-green-500 font-bold uppercase tracking-widest flex items-center gap-1 mt-0.5">
+                                <span class="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span> Online
+                            </p>
+                        </div>
+                    </div>
+                    <button onclick="document.getElementById('support-modal').remove()" class="text-on-surface-variant hover:text-text-main transition-colors p-2 -mr-2 bg-bg-main rounded-lg">
+                        <span class="material-symbols-outlined">close</span>
+                    </button>
+                </div>
+                
+                <!-- Chat Area -->
+                <div id="chat-messages-area" class="flex-1 overflow-y-auto p-4 sm:p-6 bg-bg-main/30">
+                    ${messagesHtml}
+                </div>
+                
+                <!-- Input Area -->
+                <div class="p-4 sm:p-5 border-t border-outline-variant/30 bg-surface shrink-0">
+                    <div class="flex gap-3">
+                        <input id="support-message" type="text" class="flex-1 bg-bg-main border border-outline-variant outline-none px-5 py-3.5 text-text-main text-sm rounded-xl focus:border-primary transition-colors" placeholder="Введите сообщение..." onkeypress="if(event.key === 'Enter') submitSupport('support')">
+                        <button onclick="submitSupport('support')" class="bg-primary text-white w-14 h-14 rounded-xl flex items-center justify-center shadow-lg shadow-primary/20 hover:scale-105 active:scale-95 transition-all flex-shrink-0">
+                            <span class="material-symbols-outlined">send</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+    } else {
+        const title = 'Оставить отзыв';
+        const placeholder = 'Что вам нравится в сервисе? Чего не хватает?';
+        modal.innerHTML = `
+            <div class="premium-card w-full p-6 sm:p-8 space-y-5 relative" style="max-width: 480px;" onclick="event.stopPropagation()">
+                <div class="flex justify-between items-center border-b border-outline-variant/30 pb-4 mb-2">
+                    <h3 class="font-headline text-lg font-bold tracking-tight text-text-main uppercase tracking-widest">${title}</h3>
+                    <button onclick="document.getElementById('support-modal').remove()" class="text-on-surface-variant hover:text-text-main transition-colors -mr-2 p-2">
+                        <span class="material-symbols-outlined">close</span>
+                    </button>
+                </div>
+                <textarea id="support-message" class="w-full h-36 bg-bg-main border border-outline-variant outline-none p-4 text-text-main text-sm rounded-xl focus:border-primary resize-none transition-colors" placeholder="${placeholder}"></textarea>
+                <div class="pt-2">
+                    <button onclick="submitSupport('${type}')" class="primary-btn w-full py-4 text-[11px] font-black uppercase tracking-[0.2em] rounded-xl shadow-lg shadow-primary/20 hover:shadow-primary/40 transition-all">Отправить</button>
+                </div>
+            </div>
+        `;
+    }
+
     document.body.appendChild(modal);
+    
+    if (type === 'support') {
+        const chatArea = document.getElementById('chat-messages-area');
+        if (chatArea) chatArea.scrollTop = chatArea.scrollHeight;
+        setTimeout(() => document.getElementById('support-message').focus(), 100);
+    }
 }
 
 async function submitSupport(type) {
-    const msg = document.getElementById('support-message').value.trim();
+    const inputEl = document.getElementById('support-message');
+    const msg = inputEl.value.trim();
     if (!msg) return showToast('Введите сообщение', true);
+
+    inputEl.disabled = true;
 
     try {
         const res = await fetch('/api/support', {
@@ -898,14 +965,22 @@ async function submitSupport(type) {
             body: JSON.stringify({ type, message: msg })
         });
         if (res.ok) {
-            showToast('Сообщение отправлено!');
-            document.getElementById('support-modal').remove();
             await refreshData();
+            if (type === 'support') {
+                openSupportModal('support');
+            } else {
+                showToast('Сообщение отправлено!');
+                document.getElementById('support-modal').remove();
+            }
             if (state.currentView === 'admin') showView('admin');
         } else {
             showToast('Ошибка отправки', true);
+            inputEl.disabled = false;
         }
-    } catch (e) { showToast('Ошибка сети', true); }
+    } catch (e) { 
+        showToast('Ошибка сети', true); 
+        inputEl.disabled = false;
+    }
 }
 
 async function adminReply(ticketId) {
