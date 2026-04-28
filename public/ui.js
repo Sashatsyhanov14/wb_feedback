@@ -871,18 +871,18 @@ function openSupportModal(type) {
     const modal = document.createElement('div');
     modal.id = 'support-modal';
     modal.className = 'fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in';
-    modal.innerHTML = \`
+    modal.innerHTML = `
         <div class="premium-card w-full max-w-md p-6 space-y-5" onclick="event.stopPropagation()">
             <div class="flex justify-between items-center">
-                <h3 class="font-headline text-xl font-bold tracking-tight text-text-main">\${title}</h3>
+                <h3 class="font-headline text-xl font-bold tracking-tight text-text-main">${title}</h3>
                 <button onclick="document.getElementById('support-modal').remove()" class="text-on-surface-variant hover:text-text-main transition-colors">
                     <span class="material-symbols-outlined">close</span>
                 </button>
             </div>
-            <textarea id="support-message" class="w-full h-32 bg-bg-main border border-outline-variant outline-none p-4 text-text-main text-sm rounded-lg focus:border-primary resize-none" placeholder="\${placeholder}"></textarea>
-            <button onclick="submitSupport('\${type}')" class="primary-btn w-full py-3 text-xs uppercase tracking-widest">Отправить</button>
+            <textarea id="support-message" class="w-full h-32 bg-bg-main border border-outline-variant outline-none p-4 text-text-main text-sm rounded-lg focus:border-primary resize-none" placeholder="${placeholder}"></textarea>
+            <button onclick="submitSupport('${type}')" class="primary-btn w-full py-3 text-xs uppercase tracking-widest">Отправить</button>
         </div>
-    \`;
+    `;
     modal.onclick = () => modal.remove();
     document.body.appendChild(modal);
 }
@@ -913,7 +913,7 @@ async function adminReply(ticketId) {
     if (!replyText) return;
 
     try {
-        const res = await fetch(\`/api/admin/support/\${ticketId}/reply\`, {
+        const res = await fetch(`/api/admin/support/${ticketId}/reply`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ reply: replyText })
@@ -930,7 +930,7 @@ function renderAdmin() {
     const s = state.adminStats || {};
     const tkts = state.adminTickets || [];
     
-    return \`
+    return `
         <div class="max-w-4xl mx-auto space-y-10 animate-in pb-20">
             <header>
                 <p class="text-primary text-[10px] font-black uppercase tracking-[0.3em] mb-2">Админ-панель</p>
@@ -940,19 +940,19 @@ function renderAdmin() {
             <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div class="premium-card p-5">
                     <p class="text-[9px] font-black uppercase tracking-widest text-on-surface-variant mb-2">Юзеры</p>
-                    <p class="text-3xl font-bold text-text-main">\${s.totalSellers || 0}</p>
+                    <p class="text-3xl font-bold text-text-main">${s.totalSellers || 0}</p>
                 </div>
                 <div class="premium-card p-5">
                     <p class="text-[9px] font-black uppercase tracking-widest text-on-surface-variant mb-2">Ответов</p>
-                    <p class="text-3xl font-bold text-text-main">\${s.totalApproved || 0}</p>
+                    <p class="text-3xl font-bold text-text-main">${s.totalApproved || 0}</p>
                 </div>
                 <div class="premium-card p-5">
                     <p class="text-[9px] font-black uppercase tracking-widest text-on-surface-variant mb-2">Без токена</p>
-                    <p class="text-3xl font-bold text-red-500">\${s.withoutToken || 0}</p>
+                    <p class="text-3xl font-bold text-red-500">${s.withoutToken || 0}</p>
                 </div>
                 <div class="premium-card p-5">
                     <p class="text-[9px] font-black uppercase tracking-widest text-on-surface-variant mb-2">Тикеты</p>
-                    <p class="text-3xl font-bold text-primary">\${tkts.filter(t => t.status === 'open').length}</p>
+                    <p class="text-3xl font-bold text-primary">${tkts.filter(t => t.status === 'open').length}</p>
                 </div>
             </div>
 
@@ -961,28 +961,28 @@ function renderAdmin() {
                     <h3 class="font-bold text-sm uppercase tracking-widest">Обращения и Отзывы</h3>
                 </div>
                 <div class="divide-y divide-outline-variant">
-                    \${tkts.length === 0 ? '<div class="p-8 text-center text-on-surface-variant text-sm">Нет обращений</div>' : 
-                    tkts.map(t => \`
-                        <div class="p-5 space-y-3 \${t.status === 'open' ? 'bg-primary/5' : ''}">
+                    ${tkts.length === 0 ? '<div class="p-8 text-center text-on-surface-variant text-sm">Нет обращений</div>' : 
+                    tkts.map(t => `
+                        <div class="p-5 space-y-3 ${t.status === 'open' ? 'bg-primary/5' : ''}">
                             <div class="flex justify-between items-start">
                                 <div>
-                                    <span class="text-[10px] font-black uppercase tracking-widest \${t.type === 'support' ? 'text-blue-500' : 'text-purple-500'}">\${t.type}</span>
-                                    <span class="text-xs text-on-surface-variant ml-3">\${new Date(t.created_at).toLocaleString()}</span>
-                                    <p class="text-xs font-bold text-text-main mt-1">\${t.sellers?.display_name || t.sellers?.email || 'Юзер'}</p>
+                                    <span class="text-[10px] font-black uppercase tracking-widest ${t.type === 'support' ? 'text-blue-500' : 'text-purple-500'}">${t.type}</span>
+                                    <span class="text-xs text-on-surface-variant ml-3">${new Date(t.created_at).toLocaleString()}</span>
+                                    <p class="text-xs font-bold text-text-main mt-1">${t.sellers?.display_name || t.sellers?.email || 'Юзер'}</p>
                                 </div>
-                                \${t.status === 'open' ? 
-                                  \`<button onclick="adminReply('\${t.id}')" class="text-xs bg-primary text-white px-3 py-1 rounded font-bold">Ответить</button>\` : 
-                                  \`<span class="text-[10px] font-black uppercase text-green-500">Отвечено</span>\`
+                                ${t.status === 'open' ? 
+                                  `<button onclick="adminReply('${t.id}')" class="text-xs bg-primary text-white px-3 py-1 rounded font-bold">Ответить</button>` : 
+                                  `<span class="text-[10px] font-black uppercase text-green-500">Отвечено</span>`
                                 }
                             </div>
-                            <p class="text-sm text-text-main bg-bg-main p-3 rounded border border-outline-variant/30">\${t.message}</p>
-                            \${t.admin_reply ? \`<div class="ml-4 pl-4 border-l-2 border-primary space-y-1"><p class="text-[10px] font-black uppercase text-primary">Ваш ответ</p><p class="text-sm text-text-main">\${t.admin_reply}</p></div>\` : ''}
+                            <p class="text-sm text-text-main bg-bg-main p-3 rounded border border-outline-variant/30">${t.message}</p>
+                            ${t.admin_reply ? `<div class="ml-4 pl-4 border-l-2 border-primary space-y-1"><p class="text-[10px] font-black uppercase text-primary">Ваш ответ</p><p class="text-sm text-text-main">${t.admin_reply}</p></div>` : ''}
                         </div>
-                    \`).join('')}
+                    `).join('')}
                 </div>
             </section>
         </div>
-    \`;
+    `;
 }
 
 // Utils
