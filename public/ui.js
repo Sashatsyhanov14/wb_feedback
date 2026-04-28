@@ -1189,11 +1189,11 @@ async function submitAdminReply(ticketId) {
     input.disabled = true;
     
     try {
-        const res = await fetch(\`/api/admin/support/\${ticketId}/reply\`, {
+        const res = await fetch(`/api/admin/support/${ticketId}/reply`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': \`Bearer \${localStorage.getItem('auth_token')}\`
+                'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
             },
             body: JSON.stringify({ reply })
         });
