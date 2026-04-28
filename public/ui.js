@@ -768,28 +768,32 @@ function renderInterface() {
                 </section>
 
                 <section class="premium-card p-5 sm:p-8 space-y-6">
-                    <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-outline-variant/30 pb-6">
+                    <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-5 border-b border-outline-variant/30 pb-6">
                         <div class="flex items-center gap-4">
-                            <span class="material-symbols-outlined text-primary text-2xl">support_agent</span>
+                            <div class="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                                <span class="material-symbols-outlined text-primary text-xl">support_agent</span>
+                            </div>
                             <div>
-                                <h4 class="text-text-main font-bold text-xs sm:text-sm uppercase tracking-widest">Служба поддержки</h4>
-                                <p class="text-[11px] text-on-surface-variant mt-1">Помощь с настройкой и ответы на вопросы</p>
+                                <h4 class="text-text-main font-bold text-sm uppercase tracking-widest">Служба поддержки</h4>
+                                <p class="text-[11px] text-on-surface-variant mt-1 leading-snug">Помощь с настройкой и ответы на вопросы</p>
                             </div>
                         </div>
-                        <button onclick="openSupportModal('support')" class="flex-shrink-0 text-[10px] font-black uppercase tracking-widest bg-bg-main border border-outline-variant hover:border-primary text-text-main px-6 py-3 rounded-lg transition-colors">
+                        <button onclick="openSupportModal('support')" class="w-full sm:w-auto flex-shrink-0 text-[10px] font-black uppercase tracking-widest bg-bg-main border border-outline-variant hover:border-primary text-text-main px-6 py-3.5 rounded-xl transition-all active:scale-95 text-center">
                             Написать в чат
                         </button>
                     </div>
 
-                    <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                    <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-5">
                         <div class="flex items-center gap-4">
-                            <span class="material-symbols-outlined text-primary text-2xl">rate_review</span>
+                            <div class="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                                <span class="material-symbols-outlined text-primary text-xl">rate_review</span>
+                            </div>
                             <div>
-                                <h4 class="text-text-main font-bold text-xs sm:text-sm uppercase tracking-widest">Оставить отзыв</h4>
-                                <p class="text-[11px] text-on-surface-variant mt-1">Поделитесь впечатлениями о WBREPLY AI</p>
+                                <h4 class="text-text-main font-bold text-sm uppercase tracking-widest">Оставить отзыв</h4>
+                                <p class="text-[11px] text-on-surface-variant mt-1 leading-snug">Поделитесь впечатлениями о сервисе</p>
                             </div>
                         </div>
-                        <button onclick="openSupportModal('feedback')" class="flex-shrink-0 text-[10px] font-black uppercase tracking-widest bg-primary text-white dark:text-black px-6 py-3 rounded-lg transition-colors hover:brightness-110 shadow-lg shadow-primary/20">
+                        <button onclick="openSupportModal('feedback')" class="w-full sm:w-auto flex-shrink-0 text-[10px] font-black uppercase tracking-widest bg-primary text-white dark:text-black px-6 py-3.5 rounded-xl transition-all hover:brightness-110 active:scale-95 shadow-lg shadow-primary/20 text-center">
                             Оценить сервис
                         </button>
                     </div>
@@ -846,7 +850,7 @@ function openSupportModal(type) {
 
     const modal = document.createElement('div');
     modal.id = 'support-modal';
-    modal.className = 'fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/60 backdrop-blur-sm animate-in';
+    modal.className = 'fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-sm animate-in';
     modal.onclick = () => modal.remove();
 
     if (type === 'support') {
@@ -858,7 +862,9 @@ function openSupportModal(type) {
         if (supportTickets.length === 0) {
             messagesHtml = `
                 <div class="flex flex-col items-center justify-center h-full text-center opacity-50 space-y-3 pb-10">
-                    <span class="material-symbols-outlined text-4xl">support_agent</span>
+                    <div class="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center">
+                        <span class="material-symbols-outlined text-4xl text-primary">support_agent</span>
+                    </div>
                     <p class="text-xs font-bold uppercase tracking-widest">Напишите нам</p>
                     <p class="text-[10px]">Мы ответим в ближайшее время</p>
                 </div>
@@ -877,8 +883,8 @@ function openSupportModal(type) {
                 if (t.admin_reply) {
                     messagesHtml += `
                         <div class="flex justify-start mb-4 animate-in">
-                            <div class="bg-surface-container-highest border border-outline-variant/30 text-text-main p-3 sm:p-4 rounded-2xl rounded-tl-sm max-w-[85%] text-sm shadow-sm relative">
-                                <span class="absolute -top-2.5 left-3 text-[9px] font-black uppercase tracking-widest text-primary bg-bg-main px-2 py-0.5 rounded border border-outline-variant/30">Поддержка</span>
+                            <div class="bg-surface-container-highest border border-outline-variant/30 text-text-main p-3 sm:p-4 rounded-2xl rounded-tl-sm max-w-[85%] text-sm shadow-sm relative mt-2">
+                                <span class="absolute -top-3 left-3 text-[8px] font-black uppercase tracking-widest text-primary bg-bg-main px-2 py-0.5 rounded border border-outline-variant/30">Поддержка</span>
                                 <div class="mt-1">${t.admin_reply}</div>
                             </div>
                         </div>
@@ -888,35 +894,35 @@ function openSupportModal(type) {
         }
 
         modal.innerHTML = `
-            <div class="premium-card w-full h-[85vh] max-h-[700px] flex flex-col relative overflow-hidden" style="max-width: 480px;" onclick="event.stopPropagation()">
+            <div class="bg-bg-main w-full h-[100dvh] sm:h-[85vh] sm:max-h-[700px] sm:rounded-2xl flex flex-col relative overflow-hidden shadow-2xl" style="max-width: 480px;" onclick="event.stopPropagation()">
                 <!-- Header -->
-                <div class="flex justify-between items-center border-b border-outline-variant/30 p-4 sm:p-6 bg-surface shrink-0">
+                <div class="flex justify-between items-center border-b border-outline-variant/30 p-4 bg-surface shrink-0 z-10 shadow-sm">
                     <div class="flex items-center gap-3">
-                        <div class="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center border border-primary/30">
-                            <span class="material-symbols-outlined text-primary">support_agent</span>
+                        <div class="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center border border-primary/20 shrink-0">
+                            <span class="material-symbols-outlined text-primary text-lg">support_agent</span>
                         </div>
                         <div>
                             <h3 class="font-headline text-sm font-bold tracking-tight text-text-main uppercase tracking-widest">Чат с поддержкой</h3>
-                            <p class="text-[10px] text-green-500 font-bold uppercase tracking-widest flex items-center gap-1 mt-0.5">
+                            <p class="text-[9px] text-green-500 font-bold uppercase tracking-widest flex items-center gap-1 mt-0.5">
                                 <span class="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span> Online
                             </p>
                         </div>
                     </div>
-                    <button onclick="document.getElementById('support-modal').remove()" class="text-on-surface-variant hover:text-text-main transition-colors p-2 -mr-2 bg-bg-main rounded-lg">
-                        <span class="material-symbols-outlined">close</span>
+                    <button onclick="document.getElementById('support-modal').remove()" class="text-on-surface-variant hover:text-text-main transition-colors w-10 h-10 flex items-center justify-center bg-bg-main border border-outline-variant/30 rounded-xl">
+                        <span class="material-symbols-outlined text-xl">close</span>
                     </button>
                 </div>
                 
                 <!-- Chat Area -->
-                <div id="chat-messages-area" class="flex-1 overflow-y-auto p-4 sm:p-6 bg-bg-main/30">
+                <div id="chat-messages-area" class="flex-1 overflow-y-auto p-4 sm:p-5 bg-bg-main/50 relative">
                     ${messagesHtml}
                 </div>
                 
                 <!-- Input Area -->
-                <div class="p-4 sm:p-5 border-t border-outline-variant/30 bg-surface shrink-0">
-                    <div class="flex gap-3">
-                        <input id="support-message" type="text" class="flex-1 bg-bg-main border border-outline-variant outline-none px-5 py-3.5 text-text-main text-sm rounded-xl focus:border-primary transition-colors" placeholder="Введите сообщение..." onkeypress="if(event.key === 'Enter') submitSupport('support')">
-                        <button onclick="submitSupport('support')" class="bg-primary text-white w-14 h-14 rounded-xl flex items-center justify-center shadow-lg shadow-primary/20 hover:scale-105 active:scale-95 transition-all flex-shrink-0">
+                <div class="p-3 sm:p-4 border-t border-outline-variant/30 bg-surface shrink-0 z-10">
+                    <div class="flex gap-2">
+                        <input id="support-message" type="text" class="flex-1 bg-bg-main border border-outline-variant outline-none px-4 py-3.5 text-text-main text-sm rounded-xl focus:border-primary transition-colors" placeholder="Сообщение..." onkeypress="if(event.key === 'Enter') submitSupport('support')">
+                        <button onclick="submitSupport('support')" class="bg-primary text-white w-12 h-12 rounded-xl flex items-center justify-center shadow-lg shadow-primary/20 hover:scale-105 active:scale-95 transition-all shrink-0">
                             <span class="material-symbols-outlined">send</span>
                         </button>
                     </div>
@@ -927,7 +933,7 @@ function openSupportModal(type) {
         const title = 'Оставить отзыв';
         const placeholder = 'Что вам нравится в сервисе? Чего не хватает?';
         modal.innerHTML = `
-            <div class="premium-card w-full p-6 sm:p-8 space-y-5 relative" style="max-width: 480px;" onclick="event.stopPropagation()">
+            <div class="premium-card w-full p-6 sm:p-8 space-y-5 relative mx-4 sm:mx-auto" style="max-width: 480px;" onclick="event.stopPropagation()">
                 <div class="flex justify-between items-center border-b border-outline-variant/30 pb-4 mb-2">
                     <h3 class="font-headline text-lg font-bold tracking-tight text-text-main uppercase tracking-widest">${title}</h3>
                     <button onclick="document.getElementById('support-modal').remove()" class="text-on-surface-variant hover:text-text-main transition-colors -mr-2 p-2">
