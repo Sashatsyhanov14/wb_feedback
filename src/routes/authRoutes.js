@@ -168,6 +168,11 @@ router.post('/logout', (req, res) => {
 
 // 4. Demo Login (for development testing)
 router.post('/demo', async (req, res) => {
+    // SECURITY: Disable demo login in production
+    if (config.nodeEnv === 'production') {
+        return res.status(403).json({ error: 'Demo login is disabled in production environments for security reasons.' });
+    }
+
     const testTgId = '795056847'; // Default test admin ID
 
     let { data: seller } = await supabase
