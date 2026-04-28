@@ -155,7 +155,6 @@ function showView(view) {
         content.innerHTML = renderInterface();
     } else if (view === 'login') {
         content.innerHTML = renderLogin();
-        initTelegramWidget();
         // Delay slightly to ensure DOM is ready
         setTimeout(() => {
             initVkOneTap();
@@ -199,25 +198,17 @@ function renderLogin() {
                     </button>
 
                     <!-- VK Section (One Tap Only) -->
-                    <div id="vk-onetap-container" class="w-full min-h-[56px] py-2"></div>
+    <div id="vk-onetap-container" class="w-full min-h-[56px] py-2"></div>
 
-                    <!-- Telegram Button -->
-                    <button onclick="handleTelegramLogin()" class="w-full h-14 flex items-center justify-center gap-4 bg-[#24A1DE] hover:brightness-110 active:scale-[0.97] transition-all rounded-[12px] shadow-sm mb-4">
-                        <svg class="w-6 h-6" viewBox="0 0 24 24" fill="white">
-                            <path d="M12 0c-6.627 0-12 5.373-12 12s5.373 12 12 12 12-5.373 12-12-5.373-12-12-12zm5.894 8.221l-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.446 1.394c-.14.14-.26.26-.54.26l.213-3.05 5.56-5.02c.24-.213-.054-.33-.373-.12l-6.87 4.33-2.96-.924c-.64-.203-.654-.64.135-.954l11.566-4.458c.538-.196 1.006.128.832.954z"/>
-                        </svg>
-                        <span class="text-sm font-bold text-white">Войти через Telegram</span>
-                    </button>
-
-                    <div class="relative py-2">
+    <div class="relative py-2">
                         <div class="absolute inset-0 flex items-center"><div class="w-full border-t border-outline-variant/20"></div></div>
                         <div class="relative flex justify-center text-[9px] uppercase tracking-[0.2em] font-black"><span class="bg-bg-main px-4 text-on-surface-variant/30">Или по почте</span></div>
                     </div>
 
                     <!-- Magic Link Section -->
-                    <div class="space-y-3">
-                        <input id="magic-email" type="email" placeholder="email@example.com" class="w-full h-12 bg-bg-main border border-outline-variant/30 focus:border-primary outline-none px-5 rounded-[12px] text-sm transition-all text-center">
-                        <button id="magic-btn" onclick="handleMagicLogin()" class="w-full h-12 flex items-center justify-center gap-3 bg-surface-container-high hover:bg-surface-container-highest active:scale-[0.98] transition-all rounded-[12px] border border-outline-variant/20">
+                    <div class="space-y-4">
+                        <input id="magic-email" type="email" placeholder="email@example.com" class="w-full h-14 bg-bg-main border border-outline-variant/30 focus:border-primary outline-none px-5 rounded-[12px] text-sm transition-all text-center">
+                        <button id="magic-btn" onclick="handleMagicLogin()" class="w-full h-14 flex items-center justify-center gap-3 bg-surface-container-high hover:bg-surface-container-highest active:scale-[0.98] transition-all rounded-[12px] border border-outline-variant/20">
                             <span class="material-symbols-outlined text-primary text-lg">magic_button</span>
                             <span class="text-xs font-bold text-on-surface uppercase tracking-widest">Войти по ссылке</span>
                         </button>
