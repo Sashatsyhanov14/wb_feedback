@@ -139,14 +139,14 @@ router.get('/tg-callback', async (req, res) => {
 
     res.cookie('auth_token', token, {
       httpOnly: false,
-      secure: config.nodeEnv === 'production',
+      secure: false, 
       maxAge: 30 * 24 * 60 * 60 * 1000,
       path: '/',
       sameSite: 'Lax'
     });
-    console.log('Cookie auth_token set. Redirecting to /');
+    console.log('Cookie auth_token set. Redirecting to /app with token');
 
-    res.redirect('/');
+    res.redirect(`/app?token=${token}`);
   } catch (error) {
     console.error('TG Auth Error:', error.message);
     res.redirect('/login?error=tg_auth_failed');
@@ -314,14 +314,14 @@ router.get('/google/callback', async (req, res) => {
 
     res.cookie('auth_token', token, {
       httpOnly: false,
-      secure: config.nodeEnv === 'production',
+      secure: false, 
       maxAge: 30 * 24 * 60 * 60 * 1000,
       path: '/',
       sameSite: 'Lax'
     });
-    console.log('Cookie auth_token set. Redirecting to /');
+    console.log('Cookie auth_token set. Redirecting to /app with token');
 
-    res.redirect('/');
+    res.redirect(`/app?token=${token}`);
   } catch (error) {
     console.error('Google Auth Error:', error.response?.data || error.message);
     res.redirect('/login?error=google_auth_failed');
@@ -453,14 +453,14 @@ router.get('/vk/callback', async (req, res) => {
 
     res.cookie('auth_token', token, {
       httpOnly: false,
-      secure: config.nodeEnv === 'production',
+      secure: false, 
       maxAge: 30 * 24 * 60 * 60 * 1000,
       path: '/',
       sameSite: 'Lax'
     });
-    console.log('Cookie auth_token set. Redirecting to /');
+    console.log('Cookie auth_token set. Redirecting to /app with token');
 
-    res.redirect('/');
+    res.redirect(`/app?token=${token}`);
   } catch (error) {
     const vkErr = error.response?.data;
     console.error('VK Auth Error Details:', JSON.stringify(vkErr, null, 2));
@@ -557,14 +557,14 @@ router.get('/callback', async (req, res) => {
 
     res.cookie('auth_token', token, {
       httpOnly: false,
-      secure: config.nodeEnv === 'production',
+      secure: false, 
       maxAge: 30 * 24 * 60 * 60 * 1000,
       path: '/',
       sameSite: 'Lax'
     });
-    console.log('Cookie auth_token set. Redirecting to /');
+    console.log('Cookie auth_token set. Redirecting to /app with token');
 
-    res.redirect('/');
+    res.redirect(`/app?token=${token}`);
   } catch (error) {
     console.error('Supabase Callback Error:', error.message);
     res.redirect(`/login?error=auth_failed&details=${encodeURIComponent(error.message)}`);

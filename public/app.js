@@ -25,10 +25,27 @@ document.addEventListener('DOMContentLoaded', async () => {
         state.sellerId = 795056847;
     }
 
+    // Handle token from URL (for VK/Google redirect fixes)
+    const urlParams = new URLSearchParams(window.location.search);
+    const urlToken = urlParams.get('token');
+    if (urlToken) {
+        document.cookie = `auth_token=${urlToken}; path=/; max-age=${30 * 24 * 60 * 60}`;
+        // Clean up URL
+        window.history.replaceState({}, document.title, window.location.pathname);
+    }
+
     // 2. Initial View (Immediate render)
     showView('settings');
 
     // 3. Load Data & Update
+    try {
+        const meRes = await fetch('/api/auth/me');
+        if (meRes.ok) {
+            const meData = await meRes.json();
+            if (meData.sellerId) state.sellerId = meData.sellerId;
+        }
+    } catch (e) { console.log('Auth check skipped or failed'); }
+
     await refreshData();
     showView(state.currentView);
 });
