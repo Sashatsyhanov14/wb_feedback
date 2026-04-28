@@ -313,7 +313,6 @@ router.get('/google/callback', async (req, res) => {
       { expiresIn: '30d' }
     );
 
-    const host = req.headers.host;
     res.cookie('auth_token', token, {
       httpOnly: false,
       secure: host.includes('wbreplyai.ru'), 
@@ -502,7 +501,7 @@ router.get('/vk/callback', async (req, res) => {
 
     res.cookie('auth_token', token, {
       httpOnly: false,
-      secure: false, 
+      secure: host.includes('wbreplyai.ru'), 
       maxAge: 30 * 24 * 60 * 60 * 1000,
       path: '/',
       sameSite: 'Lax'
