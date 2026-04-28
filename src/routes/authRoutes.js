@@ -519,7 +519,7 @@ router.get('/vk/callback', async (req, res) => {
 
 
 
-// 7. Magic Link (Supabase Auth)
+// 7. Magic Link (Supabase Auth - Implicit Flow)
 router.post('/magic', async (req, res) => {
   const { email } = req.body;
   
@@ -529,9 +529,9 @@ router.post('/magic', async (req, res) => {
 
   try {
     const host = req.headers.host;
-    // Force HTTPS for production domain
     const protocol = host.includes('wbreplyai.ru') ? 'https' : (req.headers['x-forwarded-proto'] || req.protocol);
-    const redirectUrl = `${protocol}://${host}/api/auth/callback`;
+    // Redirect to /app - implicit flow sends tokens in URL hash (#access_token=...)
+    const redirectUrl = `${protocol}://${host}/app`;
 
     console.log(`Magic Link request for: ${email} | Redirect URL: ${redirectUrl}`);
 
@@ -551,6 +551,93 @@ router.post('/magic', async (req, res) => {
     res.json({ success: true });
   } catch (error) {
     console.error('Magic Link Process Error:', error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 7b. Magic Link Verify (Client sends Supabase access_token, we issue our JWT)
+router.post('/magic-verify', async (req, res) => {
+  const { access_token } = req.body;
+
+  if (!access_token) {
+    return res.status(400).json({ error: 'access_token is required' });
+  }
+
+  try {
+    console.log('Magic Verify: Checking Supabase access_token...');
+    
+    // Use the access_token to get user info from Supabase
+    const { data: { user }, error } = await supabase.auth.getUser(access_token);
+    
+    if (error || !user) {
+      console.error('Magic Verify Error:', error);
+      return res.status(401).json({ error: 'Invalid or expired token' });
+    }
+
+    const email = user.email;
+    const authProvider = user.app_metadata?.provider || 'email';
+    const authProviderId = user.id;
+
+    console.log(`Magic Verify Success: ${email} | Provider: ${authProvider} | ID: ${authProviderId}`);
+
+    // Upsert user in sellers table
+    let { data: seller } = await supabase
+      .from('sellers')
+      .select('id')
+      .eq('auth_provider', authProvider)
+      .eq('auth_provider_id', authProviderId)
+      .maybeSingle();
+
+    if (!seller) {
+      console.log('New magic link user, creating seller record...');
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 3);
+
+      const { data: newSeller, error: insertError } = await supabase
+        .from('sellers')
+        .insert({
+          auth_provider: authProvider,
+          auth_provider_id: authProviderId,
+          email: email,
+          display_name: user.user_metadata?.full_name || email.split('@')[0],
+          avatar_url: user.user_metadata?.avatar_url || null,
+          subscription_status: 'trial',
+          subscription_expires_at: expiresAt.toISOString()
+        })
+        .select('id')
+        .single();
+      
+      if (insertError) {
+        console.error('Magic Verify DB Insert Error:', insertError);
+        throw insertError;
+      }
+      seller = newSeller;
+    }
+
+    if (!seller || !seller.id) {
+      throw new Error('Seller record missing after upsert');
+    }
+
+    // Issue our JWT
+    const token = jwt.sign(
+      { sellerId: seller.id },
+      config.jwtSecret,
+      { expiresIn: '30d' }
+    );
+
+    const host = req.headers.host;
+    res.cookie('auth_token', token, {
+      httpOnly: false,
+      secure: host.includes('wbreplyai.ru'),
+      maxAge: 30 * 24 * 60 * 60 * 1000,
+      path: '/',
+      sameSite: 'Lax'
+    });
+
+    console.log('Magic Verify: JWT issued for sellerId:', seller.id);
+    res.json({ success: true, token, sellerId: seller.id });
+  } catch (error) {
+    console.error('Magic Verify Error:', error.message);
     res.status(500).json({ error: error.message });
   }
 });

@@ -17,7 +17,7 @@ let state = {
 };
 
 document.addEventListener('DOMContentLoaded', async () => {
-    // Handle token from URL (for VK/Google/MagicLink OAuth redirect)
+    // Handle token from URL query (for VK/Google OAuth redirect)
     const urlParams = new URLSearchParams(window.location.search);
     const urlToken = urlParams.get('token');
     
@@ -25,7 +25,43 @@ document.addEventListener('DOMContentLoaded', async () => {
         const cookieStr = `auth_token=${urlToken}; path=/; max-age=${30 * 24 * 60 * 60}; SameSite=Lax`;
         document.cookie = cookieStr;
         localStorage.setItem('auth_token', urlToken);
-        console.log('Token captured from URL and saved');
+        console.log('Token captured from URL query and saved');
+    }
+
+    // Handle Supabase implicit flow hash (for Magic Link)
+    // URL looks like: /app#access_token=...&token_type=bearer&type=magiclink
+    const hash = window.location.hash;
+    let magicLinkProcessed = false;
+    
+    if (hash && hash.includes('access_token=')) {
+        console.log('Supabase implicit token detected in URL hash');
+        const hashParams = new URLSearchParams(hash.substring(1));
+        const supabaseToken = hashParams.get('access_token');
+        
+        if (supabaseToken) {
+            try {
+                const verifyRes = await fetch('/api/auth/magic-verify', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ access_token: supabaseToken })
+                });
+                
+                if (verifyRes.ok) {
+                    const data = await verifyRes.json();
+                    document.cookie = `auth_token=${data.token}; path=/; max-age=${30 * 24 * 60 * 60}; SameSite=Lax`;
+                    localStorage.setItem('auth_token', data.token);
+                    state.sellerId = data.sellerId;
+                    magicLinkProcessed = true;
+                    console.log('Magic link auth success, sellerId:', data.sellerId);
+                } else {
+                    console.error('Magic link verify failed:', await verifyRes.text());
+                }
+            } catch (e) {
+                console.error('Magic link verify error:', e);
+            }
+        }
+        // Clean hash
+        window.history.replaceState({}, document.title, window.location.pathname);
     }
 
     // Check for token in multiple places
@@ -33,20 +69,22 @@ document.addEventListener('DOMContentLoaded', async () => {
     const localToken = localStorage.getItem('auth_token');
     const activeToken = urlToken || cookieToken || localToken;
     
-    // Clean up URL if token was present
+    // Clean up URL if token was present in query
     if (urlToken) {
         window.history.replaceState({}, document.title, window.location.pathname);
     }
 
     const isTelegram = window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initData;
     
-    if (!activeToken && !isTelegram) {
+    if (!activeToken && !magicLinkProcessed && !isTelegram) {
         showView('login');
         return; // Skip API check
     }
 
     // 1. Check Auth (Web or Mini App)
-    await checkAuth();
+    if (!magicLinkProcessed) {
+        await checkAuth();
+    }
 
     // 2. Initial View
     if (!state.sellerId) {
