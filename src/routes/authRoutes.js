@@ -137,9 +137,10 @@ router.get('/tg-callback', async (req, res) => {
       { expiresIn: '30d' }
     );
 
+    const host = req.headers.host;
     res.cookie('auth_token', token, {
       httpOnly: false,
-      secure: false, 
+      secure: host.includes('wbreplyai.ru'), 
       maxAge: 30 * 24 * 60 * 60 * 1000,
       path: '/',
       sameSite: 'Lax'
@@ -312,9 +313,10 @@ router.get('/google/callback', async (req, res) => {
       { expiresIn: '30d' }
     );
 
+    const host = req.headers.host;
     res.cookie('auth_token', token, {
       httpOnly: false,
-      secure: false, 
+      secure: host.includes('wbreplyai.ru'), 
       maxAge: 30 * 24 * 60 * 60 * 1000,
       path: '/',
       sameSite: 'Lax'
@@ -528,20 +530,28 @@ router.post('/magic', async (req, res) => {
 
   try {
     const host = req.headers.host;
-    const protocol = req.headers['x-forwarded-proto'] || req.protocol;
+    // Force HTTPS for production domain
+    const protocol = host.includes('wbreplyai.ru') ? 'https' : (req.headers['x-forwarded-proto'] || req.protocol);
     const redirectUrl = `${protocol}://${host}/api/auth/callback`;
 
-    const { error } = await supabase.auth.signInWithOtp({
+    console.log(`Magic Link request for: ${email} | Redirect URL: ${redirectUrl}`);
+
+    const { data, error } = await supabase.auth.signInWithOtp({
       email,
       options: {
         emailRedirectTo: redirectUrl,
       },
     });
 
-    if (error) throw error;
+    if (error) {
+      console.error('Supabase Magic Link Error:', error);
+      throw error;
+    }
+    
+    console.log('Magic Link sent successfully via Supabase');
     res.json({ success: true });
   } catch (error) {
-    console.error('Magic Link Error:', error.message);
+    console.error('Magic Link Process Error:', error.message);
     res.status(500).json({ error: error.message });
   }
 });
@@ -549,20 +559,29 @@ router.post('/magic', async (req, res) => {
 // 8. Supabase Auth Callback (Universal)
 router.get('/callback', async (req, res) => {
   const code = req.query.code;
+  const error_description = req.query.error_description;
+
+  console.log('Supabase Callback received. Code exists:', !!code, 'Error:', error_description);
 
   if (!code) {
-    return res.redirect('/login?error=no_code');
+    return res.redirect(`/login?error=no_code&details=${encodeURIComponent(error_description || '')}`);
   }
 
   try {
     // Exchange the code for a session
+    console.log('Exchanging code for session...');
     const { data, error } = await supabase.auth.exchangeCodeForSession(code);
-    if (error) throw error;
+    if (error) {
+      console.error('Supabase Session Exchange Error:', error);
+      throw error;
+    }
 
     const { user } = data;
     const email = user.email;
-    const authProvider = user.app_metadata.provider || 'email';
+    const authProvider = user.app_metadata?.provider || 'email';
     const authProviderId = user.id;
+
+    console.log(`Auth Callback Success: ${email} | Provider: ${authProvider} | ID: ${authProviderId}`);
 
     // Upsert user in our sellers table
     let { data: seller, error: findError } = await supabase
@@ -573,6 +592,7 @@ router.get('/callback', async (req, res) => {
       .maybeSingle();
 
     if (!seller) {
+      console.log('New user detected, creating seller record...');
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + 3);
 
@@ -582,38 +602,46 @@ router.get('/callback', async (req, res) => {
           auth_provider: authProvider,
           auth_provider_id: authProviderId,
           email: email,
-          display_name: user.user_metadata.full_name || email.split('@')[0],
-          avatar_url: user.user_metadata.avatar_url || null,
+          display_name: user.user_metadata?.full_name || email.split('@')[0],
+          avatar_url: user.user_metadata?.avatar_url || null,
           subscription_status: 'trial',
           subscription_expires_at: expiresAt.toISOString()
         })
         .select('id')
         .single();
       
-      if (insertError) throw insertError;
+      if (insertError) {
+        console.error('DB Insert Error during magic link callback:', insertError);
+        throw insertError;
+      }
       seller = newSeller;
     }
 
+    if (!seller || !seller.id) {
+        throw new Error('Seller record missing after upsert');
+    }
+
     // Issue our custom JWT
-    console.log('Issuing token for sellerId:', seller.id);
+    console.log('Issuing local JWT token for sellerId:', seller.id);
     const token = jwt.sign(
       { sellerId: seller.id },
       config.jwtSecret,
       { expiresIn: '30d' }
     );
 
+    const host = req.headers.host;
     res.cookie('auth_token', token, {
       httpOnly: false,
-      secure: false, 
+      secure: host.includes('wbreplyai.ru'), 
       maxAge: 30 * 24 * 60 * 60 * 1000,
       path: '/',
       sameSite: 'Lax'
     });
-    console.log('Cookie auth_token set. Redirecting to /app with token');
-
+    
+    console.log('Local auth_token cookie set. Redirecting to /app');
     res.redirect(`/app?token=${token}`);
   } catch (error) {
-    console.error('Supabase Callback Error:', error.message);
+    console.error('Supabase Callback Detailed Error:', error.message);
     res.redirect(`/login?error=auth_failed&details=${encodeURIComponent(error.message)}`);
   }
 });

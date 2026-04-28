@@ -8,6 +8,7 @@ const { initJobs, processAll } = require('./src/jobs/reviewCron');
 require('dotenv').config();
 
 const app = express();
+app.set('trust proxy', true);
 const cookieParser = require('cookie-parser');
 const authRoutes = require('./src/routes/authRoutes');
 

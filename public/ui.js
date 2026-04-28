@@ -17,21 +17,30 @@ let state = {
 };
 
 document.addEventListener('DOMContentLoaded', async () => {
-    // Handle token from URL (for VK/Google OAuth redirect)
+    // Handle token from URL (for VK/Google/MagicLink OAuth redirect)
     const urlParams = new URLSearchParams(window.location.search);
     const urlToken = urlParams.get('token');
+    
     if (urlToken) {
-        document.cookie = `auth_token=${urlToken}; path=/; max-age=${30 * 24 * 60 * 60}; SameSite=Lax`;
+        const cookieStr = `auth_token=${urlToken}; path=/; max-age=${30 * 24 * 60 * 60}; SameSite=Lax`;
+        document.cookie = cookieStr;
         localStorage.setItem('auth_token', urlToken);
-        // Clean up URL
+        console.log('Token captured from URL and saved');
+    }
+
+    // Check for token in multiple places
+    const cookieToken = document.cookie.split('; ').find(row => row.startsWith('auth_token='))?.split('=')[1];
+    const localToken = localStorage.getItem('auth_token');
+    const activeToken = urlToken || cookieToken || localToken;
+    
+    // Clean up URL if token was present
+    if (urlToken) {
         window.history.replaceState({}, document.title, window.location.pathname);
     }
 
-    // Fast path: if no token cookie exists and not in Telegram, show login immediately
-    const hasToken = document.cookie.includes('auth_token=');
     const isTelegram = window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initData;
     
-    if (!hasToken && !isTelegram) {
+    if (!activeToken && !isTelegram) {
         showView('login');
         return; // Skip API check
     }
@@ -60,10 +69,23 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 async function checkAuth() {
     try {
-        const res = await fetch('/api/auth/me');
+        const cookieToken = document.cookie.split('; ').find(row => row.startsWith('auth_token='))?.split('=')[1];
+        const localToken = localStorage.getItem('auth_token');
+        const token = cookieToken || localToken;
+        
+        console.log('Checking auth with token:', !!token);
+
+        const headers = {};
+        if (token) {
+            headers['Authorization'] = `Bearer ${token}`;
+        }
+
+        const res = await fetch('/api/auth/me', { headers });
+        
         if (res.ok) {
             const data = await res.json();
             state.sellerId = data.sellerId;
+            console.log('Auth success, sellerId:', state.sellerId);
         } else if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initData) {
             // Automatic login for Mini App
             const tg = window.Telegram.WebApp;
