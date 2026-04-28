@@ -195,19 +195,17 @@ function renderLogin() {
                         <span class="text-base font-bold text-gray-900">Войти через Google</span>
                     </button>
 
-                    <!-- VK One Tap -->
+                    <!-- VK Section -->
                     <div id="vk-onetap-container" class="w-full"></div>
-
-                    <!-- VK OAuth List (Icons) -->
-                    <div id="vk-oauth-list-container" class="flex justify-center w-full py-2"></div>
-
-                    <!-- Telegram Button -->
-                    <button onclick="handleTelegramLogin()" class="w-full h-16 flex items-center justify-center gap-4 bg-[#24A1DE] hover:brightness-110 active:scale-[0.97] transition-all rounded-[12px] shadow-lg shadow-[#24A1DE]/30">
-                        <svg class="w-8 h-8 fill-white" viewBox="0 0 24 24">
-                            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69.01-.03.01-.14-.07-.2-.08-.06-.19-.04-.27-.02-.12.02-1.96 1.25-5.54 3.69-.52.36-1 .53-1.42.52-.47-.01-1.37-.26-2.03-.48-.82-.27-1.47-.42-1.42-.88.03-.24.35-.49.96-.75 3.78-1.65 6.31-2.74 7.58-3.27 3.61-1.51 4.35-1.77 4.84-1.78.11 0 .35.03.5.16.12.1.16.23.18.33.02.11.02.24.01.37z"/>
+                    
+                    <button id="vk-fallback-btn" onclick="handleVkLogin()" class="w-full h-16 flex items-center justify-center gap-4 bg-[#0077FF] hover:brightness-110 active:scale-[0.97] transition-all rounded-[12px] shadow-lg shadow-[#0077FF]/30">
+                        <svg class="w-8 h-8" viewBox="0 0 24 24" fill="white">
+                            <path d="M12 0c-6.627 0-12 5.373-12 12s5.373 12 12 12 12-5.373 12-12-5.373-12-12-12zm5.833 17.333h-1.75c-.53 0-.7-.42-1.66-1.38-.84-.8-1.21-.9-1.42-.9-.3 0-.38.08-.38.51v1.1c0 .4-.13.67-1.17.67-1.72 0-3.62-1.04-4.96-2.95-2-2.85-2.57-5.01-2.57-5.44 0-.25.1-.48.58-.48h1.75c.43 0 .59.19.75.62.86 2.5 2.31 4.7 2.91 4.7.22 0 .32-.1.32-.65V10c0-.7-.41-.76-.41-1.01 0-.12.1-.24.26-.24h2.74c.23 0 .33.11.33.36v3.7c0 .4.18.54.34.54.26 0 .47-.14.94-.61 1.05-1.18 1.84-3.5 1.84-3.5.12-.3.29-.49.72-.49h1.75c.53 0 .65.27.53.67-.38 1.4-2.5 4.36-2.5 4.36-.2.33-.27.46 0 .82.2.26.85.83 1.28 1.34.78.93 1.37 1.7 1.53 2.23.16.53-.1.82-.63.82z"/>
                         </svg>
-                        <span class="text-base font-bold text-white tracking-tight">Войти через Telegram</span>
+                        <span class="text-base font-bold text-white">Войти через ВКонтакте</span>
                     </button>
+
+                    <div id="vk-oauth-list-container" class="flex justify-center w-full py-2"></div>
                 </div>
 
                 <div class="flex flex-col items-center gap-6 pt-8 opacity-30">
@@ -267,10 +265,7 @@ async function handleVkLogin() {
 }
 
 function initVkOneTap() {
-    if (!window.VKIDSDK) {
-        document.getElementById('vk-fallback-btn')?.classList.remove('hidden');
-        return;
-    }
+    if (!window.VKIDSDK) return;
     
     const VKID = window.VKIDSDK;
     VKID.Config.init({
@@ -290,7 +285,6 @@ function initVkOneTap() {
         })
         .on(VKID.WidgetEvents.ERROR, (err) => {
             console.error('VK OneTap Error:', err);
-            document.getElementById('vk-fallback-btn')?.classList.remove('hidden');
         })
         .on(VKID.OneTapInternalEvents.LOGIN_SUCCESS, function (payload) {
             const code = payload.code;
@@ -298,6 +292,10 @@ function initVkOneTap() {
                 window.location.href = `/api/auth/vk/callback?code=${code}`;
             }
         });
+        
+        // If oneTap is rendered, we could hide the fallback button, 
+        // but it's safer to keep it for a few seconds or until success.
+        // For now, let's keep both for maximum reliability.
     }
 }
 
