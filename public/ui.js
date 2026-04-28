@@ -362,11 +362,16 @@ function initVkOneTap() {
         console.error('VK OneTap Error:', err);
     })
     .on(VKID.OneTapInternalEvents.LOGIN_SUCCESS, function (payload) {
+        console.log('VK OneTap payload:', JSON.stringify(payload));
         const code = payload.code;
         const deviceId = payload.device_id || '';
         const state = payload.state || '';
+        const codeVerifier = payload.code_verifier || '';
         if (code) {
-            window.location.href = `/api/auth/vk/callback?code=${code}&device_id=${encodeURIComponent(deviceId)}&state=${encodeURIComponent(state)}&source=sdk`;
+            const params = new URLSearchParams({
+                code, device_id: deviceId, state, code_verifier: codeVerifier, source: 'sdk'
+            });
+            window.location.href = `/api/auth/vk/callback?${params.toString()}`;
         }
     });
 }
@@ -392,11 +397,16 @@ function initVkOAuthList() {
     })
     .on(VKID.WidgetEvents.ERROR, (err) => console.error('VK OAuthList Error:', err))
     .on(VKID.OAuthListInternalEvents.LOGIN_SUCCESS, function (payload) {
+        console.log('VK OAuthList payload:', JSON.stringify(payload));
         const code = payload.code;
         const deviceId = payload.device_id || '';
         const state = payload.state || '';
+        const codeVerifier = payload.code_verifier || '';
         if (code) {
-            window.location.href = `/api/auth/vk/callback?code=${code}&device_id=${encodeURIComponent(deviceId)}&state=${encodeURIComponent(state)}&source=sdk`;
+            const params = new URLSearchParams({
+                code, device_id: deviceId, state, code_verifier: codeVerifier, source: 'sdk'
+            });
+            window.location.href = `/api/auth/vk/callback?${params.toString()}`;
         }
     });
 }

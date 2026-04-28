@@ -363,7 +363,8 @@ router.get('/vk/callback', async (req, res) => {
   const isFromSdk = req.query.source === 'sdk';
   const deviceId = req.query.device_id || '';
   const state = req.query.state || '';
-  console.log('VK Callback received. Code exists:', !!code, '| Source:', isFromSdk ? 'VK ID SDK' : 'Legacy redirect');
+  const codeVerifier = req.query.code_verifier || '';
+  console.log('VK Callback received. Code exists:', !!code, '| Source:', isFromSdk ? 'VK ID SDK' : 'Legacy redirect', '| Has verifier:', !!codeVerifier);
 
   if (!code) {
     return res.redirect('/login?error=vk_no_code');
@@ -381,16 +382,22 @@ router.get('/vk/callback', async (req, res) => {
       // ========= VK ID SDK Flow (id.vk.com endpoints) =========
       console.log('VK ID Token Exchange at id.vk.com/oauth2/auth');
 
+      // Build token exchange params (code_verifier is required for PKCE)
+      const tokenParams = {
+        grant_type: 'authorization_code',
+        code: code,
+        client_id: config.vkClientId,
+        device_id: deviceId,
+        state: state,
+        redirect_uri: redirectUri,
+      };
+      if (codeVerifier) {
+        tokenParams.code_verifier = codeVerifier;
+      }
+
       // Step 1: Exchange code for tokens via VK ID endpoint
       const tokenRes = await axios.post('https://id.vk.com/oauth2/auth', 
-        new URLSearchParams({
-          grant_type: 'authorization_code',
-          code: code,
-          client_id: config.vkClientId,
-          device_id: deviceId,
-          state: state,
-          redirect_uri: redirectUri,
-        }).toString(),
+        new URLSearchParams(tokenParams).toString(),
         {
           headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
         }
