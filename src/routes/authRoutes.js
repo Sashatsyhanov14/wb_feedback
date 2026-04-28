@@ -120,6 +120,7 @@ router.get('/tg-callback', async (req, res) => {
       seller = newSeller;
     }
 
+    console.log('Issuing token for sellerId:', seller.id);
     const token = jwt.sign(
       { sellerId: seller.id },
       config.jwtSecret,
@@ -130,8 +131,10 @@ router.get('/tg-callback', async (req, res) => {
       httpOnly: false,
       secure: config.nodeEnv === 'production',
       maxAge: 30 * 24 * 60 * 60 * 1000,
-      path: '/'
+      path: '/',
+      sameSite: 'Lax'
     });
+    console.log('Cookie auth_token set. Redirecting to /');
 
     res.redirect('/');
   } catch (error) {
@@ -282,6 +285,7 @@ router.get('/google/callback', async (req, res) => {
     }
 
     // Issue our custom JWT
+    console.log('Issuing token for sellerId:', seller.id);
     const token = jwt.sign(
       { sellerId: seller.id },
       config.jwtSecret,
@@ -292,8 +296,10 @@ router.get('/google/callback', async (req, res) => {
       httpOnly: false,
       secure: config.nodeEnv === 'production',
       maxAge: 30 * 24 * 60 * 60 * 1000,
-      path: '/'
+      path: '/',
+      sameSite: 'Lax'
     });
+    console.log('Cookie auth_token set. Redirecting to /');
 
     res.redirect('/');
   } catch (error) {
@@ -403,6 +409,7 @@ router.get('/vk/callback', async (req, res) => {
     }
 
     // Issue our custom JWT
+    console.log('Issuing token for sellerId:', seller.id);
     const token = jwt.sign(
       { sellerId: seller.id },
       config.jwtSecret,
@@ -413,8 +420,10 @@ router.get('/vk/callback', async (req, res) => {
       httpOnly: false,
       secure: config.nodeEnv === 'production',
       maxAge: 30 * 24 * 60 * 60 * 1000,
-      path: '/'
+      path: '/',
+      sameSite: 'Lax'
     });
+    console.log('Cookie auth_token set. Redirecting to /');
 
     res.redirect('/');
   } catch (error) {
@@ -502,6 +511,7 @@ router.get('/callback', async (req, res) => {
     }
 
     // Issue our custom JWT
+    console.log('Issuing token for sellerId:', seller.id);
     const token = jwt.sign(
       { sellerId: seller.id },
       config.jwtSecret,
@@ -512,8 +522,10 @@ router.get('/callback', async (req, res) => {
       httpOnly: false,
       secure: config.nodeEnv === 'production',
       maxAge: 30 * 24 * 60 * 60 * 1000,
-      path: '/'
+      path: '/',
+      sameSite: 'Lax'
     });
+    console.log('Cookie auth_token set. Redirecting to /');
 
     res.redirect('/');
   } catch (error) {
