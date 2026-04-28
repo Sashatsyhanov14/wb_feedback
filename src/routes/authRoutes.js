@@ -198,7 +198,8 @@ router.post('/demo', async (req, res) => {
 // 5. Google Login (Manual Flow)
 router.get('/google', (req, res) => {
   const host = req.headers.host;
-  const protocol = req.headers['x-forwarded-proto'] || req.protocol;
+  // Force https for production domain
+  const protocol = host.includes('wbreplyai.ru') ? 'https' : (req.headers['x-forwarded-proto'] || req.protocol);
   const redirectUri = `${protocol}://${host}/api/auth/google/callback`;
 
   const rootUrl = 'https://accounts.google.com/o/oauth2/v2/auth';
@@ -228,7 +229,7 @@ router.get('/google/callback', async (req, res) => {
 
   try {
     const host = req.headers.host;
-    const protocol = req.headers['x-forwarded-proto'] || req.protocol;
+    const protocol = host.includes('wbreplyai.ru') ? 'https' : (req.headers['x-forwarded-proto'] || req.protocol);
     const redirectUri = `${protocol}://${host}/api/auth/google/callback`;
     
     // Exchange code for tokens
