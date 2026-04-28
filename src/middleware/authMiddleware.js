@@ -5,11 +5,13 @@ const authMiddleware = (req, res, next) => {
   const token = req.cookies.auth_token;
 
   if (!token) {
+    console.log('[AuthMiddleware] No token found in cookies');
     return res.status(401).json({ error: 'Unauthorized: No token provided' });
   }
 
   try {
     const decoded = jwt.verify(token, config.jwtSecret);
+    console.log('[AuthMiddleware] Token verified for sellerId:', decoded.sellerId);
     req.user = decoded; // { sellerId: ... }
     next();
   } catch (error) {
