@@ -338,9 +338,10 @@ router.get('/google/callback', async (req, res) => {
 // 6. VK Login (Manual Flow)
 router.get('/vk', (req, res) => {
   const host = req.headers.host;
-  // Force https for production domain
-  const protocol = host.includes('wbreplyai.ru') ? 'https' : (req.headers['x-forwarded-proto'] || req.protocol);
-  const redirectUri = `${protocol}://${host}/api/auth/vk/callback`;
+  // Use hardcoded URI for production, dynamic for local
+  const redirectUri = host.includes('wbreplyai.ru') 
+    ? 'https://wbreplyai.ru/api/auth/vk/callback' 
+    : `http://${host}/api/auth/vk/callback`;
 
   const rootUrl = 'https://oauth.vk.com/authorize';
   const options = {
@@ -367,8 +368,10 @@ router.get('/vk/callback', async (req, res) => {
 
   try {
     const host = req.headers.host;
-    const protocol = host.includes('wbreplyai.ru') ? 'https' : (req.headers['x-forwarded-proto'] || req.protocol);
-    const redirectUri = `${protocol}://${host}/api/auth/vk/callback`;
+    // Must match the one used in /vk route exactly
+    const redirectUri = host.includes('wbreplyai.ru') 
+      ? 'https://wbreplyai.ru/api/auth/vk/callback' 
+      : `http://${host}/api/auth/vk/callback`;
     
     console.log('VK Token Exchange with redirectUri:', redirectUri);
 
