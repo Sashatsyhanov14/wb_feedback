@@ -357,10 +357,13 @@ router.get('/vk', (req, res) => {
   res.redirect(`${rootUrl}?${qs.toString()}`);
 });
 
-// VK OAuth Callback (Manual)
+// VK OAuth Callback (supports both VK ID SDK and legacy redirect flow)
 router.get('/vk/callback', async (req, res) => {
   const code = req.query.code;
-  console.log('VK Callback received. Code exists:', !!code);
+  const isFromSdk = req.query.source === 'sdk';
+  const deviceId = req.query.device_id || '';
+  const state = req.query.state || '';
+  console.log('VK Callback received. Code exists:', !!code, '| Source:', isFromSdk ? 'VK ID SDK' : 'Legacy redirect');
 
   if (!code) {
     return res.redirect('/login?error=vk_no_code');
@@ -368,47 +371,107 @@ router.get('/vk/callback', async (req, res) => {
 
   try {
     const host = req.headers.host;
-    // Must match the one used in /vk route exactly
     const redirectUri = host.includes('wbreplyai.ru') 
       ? 'https://wbreplyai.ru/api/auth/vk/callback' 
       : `http://${host}/api/auth/vk/callback`;
-    
-    console.log('VK Token Exchange with redirectUri:', redirectUri);
 
-    // Exchange code for access token
-    const tokenRes = await axios.get('https://oauth.vk.com/access_token', {
-      params: {
-        client_id: config.vkClientId,
-        client_secret: config.vkClientSecret,
-        redirect_uri: redirectUri,
-        code: code,
-      },
-    });
+    let vkUserId, vkEmail, vkFirstName, vkLastName, vkAvatar;
 
-    if (tokenRes.data.error) {
-      throw new Error(tokenRes.data.error_description || tokenRes.data.error);
+    if (isFromSdk) {
+      // ========= VK ID SDK Flow (id.vk.com endpoints) =========
+      console.log('VK ID Token Exchange at id.vk.com/oauth2/auth');
+
+      // Step 1: Exchange code for tokens via VK ID endpoint
+      const tokenRes = await axios.post('https://id.vk.com/oauth2/auth', 
+        new URLSearchParams({
+          grant_type: 'authorization_code',
+          code: code,
+          client_id: config.vkClientId,
+          device_id: deviceId,
+          state: state,
+          redirect_uri: redirectUri,
+        }).toString(),
+        {
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+        }
+      );
+
+      console.log('VK ID Token Response status:', tokenRes.status);
+
+      if (tokenRes.data.error) {
+        console.error('VK ID Token Error:', tokenRes.data);
+        throw new Error(tokenRes.data.error_description || tokenRes.data.error);
+      }
+
+      const { access_token, user_id, id_token } = tokenRes.data;
+      vkUserId = user_id;
+
+      // Step 2: Get user profile via VK ID user_info endpoint
+      const profileRes = await axios.post('https://id.vk.com/oauth2/user_info',
+        new URLSearchParams({
+          client_id: config.vkClientId,
+          access_token: access_token,
+        }).toString(),
+        {
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+        }
+      );
+
+      console.log('VK ID Profile Response:', JSON.stringify(profileRes.data, null, 2));
+
+      const user = profileRes.data.user;
+      if (user) {
+        vkFirstName = user.first_name || '';
+        vkLastName = user.last_name || '';
+        vkEmail = user.email || null;
+        vkAvatar = user.avatar || null;
+        if (!vkUserId) vkUserId = user.user_id;
+      }
+    } else {
+      // ========= Legacy VK OAuth Flow (oauth.vk.com endpoints) =========
+      console.log('Legacy VK Token Exchange at oauth.vk.com/access_token');
+
+      const tokenRes = await axios.get('https://oauth.vk.com/access_token', {
+        params: {
+          client_id: config.vkClientId,
+          client_secret: config.vkClientSecret,
+          redirect_uri: redirectUri,
+          code: code,
+        },
+      });
+
+      if (tokenRes.data.error) {
+        throw new Error(tokenRes.data.error_description || tokenRes.data.error);
+      }
+
+      const { access_token, user_id, email } = tokenRes.data;
+      vkUserId = user_id;
+      vkEmail = email || null;
+
+      const profileRes = await axios.get('https://api.vk.com/method/users.get', {
+        params: {
+          user_ids: user_id,
+          fields: 'photo_max,screen_name',
+          access_token,
+          v: '5.131',
+        },
+      });
+
+      const profile = profileRes.data.response[0];
+      vkFirstName = profile.first_name;
+      vkLastName = profile.last_name;
+      vkAvatar = profile.photo_max;
     }
 
-    const { access_token, user_id, email } = tokenRes.data;
+    // ========= Common: Upsert user in sellers table =========
+    const vkIdStr = vkUserId.toString();
+    console.log('VK Auth Success. User ID:', vkIdStr, '| Name:', vkFirstName, vkLastName);
 
-    // Get user profile
-    const profileRes = await axios.get('https://api.vk.com/method/users.get', {
-      params: {
-        user_ids: user_id,
-        fields: 'photo_max,screen_name',
-        access_token,
-        v: '5.131',
-      },
-    });
-
-    const profile = profileRes.data.response[0];
-
-    // Upsert user in our sellers table
     let { data: seller, error: findError } = await supabase
       .from('sellers')
       .select('id')
       .eq('auth_provider', 'vk')
-      .eq('auth_provider_id', user_id.toString())
+      .eq('auth_provider_id', vkIdStr)
       .maybeSingle();
 
     if (!seller) {
@@ -419,10 +482,10 @@ router.get('/vk/callback', async (req, res) => {
         .from('sellers')
         .insert({
           auth_provider: 'vk',
-          auth_provider_id: user_id.toString(),
-          email: email || null,
-          display_name: `${profile.first_name} ${profile.last_name}`,
-          avatar_url: profile.photo_max,
+          auth_provider_id: vkIdStr,
+          email: vkEmail,
+          display_name: `${vkFirstName} ${vkLastName}`.trim() || 'VK User',
+          avatar_url: vkAvatar,
           subscription_status: 'trial',
           subscription_expires_at: expiresAt.toISOString()
         })

@@ -17,6 +17,16 @@ let state = {
 };
 
 document.addEventListener('DOMContentLoaded', async () => {
+    // Handle token from URL (for VK/Google OAuth redirect)
+    const urlParams = new URLSearchParams(window.location.search);
+    const urlToken = urlParams.get('token');
+    if (urlToken) {
+        document.cookie = `auth_token=${urlToken}; path=/; max-age=${30 * 24 * 60 * 60}; SameSite=Lax`;
+        localStorage.setItem('auth_token', urlToken);
+        // Clean up URL
+        window.history.replaceState({}, document.title, window.location.pathname);
+    }
+
     // Fast path: if no token cookie exists and not in Telegram, show login immediately
     const hasToken = document.cookie.includes('auth_token=');
     const isTelegram = window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initData;
@@ -353,8 +363,10 @@ function initVkOneTap() {
     })
     .on(VKID.OneTapInternalEvents.LOGIN_SUCCESS, function (payload) {
         const code = payload.code;
+        const deviceId = payload.device_id || '';
+        const state = payload.state || '';
         if (code) {
-            window.location.href = `/api/auth/vk/callback?code=${code}`;
+            window.location.href = `/api/auth/vk/callback?code=${code}&device_id=${encodeURIComponent(deviceId)}&state=${encodeURIComponent(state)}&source=sdk`;
         }
     });
 }
@@ -381,8 +393,10 @@ function initVkOAuthList() {
     .on(VKID.WidgetEvents.ERROR, (err) => console.error('VK OAuthList Error:', err))
     .on(VKID.OAuthListInternalEvents.LOGIN_SUCCESS, function (payload) {
         const code = payload.code;
+        const deviceId = payload.device_id || '';
+        const state = payload.state || '';
         if (code) {
-            window.location.href = `/api/auth/vk/callback?code=${code}`;
+            window.location.href = `/api/auth/vk/callback?code=${code}&device_id=${encodeURIComponent(deviceId)}&state=${encodeURIComponent(state)}&source=sdk`;
         }
     });
 }
