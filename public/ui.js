@@ -767,34 +767,34 @@ function renderInterface() {
 
                 </section>
 
-                <section class="premium-card p-5 sm:p-8 space-y-6">
-                    <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-5 border-b border-outline-variant/30 pb-6">
+                <section class="premium-card overflow-hidden divide-y divide-outline-variant/30">
+                    <div class="p-5 sm:p-6 flex items-center justify-between gap-4">
                         <div class="flex items-center gap-4">
-                            <div class="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                            <div class="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0 border border-primary/20">
                                 <span class="material-symbols-outlined text-primary text-xl">support_agent</span>
                             </div>
                             <div>
-                                <h4 class="text-text-main font-bold text-sm uppercase tracking-widest">Служба поддержки</h4>
-                                <p class="text-[11px] text-on-surface-variant mt-1 leading-snug">Помощь с настройкой и ответы на вопросы</p>
+                                <h4 class="text-text-main font-bold text-xs sm:text-sm uppercase tracking-widest">Поддержка</h4>
+                                <p class="text-[10px] sm:text-[11px] text-on-surface-variant mt-0.5 leading-tight">Помощь и вопросы</p>
                             </div>
                         </div>
-                        <button onclick="openSupportModal('support')" class="w-full sm:w-auto flex-shrink-0 text-[10px] font-black uppercase tracking-widest bg-bg-main border border-outline-variant hover:border-primary text-text-main px-6 py-3.5 rounded-xl transition-all active:scale-95 text-center">
-                            Написать в чат
+                        <button onclick="openSupportModal('support')" class="shrink-0 bg-bg-main border border-outline-variant hover:border-primary text-text-main px-5 h-10 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 whitespace-nowrap shadow-sm flex items-center justify-center">
+                            Написать
                         </button>
                     </div>
 
-                    <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-5">
+                    <div class="p-5 sm:p-6 flex items-center justify-between gap-4">
                         <div class="flex items-center gap-4">
-                            <div class="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                            <div class="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0 border border-primary/20">
                                 <span class="material-symbols-outlined text-primary text-xl">rate_review</span>
                             </div>
                             <div>
-                                <h4 class="text-text-main font-bold text-sm uppercase tracking-widest">Оставить отзыв</h4>
-                                <p class="text-[11px] text-on-surface-variant mt-1 leading-snug">Поделитесь впечатлениями о сервисе</p>
+                                <h4 class="text-text-main font-bold text-xs sm:text-sm uppercase tracking-widest">Отзыв</h4>
+                                <p class="text-[10px] sm:text-[11px] text-on-surface-variant mt-0.5 leading-tight">Оценить сервис</p>
                             </div>
                         </div>
-                        <button onclick="openSupportModal('feedback')" class="w-full sm:w-auto flex-shrink-0 text-[10px] font-black uppercase tracking-widest bg-primary text-white dark:text-black px-6 py-3.5 rounded-xl transition-all hover:brightness-110 active:scale-95 shadow-lg shadow-primary/20 text-center">
-                            Оценить сервис
+                        <button onclick="openSupportModal('feedback')" class="shrink-0 bg-primary text-white dark:text-black px-6 h-10 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all hover:brightness-110 active:scale-95 shadow-lg shadow-primary/20 whitespace-nowrap flex items-center justify-center">
+                            Оценить
                         </button>
                     </div>
                 </section>
@@ -850,7 +850,7 @@ function openSupportModal(type) {
 
     const modal = document.createElement('div');
     modal.id = 'support-modal';
-    modal.className = 'fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-sm animate-in';
+    modal.className = 'fixed inset-0 z-50 flex items-center justify-center sm:p-4 bg-black/80 backdrop-blur-sm animate-in';
     modal.onclick = () => modal.remove();
 
     if (type === 'support') {
@@ -861,10 +861,8 @@ function openSupportModal(type) {
         let messagesHtml = '';
         if (supportTickets.length === 0) {
             messagesHtml = `
-                <div class="flex flex-col items-center justify-center h-full text-center opacity-50 space-y-3 pb-10">
-                    <div class="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center">
-                        <span class="material-symbols-outlined text-4xl text-primary">support_agent</span>
-                    </div>
+                <div class="flex flex-col items-center justify-center h-full text-center opacity-50 space-y-2 pb-10">
+                    <span class="material-symbols-outlined text-5xl mb-2">support_agent</span>
                     <p class="text-xs font-bold uppercase tracking-widest">Напишите нам</p>
                     <p class="text-[10px]">Мы ответим в ближайшее время</p>
                 </div>
@@ -874,17 +872,17 @@ function openSupportModal(type) {
                 const time = new Date(t.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
                 messagesHtml += `
                     <div class="flex justify-end mb-4 animate-in">
-                        <div class="bg-primary text-white p-3 sm:p-4 rounded-2xl rounded-tr-sm max-w-[85%] text-sm shadow-md shadow-primary/10">
-                            ${t.message}
-                            <div class="text-[9px] text-white/70 text-right mt-1.5 font-bold">${time}</div>
+                        <div class="bg-primary text-white px-4 py-3 rounded-2xl rounded-tr-none max-w-[80%] min-w-[70px] text-sm shadow-lg shadow-primary/10 relative" style="overflow-wrap: anywhere; word-break: break-word;">
+                            <div class="leading-relaxed">${t.message}</div>
+                            <div class="text-[9px] text-white/80 text-right mt-1.5 font-bold tabular-nums">${time}</div>
                         </div>
                     </div>
                 `;
                 if (t.admin_reply) {
                     messagesHtml += `
-                        <div class="flex justify-start mb-4 animate-in">
-                            <div class="bg-surface-container-highest border border-outline-variant/30 text-text-main p-3 sm:p-4 rounded-2xl rounded-tl-sm max-w-[85%] text-sm shadow-sm relative mt-2">
-                                <span class="absolute -top-3 left-3 text-[8px] font-black uppercase tracking-widest text-primary bg-bg-main px-2 py-0.5 rounded border border-outline-variant/30">Поддержка</span>
+                        <div class="flex justify-start mb-5 animate-in">
+                            <div class="bg-surface-container-highest border border-outline-variant/30 text-text-main px-4 py-3 rounded-2xl rounded-tl-none max-w-[80%] min-w-[70px] text-sm shadow-sm relative mt-3 break-words leading-relaxed" style="overflow-wrap: anywhere; word-break: break-word;">
+                                <span class="absolute -top-3 left-2 text-[8px] font-black uppercase tracking-widest text-primary bg-bg-main px-2 py-0.5 rounded border border-outline-variant/30 z-10 shadow-sm">Поддержка</span>
                                 <div class="mt-1">${t.admin_reply}</div>
                             </div>
                         </div>
@@ -896,11 +894,9 @@ function openSupportModal(type) {
         modal.innerHTML = `
             <div class="bg-bg-main w-full h-[100dvh] sm:h-[85vh] sm:max-h-[700px] sm:rounded-2xl flex flex-col relative overflow-hidden shadow-2xl" style="max-width: 480px;" onclick="event.stopPropagation()">
                 <!-- Header -->
-                <div class="flex justify-between items-center border-b border-outline-variant/30 p-4 bg-surface shrink-0 z-10 shadow-sm">
+                <div class="flex justify-between items-center border-b border-outline-variant/30 p-4 shrink-0 bg-surface">
                     <div class="flex items-center gap-3">
-                        <div class="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center border border-primary/20 shrink-0">
-                            <span class="material-symbols-outlined text-primary text-lg">support_agent</span>
-                        </div>
+                        <span class="material-symbols-outlined text-primary text-3xl">support_agent</span>
                         <div>
                             <h3 class="font-headline text-sm font-bold tracking-tight text-text-main uppercase tracking-widest">Чат с поддержкой</h3>
                             <p class="text-[9px] text-green-500 font-bold uppercase tracking-widest flex items-center gap-1 mt-0.5">
@@ -908,21 +904,21 @@ function openSupportModal(type) {
                             </p>
                         </div>
                     </div>
-                    <button onclick="document.getElementById('support-modal').remove()" class="text-on-surface-variant hover:text-text-main transition-colors w-10 h-10 flex items-center justify-center bg-bg-main border border-outline-variant/30 rounded-xl">
-                        <span class="material-symbols-outlined text-xl">close</span>
+                    <button onclick="document.getElementById('support-modal').remove()" class="text-on-surface-variant hover:text-text-main transition-colors p-2 rounded-lg bg-bg-main border border-outline-variant/30 flex items-center justify-center">
+                        <span class="material-symbols-outlined">close</span>
                     </button>
                 </div>
                 
                 <!-- Chat Area -->
-                <div id="chat-messages-area" class="flex-1 overflow-y-auto p-4 sm:p-5 bg-bg-main/50 relative">
+                <div id="chat-messages-area" class="flex-1 overflow-y-auto p-4 bg-bg-main/50 relative">
                     ${messagesHtml}
                 </div>
                 
                 <!-- Input Area -->
-                <div class="p-3 sm:p-4 border-t border-outline-variant/30 bg-surface shrink-0 z-10">
+                <div class="p-3 sm:p-4 border-t border-outline-variant/30 shrink-0 bg-surface">
                     <div class="flex gap-2">
-                        <input id="support-message" type="text" class="flex-1 bg-bg-main border border-outline-variant outline-none px-4 py-3.5 text-text-main text-sm rounded-xl focus:border-primary transition-colors" placeholder="Сообщение..." onkeypress="if(event.key === 'Enter') submitSupport('support')">
-                        <button onclick="submitSupport('support')" class="bg-primary text-white w-12 h-12 rounded-xl flex items-center justify-center shadow-lg shadow-primary/20 hover:scale-105 active:scale-95 transition-all shrink-0">
+                        <input id="support-message" type="text" class="flex-1 bg-bg-main border border-outline-variant outline-none px-4 py-3 text-text-main text-sm rounded-xl focus:border-primary transition-colors" placeholder="Сообщение..." onkeypress="if(event.key === 'Enter') submitSupport('support')">
+                        <button onclick="submitSupport('support')" class="bg-primary text-white w-12 h-12 rounded-xl flex items-center justify-center shrink-0 shadow-lg shadow-primary/20">
                             <span class="material-symbols-outlined">send</span>
                         </button>
                     </div>

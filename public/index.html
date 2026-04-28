@@ -248,7 +248,7 @@
 
         <!-- Main Content Area -->
         <main class="w-full">
-            <header id="mobile-header" style="display: none;" class="fixed top-0 w-full z-40 flex justify-between items-center px-6 h-16 lg:hidden" style="background: var(--c-bg); border-bottom: 1px solid var(--c-border)">
+            <header id="mobile-header" class="fixed top-0 w-full z-40 flex justify-between items-center px-6 h-16 lg:hidden shadow-sm" style="display: none; background: var(--c-bg); border-bottom: 1px solid var(--c-border); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);">
                 <div class="flex items-center font-black tracking-tighter text-lg cursor-default text-text-main">
                     <span>WR</span>
                     <svg class="w-4 h-4 text-[#E1AF66] mx-0.5" viewBox="0 0 24 24" fill="currentColor">
@@ -259,14 +259,14 @@
                 <span class="material-symbols-outlined" style="color: var(--c-text-dim)">menu</span>
             </header>
 
-            <div id="content-view" class="max-w-4xl mx-auto px-6 py-12 lg:py-20 w-full">
+            <div id="content-view" class="max-w-4xl mx-auto px-6 pt-24 pb-32 lg:py-20 w-full">
                 <!-- Content injected by ui.js -->
             </div>
         </main>
     </div>
 
     <!-- Mobile Navigation -->
-    <nav id="main-nav" style="display: none;" class="fixed bottom-0 w-full flex justify-between items-center px-2 py-4 z-40 lg:hidden" style="background: var(--c-bg); border-top: 1px solid var(--c-border); backdrop-filter: blur(10px);">
+    <nav id="main-nav" class="fixed bottom-0 w-full flex justify-between items-center px-2 py-3 z-40 lg:hidden shadow-lg" style="display: none; background: var(--c-bg); border-top: 1px solid var(--c-border); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); padding-bottom: calc(0.75rem + env(safe-area-inset-bottom));">
         <a id="nav-settings" class="tab-item flex-1 flex flex-col items-center justify-center transition-all active:scale-95" onclick="showView('settings')">
             <span class="material-symbols-outlined text-xl">tune</span>
             <span class="text-[10px] font-black uppercase tracking-[0.2em] mt-1.5">Бизнес</span>
