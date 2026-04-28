@@ -151,7 +151,7 @@ async function checkAuth() {
 async function refreshData() {
     if (!state.sellerId) return;
     try {
-        const adminId = '795056847';
+        const adminId = '68cfdf5a-25fb-43f5-8672-c03d1bddc29b';
         const requests = [
             fetch(`/api/settings`).then(r => r.status === 200 ? r.json() : null),
             fetch(`/api/matrix`).then(r => r.status === 200 ? r.json() : null),

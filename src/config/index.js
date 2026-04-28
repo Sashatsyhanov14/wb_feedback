@@ -17,7 +17,7 @@ module.exports = {
   vkClientId: process.env.VK_CLIENT_ID,
   vkClientSecret: process.env.VK_CLIENT_SECRET,
   vkRedirectUri: process.env.VK_REDIRECT_URI || 'https://wbreplyai.ru/api/auth/vk/callback',
-  adminId: '795056847',
+  adminId: '68cfdf5a-25fb-43f5-8672-c03d1bddc29b',
   adminIdUsername: process.env.TELEGRAM_ADMIN_USERNAME || '@edh4hhr',
   
   // Robokassa
