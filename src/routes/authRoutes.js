@@ -459,7 +459,9 @@ router.get('/vk/callback', async (req, res) => {
 
     res.redirect('/');
   } catch (error) {
-    console.error('VK Auth Error:', error.message);
+    const vkErr = error.response?.data;
+    console.error('VK Auth Error Details:', JSON.stringify(vkErr, null, 2));
+    console.error('VK Auth Error Message:', error.message);
     res.redirect(`/login?error=vk_auth_failed&details=${encodeURIComponent(error.message)}`);
   }
 });
