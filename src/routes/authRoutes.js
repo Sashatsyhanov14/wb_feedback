@@ -116,8 +116,18 @@ router.get('/tg-callback', async (req, res) => {
         .select('id')
         .single();
         
-      if (insertError) throw insertError;
+      if (insertError) {
+        console.error('DB Insert Error:', insertError);
+        throw insertError;
+      }
+      if (!newSeller) {
+        throw new Error('User creation failed: No data returned');
+      }
       seller = newSeller;
+    }
+
+    if (!seller || !seller.id) {
+        throw new Error('User session creation failed: Seller ID missing');
     }
 
     console.log('Issuing token for sellerId:', seller.id);
@@ -280,8 +290,18 @@ router.get('/google/callback', async (req, res) => {
         .select('id')
         .single();
       
-      if (insertError) throw insertError;
+      if (insertError) {
+        console.error('Google DB Insert Error:', insertError);
+        throw insertError;
+      }
+      if (!newSeller) {
+        throw new Error('Google User creation failed: No data returned');
+      }
       seller = newSeller;
+    }
+
+    if (!seller || !seller.id) {
+        throw new Error('Google User session creation failed: Seller ID missing');
     }
 
     // Issue our custom JWT
@@ -404,8 +424,18 @@ router.get('/vk/callback', async (req, res) => {
         .select('id')
         .single();
       
-      if (insertError) throw insertError;
+      if (insertError) {
+        console.error('VK DB Insert Error:', insertError);
+        throw insertError;
+      }
+      if (!newSeller) {
+        throw new Error('VK User creation failed: No data returned');
+      }
       seller = newSeller;
+    }
+
+    if (!seller || !seller.id) {
+        throw new Error('VK User session creation failed: Seller ID missing');
     }
 
     // Issue our custom JWT
