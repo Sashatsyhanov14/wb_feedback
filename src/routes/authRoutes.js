@@ -194,107 +194,49 @@ router.post('/demo', async (req, res) => {
     res.json({ success: true, sellerId: seller.id });
 });
 
-// 5. Google Login
-// Redirect to Google OAuth
-router.get('/google', (req, res) => {
-  const rootUrl = 'https://accounts.google.com/o/oauth2/v2/auth';
-  const options = {
-    redirect_uri: config.googleRedirectUri,
-    client_id: config.googleClientId,
-    access_type: 'offline',
-    response_type: 'code',
-    prompt: 'consent',
-    scope: [
-      'https://www.googleapis.com/auth/userinfo.profile',
-      'https://www.googleapis.com/auth/userinfo.email',
-    ].join(' '),
-  };
-
-  const qs = new URLSearchParams(options);
-  res.redirect(`${rootUrl}?${qs.toString()}`);
-});
-
-// Google OAuth Callback
-router.get('/google/callback', async (req, res) => {
-  const code = req.query.code;
-
+// 5. Google Login (Via Supabase)
+router.get('/google', async (req, res) => {
   try {
-    // Exchange code for tokens
-    const { data } = await axios.post('https://oauth2.googleapis.com/token', {
-      code,
-      client_id: config.googleClientId,
-      client_secret: config.googleClientSecret,
-      redirect_uri: config.googleRedirectUri,
-      grant_type: 'authorization_code',
+    const host = req.headers.host;
+    const protocol = req.headers['x-forwarded-proto'] || req.protocol;
+    const redirectUrl = `${protocol}://${host}/api/auth/callback`;
+
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: redirectUrl,
+        queryParams: {
+          access_type: 'offline',
+          prompt: 'consent',
+        },
+      },
     });
 
-    const { id_token, access_token } = data;
-
-    // Get user profile
-    const { data: profile } = await axios.get(
-      `https://www.googleapis.com/oauth2/v1/userinfo?alt=json&access_token=${access_token}`,
-      {
-        headers: { Authorization: `Bearer ${id_token}` },
-      }
-    );
-
-    // Upsert user in sellers table
-    let { data: seller, error: findError } = await supabase
-      .from('sellers')
-      .select('id')
-      .eq('auth_provider', 'google')
-      .eq('auth_provider_id', profile.id)
-      .maybeSingle();
-
-    if (!seller) {
-      const expiresAt = new Date();
-      expiresAt.setDate(expiresAt.getDate() + 3);
-
-      const { data: newSeller, error: insertError } = await supabase
-        .from('sellers')
-        .insert({
-          auth_provider: 'google',
-          auth_provider_id: profile.id,
-          email: profile.email,
-          display_name: profile.name,
-          avatar_url: profile.picture,
-          subscription_status: 'trial',
-          subscription_expires_at: expiresAt.toISOString()
-        })
-        .select('id')
-        .single();
-      
-      if (insertError) throw insertError;
-      seller = newSeller;
-    }
-
-    // Issue JWT
-    const token = jwt.sign(
-      { sellerId: seller.id },
-      config.jwtSecret,
-      { expiresIn: '30d' }
-    );
-
-    res.cookie('auth_token', token, {
-      httpOnly: false,
-      secure: config.nodeEnv === 'production',
-      maxAge: 30 * 24 * 60 * 60 * 1000
-    });
-
-    // Redirect to dashboard
-    res.redirect('/');
+    if (error) throw error;
+    res.redirect(data.url);
   } catch (error) {
-    console.error('Google Auth Error:', error.response?.data || error.message);
+    console.error('Google Auth Error:', error.message);
     res.redirect('/login?error=google_auth_failed');
   }
 });
 
-// 6. VK Login
+// Old Google Callback (Replaced by universal /callback)
+/*
+router.get('/google/callback', async (req, res) => {
+  // ... existing code ...
+});
+*/
+
+// 6. VK Login (Manual Flow)
 router.get('/vk', (req, res) => {
+  const host = req.headers.host;
+  const protocol = req.headers['x-forwarded-proto'] || req.protocol;
+  const redirectUri = `${protocol}://${host}/api/auth/vk/callback`;
+
   const rootUrl = 'https://oauth.vk.com/authorize';
   const options = {
     client_id: config.vkClientId,
-    redirect_uri: config.vkRedirectUri,
+    redirect_uri: redirectUri,
     display: 'page',
     scope: 'email',
     response_type: 'code',
@@ -305,24 +247,33 @@ router.get('/vk', (req, res) => {
   res.redirect(`${rootUrl}?${qs.toString()}`);
 });
 
-// VK OAuth Callback
+// VK OAuth Callback (Manual)
 router.get('/vk/callback', async (req, res) => {
   const code = req.query.code;
+  console.log('VK Callback received. Code exists:', !!code);
 
   if (!code) {
     return res.redirect('/login?error=vk_no_code');
   }
 
   try {
+    const host = req.headers.host;
+    const protocol = req.headers['x-forwarded-proto'] || req.protocol;
+    const redirectUri = config.vkRedirectUri || `${protocol}://${host}/api/auth/vk/callback`;
+    
     // Exchange code for access token
     const tokenRes = await axios.get('https://oauth.vk.com/access_token', {
       params: {
         client_id: config.vkClientId,
         client_secret: config.vkClientSecret,
-        redirect_uri: config.vkRedirectUri,
+        redirect_uri: redirectUri,
         code,
       },
     });
+
+    if (tokenRes.data.error) {
+      throw new Error(tokenRes.data.error_description || tokenRes.data.error);
+    }
 
     const { access_token, user_id, email } = tokenRes.data;
 
@@ -336,18 +287,14 @@ router.get('/vk/callback', async (req, res) => {
       },
     });
 
-    if (!profileRes.data.response || !profileRes.data.response[0]) {
-      throw new Error('Failed to get VK profile');
-    }
-
     const profile = profileRes.data.response[0];
 
-    // Upsert user in sellers table
+    // Upsert user in our sellers table
     let { data: seller, error: findError } = await supabase
       .from('sellers')
       .select('id')
       .eq('auth_provider', 'vk')
-      .eq('auth_provider_id', String(user_id))
+      .eq('auth_provider_id', user_id.toString())
       .maybeSingle();
 
     if (!seller) {
@@ -358,7 +305,7 @@ router.get('/vk/callback', async (req, res) => {
         .from('sellers')
         .insert({
           auth_provider: 'vk',
-          auth_provider_id: String(user_id),
+          auth_provider_id: user_id.toString(),
           email: email || null,
           display_name: `${profile.first_name} ${profile.last_name}`,
           avatar_url: profile.photo_max,
@@ -372,7 +319,7 @@ router.get('/vk/callback', async (req, res) => {
       seller = newSeller;
     }
 
-    // Issue JWT
+    // Issue our custom JWT
     const token = jwt.sign(
       { sellerId: seller.id },
       config.jwtSecret,
@@ -387,8 +334,106 @@ router.get('/vk/callback', async (req, res) => {
 
     res.redirect('/');
   } catch (error) {
-    console.error('VK Auth Error:', error.response?.data || error.message);
-    res.redirect('/login?error=vk_auth_failed');
+    console.error('VK Auth Error:', error.message);
+    res.redirect(`/login?error=vk_auth_failed&details=${encodeURIComponent(error.message)}`);
+  }
+});
+
+
+
+// 7. Magic Link (Supabase Auth)
+router.post('/magic', async (req, res) => {
+  const { email } = req.body;
+  
+  if (!email) {
+    return res.status(400).json({ error: 'Email is required' });
+  }
+
+  try {
+    const host = req.headers.host;
+    const protocol = req.headers['x-forwarded-proto'] || req.protocol;
+    const redirectUrl = `${protocol}://${host}/api/auth/callback`;
+
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
+      options: {
+        emailRedirectTo: redirectUrl,
+      },
+    });
+
+    if (error) throw error;
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Magic Link Error:', error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 8. Supabase Auth Callback (Universal)
+router.get('/callback', async (req, res) => {
+  const code = req.query.code;
+
+  if (!code) {
+    return res.redirect('/login?error=no_code');
+  }
+
+  try {
+    // Exchange the code for a session
+    const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+    if (error) throw error;
+
+    const { user } = data;
+    const email = user.email;
+    const authProvider = user.app_metadata.provider || 'email';
+    const authProviderId = user.id;
+
+    // Upsert user in our sellers table
+    let { data: seller, error: findError } = await supabase
+      .from('sellers')
+      .select('id')
+      .eq('auth_provider', authProvider)
+      .eq('auth_provider_id', authProviderId)
+      .maybeSingle();
+
+    if (!seller) {
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 3);
+
+      const { data: newSeller, error: insertError } = await supabase
+        .from('sellers')
+        .insert({
+          auth_provider: authProvider,
+          auth_provider_id: authProviderId,
+          email: email,
+          display_name: user.user_metadata.full_name || email.split('@')[0],
+          avatar_url: user.user_metadata.avatar_url || null,
+          subscription_status: 'trial',
+          subscription_expires_at: expiresAt.toISOString()
+        })
+        .select('id')
+        .single();
+      
+      if (insertError) throw insertError;
+      seller = newSeller;
+    }
+
+    // Issue our custom JWT
+    const token = jwt.sign(
+      { sellerId: seller.id },
+      config.jwtSecret,
+      { expiresIn: '30d' }
+    );
+
+    res.cookie('auth_token', token, {
+      httpOnly: false,
+      secure: config.nodeEnv === 'production',
+      maxAge: 30 * 24 * 60 * 60 * 1000
+    });
+
+    res.redirect('/');
+  } catch (error) {
+    console.error('Supabase Callback Error:', error.message);
+    res.redirect(`/login?error=auth_failed&details=${encodeURIComponent(error.message)}`);
   }
 });
 

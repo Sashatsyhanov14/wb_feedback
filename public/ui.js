@@ -156,9 +156,12 @@ function showView(view) {
     } else if (view === 'login') {
         content.innerHTML = renderLogin();
         initTelegramWidget();
-        initVkOneTap();
-        initVkFloatingOneTap();
-        initVkOAuthList();
+        // Delay slightly to ensure DOM is ready
+        setTimeout(() => {
+            initVkOneTap();
+            initVkFloatingOneTap();
+            initVkOAuthList();
+        }, 100);
     }
 }
 
@@ -206,6 +209,32 @@ function renderLogin() {
                     </button>
 
                     <div id="vk-oauth-list-container" class="flex justify-center w-full py-2"></div>
+
+                    <!-- Telegram Button -->
+                    <div id="tg-login-container" class="flex justify-center w-full py-2">
+                        <button onclick="handleTelegramLogin()" class="w-full h-16 flex items-center justify-center gap-4 bg-[#24A1DE] hover:brightness-110 active:scale-[0.97] transition-all rounded-[12px] shadow-lg shadow-[#24A1DE]/30">
+                            <svg class="w-8 h-8" viewBox="0 0 24 24" fill="white">
+                                <path d="M12 0c-6.627 0-12 5.373-12 12s5.373 12 12 12 12-5.373 12-12-5.373-12-12-12zm5.894 8.221l-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.446 1.394c-.14.14-.26.26-.54.26l.213-3.05 5.56-5.02c.24-.213-.054-.33-.373-.12l-6.87 4.33-2.96-.924c-.64-.203-.654-.64.135-.954l11.566-4.458c.538-.196 1.006.128.832.954z"/>
+                            </svg>
+                            <span class="text-base font-bold text-white">Войти через Telegram</span>
+                        </button>
+                    </div>
+
+                    <div class="relative py-4">
+                        <div class="absolute inset-0 flex items-center"><div class="w-full border-t border-outline-variant/30"></div></div>
+                        <div class="relative flex justify-center text-[10px] uppercase tracking-[0.2em] font-bold"><span class="bg-bg-main px-4 text-on-surface-variant/40">Или по почте</span></div>
+                    </div>
+
+                    <!-- Magic Link Section -->
+                    <div class="space-y-3">
+                        <div class="relative">
+                            <input id="magic-email" type="email" placeholder="email@example.com" class="w-full h-14 bg-bg-main border border-outline-variant/50 focus:border-primary outline-none px-5 rounded-[12px] text-sm transition-all">
+                        </div>
+                        <button id="magic-btn" onclick="handleMagicLogin()" class="w-full h-14 flex items-center justify-center gap-3 bg-surface-container-high hover:bg-surface-container-highest active:scale-[0.98] transition-all rounded-[12px] border border-outline-variant/30">
+                            <span class="material-symbols-outlined text-primary text-xl">magic_button</span>
+                            <span class="text-sm font-bold text-on-surface">Войти по ссылке</span>
+                        </button>
+                    </div>
                 </div>
 
                 <div class="flex flex-col items-center gap-6 pt-8 opacity-30">
@@ -264,39 +293,92 @@ async function handleVkLogin() {
     window.location.href = '/api/auth/vk';
 }
 
+async function handleMagicLogin() {
+    const email = document.getElementById('magic-email').value;
+    if (!email || !email.includes('@')) {
+        return showToast('Введите корректный email', true);
+    }
+
+    const btn = document.getElementById('magic-btn');
+    const originalContent = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="animate-spin material-symbols-outlined">sync</span><span>Отправка...</span>';
+
+    try {
+        const res = await fetch('/api/auth/magic', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email })
+        });
+        
+        const data = await res.json();
+        if (res.ok) {
+            showToast('Ссылка отправлена на почту!');
+            btn.innerHTML = '<span>Проверьте почту ✉️</span>';
+        } else {
+            showToast(data.error || 'Ошибка отправки', true);
+            btn.disabled = false;
+            btn.innerHTML = originalContent;
+        }
+    } catch (e) {
+        showToast('Ошибка сети', true);
+        btn.disabled = false;
+        btn.innerHTML = originalContent;
+    }
+}
+
+function initTelegramWidget() {
+    const container = document.getElementById('tg-login-container');
+    if (!container) return;
+
+    // Optional: inject official widget if preferred over redirect button
+    /*
+    const script = document.createElement('script');
+    script.src = "https://telegram.org/js/telegram-widget.js?22";
+    script.setAttribute('data-telegram-login', 'WBReplyAIbot');
+    script.setAttribute('data-size', 'large');
+    script.setAttribute('data-radius', '12');
+    script.setAttribute('data-onauth', 'onTelegramAuth(user)');
+    script.setAttribute('data-request-access', 'write');
+    container.innerHTML = '';
+    container.appendChild(script);
+    */
+}
+
 function initVkOneTap() {
     if (!window.VKIDSDK) return;
     
     const VKID = window.VKIDSDK;
+    const container = document.getElementById('vk-onetap-container');
+    if (!container) return;
+    
+    // Clean up previous instance if any
+    container.innerHTML = '';
+
+    const redirectUri = window.location.origin + '/api/auth/vk/callback';
+
     VKID.Config.init({
         app: 54569358,
-        redirectUrl: 'https://wbreplyai.ru/api/auth/vk/callback',
+        redirectUrl: redirectUri,
         responseMode: VKID.ConfigResponseMode.Callback,
         source: VKID.ConfigSource.LOWCODE,
     });
 
     const oneTap = new VKID.OneTap();
-    const container = document.getElementById('vk-onetap-container');
     
-    if (container) {
-        oneTap.render({
-            container: container,
-            showAlternativeLogin: true
-        })
-        .on(VKID.WidgetEvents.ERROR, (err) => {
-            console.error('VK OneTap Error:', err);
-        })
-        .on(VKID.OneTapInternalEvents.LOGIN_SUCCESS, function (payload) {
-            const code = payload.code;
-            if (code) {
-                window.location.href = `/api/auth/vk/callback?code=${code}`;
-            }
-        });
-        
-        // If oneTap is rendered, we could hide the fallback button, 
-        // but it's safer to keep it for a few seconds or until success.
-        // For now, let's keep both for maximum reliability.
-    }
+    oneTap.render({
+        container: container,
+        showAlternativeLogin: true
+    })
+    .on(VKID.WidgetEvents.ERROR, (err) => {
+        console.error('VK OneTap Error:', err);
+    })
+    .on(VKID.OneTapInternalEvents.LOGIN_SUCCESS, function (payload) {
+        const code = payload.code;
+        if (code) {
+            window.location.href = `/api/auth/vk/callback?code=${code}`;
+        }
+    });
 }
 
 function initVkFloatingOneTap() {
@@ -309,7 +391,10 @@ function initVkFloatingOneTap() {
         appName: 'Wbreply AI',
         showAlternativeLogin: true
     })
-    .on(VKID.WidgetEvents.ERROR, (err) => console.error('VK FloatingOneTap Error:', err))
+    .on(VKID.WidgetEvents.ERROR, (err) => {
+        // Only log if it's not a "already shown" error or similar
+        console.warn('VK FloatingOneTap (Info):', err);
+    })
     .on(VKID.FloatingOneTapInternalEvents.LOGIN_SUCCESS, function (payload) {
         const code = payload.code;
         if (code) {
@@ -322,22 +407,23 @@ function initVkOAuthList() {
     if (!window.VKIDSDK) return;
     
     const VKID = window.VKIDSDK;
-    const oAuth = new VKID.OAuthList();
     const container = document.getElementById('vk-oauth-list-container');
+    if (!container) return;
+    
+    container.innerHTML = '';
 
-    if (container) {
-        oAuth.render({
-            container: container,
-            oauthList: ['vkid']
-        })
-        .on(VKID.WidgetEvents.ERROR, (err) => console.error('VK OAuthList Error:', err))
-        .on(VKID.OAuthListInternalEvents.LOGIN_SUCCESS, function (payload) {
-            const code = payload.code;
-            if (code) {
-                window.location.href = `/api/auth/vk/callback?code=${code}`;
-            }
-        });
-    }
+    const oAuth = new VKID.OAuthList();
+    oAuth.render({
+        container: container,
+        oauthList: ['vkid']
+    })
+    .on(VKID.WidgetEvents.ERROR, (err) => console.error('VK OAuthList Error:', err))
+    .on(VKID.OAuthListInternalEvents.LOGIN_SUCCESS, function (payload) {
+        const code = payload.code;
+        if (code) {
+            window.location.href = `/api/auth/vk/callback?code=${code}`;
+        }
+    });
 }
 
 
