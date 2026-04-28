@@ -188,51 +188,38 @@ function renderLogin() {
                 
                 <div class="flex flex-col gap-4">
                     <!-- Google Button -->
-                    <button onclick="handleGoogleLogin()" class="w-full h-16 flex items-center justify-center gap-4 bg-white hover:bg-gray-100 active:scale-[0.97] transition-all rounded-[12px] shadow-lg shadow-black/10 border border-gray-200">
-                        <svg class="w-6 h-6" viewBox="0 0 48 48">
+                    <button onclick="handleGoogleLogin()" class="w-full h-14 flex items-center justify-center gap-4 bg-white hover:bg-gray-100 active:scale-[0.97] transition-all rounded-[12px] shadow-sm border border-gray-200">
+                        <svg class="w-5 h-5" viewBox="0 0 48 48">
                             <path fill="#FFC107" d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12c0-6.627,5.373-12,12-12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C12.955,4,4,12.955,4,24c0,11.045,8.955,20,20,20c11.045,0,20-8.955,20-20C44,22.659,43.862,21.35,43.611,20.083z"></path>
                             <path fill="#FF3D00" d="M6.306,14.691l6.571,4.819C14.655,15.108,18.961,12,24,12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C16.318,4,9.656,8.337,6.306,14.691z"></path>
                             <path fill="#4CAF50" d="M24,44c5.166,0,9.86-1.977,13.409-5.192l-6.19-5.238C29.211,35.091,26.715,36,24,36c-5.202,0-9.619-3.317-11.283-7.946l-6.522,5.025C9.505,39.556,16.227,44,24,44z"></path>
                             <path fill="#1976D2" d="M43.611,20.083H42V20H24v8h11.303c-0.792,2.237-2.231,4.166-4.087,5.571c0.001-0.001,0.002-0.001,0.003-0.002l6.19,5.238C36.971,39.205,44,34,44,24C44,22.659,43.862,21.35,43.611,20.083z"></path>
                         </svg>
-                        <span class="text-base font-bold text-gray-900">Войти через Google</span>
+                        <span class="text-sm font-bold text-gray-900">Войти через Google</span>
                     </button>
 
-                    <!-- VK Section -->
-                    <div id="vk-onetap-container" class="w-full"></div>
-                    
-                    <button id="vk-fallback-btn" onclick="handleVkLogin()" class="w-full h-16 flex items-center justify-center gap-4 bg-[#0077FF] hover:brightness-110 active:scale-[0.97] transition-all rounded-[12px] shadow-lg shadow-[#0077FF]/30">
-                        <svg class="w-8 h-8" viewBox="0 0 24 24" fill="white">
-                            <path d="M12 0c-6.627 0-12 5.373-12 12s5.373 12 12 12 12-5.373 12-12-5.373-12-12-12zm5.833 17.333h-1.75c-.53 0-.7-.42-1.66-1.38-.84-.8-1.21-.9-1.42-.9-.3 0-.38.08-.38.51v1.1c0 .4-.13.67-1.17.67-1.72 0-3.62-1.04-4.96-2.95-2-2.85-2.57-5.01-2.57-5.44 0-.25.1-.48.58-.48h1.75c.43 0 .59.19.75.62.86 2.5 2.31 4.7 2.91 4.7.22 0 .32-.1.32-.65V10c0-.7-.41-.76-.41-1.01 0-.12.1-.24.26-.24h2.74c.23 0 .33.11.33.36v3.7c0 .4.18.54.34.54.26 0 .47-.14.94-.61 1.05-1.18 1.84-3.5 1.84-3.5.12-.3.29-.49.72-.49h1.75c.53 0 .65.27.53.67-.38 1.4-2.5 4.36-2.5 4.36-.2.33-.27.46 0 .82.2.26.85.83 1.28 1.34.78.93 1.37 1.7 1.53 2.23.16.53-.1.82-.63.82z"/>
-                        </svg>
-                        <span class="text-base font-bold text-white">Войти через ВКонтакте</span>
-                    </button>
-
-                    <div id="vk-oauth-list-container" class="flex justify-center w-full py-2"></div>
+                    <!-- VK Section (One Tap Only) -->
+                    <div id="vk-onetap-container" class="w-full min-h-[56px]"></div>
 
                     <!-- Telegram Button -->
-                    <div id="tg-login-container" class="flex justify-center w-full py-2">
-                        <button onclick="handleTelegramLogin()" class="w-full h-16 flex items-center justify-center gap-4 bg-[#24A1DE] hover:brightness-110 active:scale-[0.97] transition-all rounded-[12px] shadow-lg shadow-[#24A1DE]/30">
-                            <svg class="w-8 h-8" viewBox="0 0 24 24" fill="white">
-                                <path d="M12 0c-6.627 0-12 5.373-12 12s5.373 12 12 12 12-5.373 12-12-5.373-12-12-12zm5.894 8.221l-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.446 1.394c-.14.14-.26.26-.54.26l.213-3.05 5.56-5.02c.24-.213-.054-.33-.373-.12l-6.87 4.33-2.96-.924c-.64-.203-.654-.64.135-.954l11.566-4.458c.538-.196 1.006.128.832.954z"/>
-                            </svg>
-                            <span class="text-base font-bold text-white">Войти через Telegram</span>
-                        </button>
-                    </div>
+                    <button onclick="handleTelegramLogin()" class="w-full h-14 flex items-center justify-center gap-4 bg-[#24A1DE] hover:brightness-110 active:scale-[0.97] transition-all rounded-[12px] shadow-sm">
+                        <svg class="w-6 h-6" viewBox="0 0 24 24" fill="white">
+                            <path d="M12 0c-6.627 0-12 5.373-12 12s5.373 12 12 12 12-5.373 12-12-5.373-12-12-12zm5.894 8.221l-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.446 1.394c-.14.14-.26.26-.54.26l.213-3.05 5.56-5.02c.24-.213-.054-.33-.373-.12l-6.87 4.33-2.96-.924c-.64-.203-.654-.64.135-.954l11.566-4.458c.538-.196 1.006.128.832.954z"/>
+                        </svg>
+                        <span class="text-sm font-bold text-white">Войти через Telegram</span>
+                    </button>
 
-                    <div class="relative py-4">
-                        <div class="absolute inset-0 flex items-center"><div class="w-full border-t border-outline-variant/30"></div></div>
-                        <div class="relative flex justify-center text-[10px] uppercase tracking-[0.2em] font-bold"><span class="bg-bg-main px-4 text-on-surface-variant/40">Или по почте</span></div>
+                    <div class="relative py-2">
+                        <div class="absolute inset-0 flex items-center"><div class="w-full border-t border-outline-variant/20"></div></div>
+                        <div class="relative flex justify-center text-[9px] uppercase tracking-[0.2em] font-black"><span class="bg-bg-main px-4 text-on-surface-variant/30">Или по почте</span></div>
                     </div>
 
                     <!-- Magic Link Section -->
                     <div class="space-y-3">
-                        <div class="relative">
-                            <input id="magic-email" type="email" placeholder="email@example.com" class="w-full h-14 bg-bg-main border border-outline-variant/50 focus:border-primary outline-none px-5 rounded-[12px] text-sm transition-all">
-                        </div>
-                        <button id="magic-btn" onclick="handleMagicLogin()" class="w-full h-14 flex items-center justify-center gap-3 bg-surface-container-high hover:bg-surface-container-highest active:scale-[0.98] transition-all rounded-[12px] border border-outline-variant/30">
-                            <span class="material-symbols-outlined text-primary text-xl">magic_button</span>
-                            <span class="text-sm font-bold text-on-surface">Войти по ссылке</span>
+                        <input id="magic-email" type="email" placeholder="email@example.com" class="w-full h-12 bg-bg-main border border-outline-variant/30 focus:border-primary outline-none px-5 rounded-[12px] text-sm transition-all text-center">
+                        <button id="magic-btn" onclick="handleMagicLogin()" class="w-full h-12 flex items-center justify-center gap-3 bg-surface-container-high hover:bg-surface-container-highest active:scale-[0.98] transition-all rounded-[12px] border border-outline-variant/20">
+                            <span class="material-symbols-outlined text-primary text-lg">magic_button</span>
+                            <span class="text-xs font-bold text-on-surface uppercase tracking-widest">Войти по ссылке</span>
                         </button>
                     </div>
                 </div>
@@ -382,25 +369,8 @@ function initVkOneTap() {
 }
 
 function initVkFloatingOneTap() {
-    if (!window.VKIDSDK) return;
-    
-    const VKID = window.VKIDSDK;
-    const floatingOneTap = new VKID.FloatingOneTap();
-
-    floatingOneTap.render({
-        appName: 'Wbreply AI',
-        showAlternativeLogin: true
-    })
-    .on(VKID.WidgetEvents.ERROR, (err) => {
-        // Only log if it's not a "already shown" error or similar
-        console.warn('VK FloatingOneTap (Info):', err);
-    })
-    .on(VKID.FloatingOneTapInternalEvents.LOGIN_SUCCESS, function (payload) {
-        const code = payload.code;
-        if (code) {
-            window.location.href = `/api/auth/vk/callback?code=${code}`;
-        }
-    });
+    // Disabled to avoid UI clutter as requested
+    return;
 }
 
 function initVkOAuthList() {
