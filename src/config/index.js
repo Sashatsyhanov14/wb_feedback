@@ -25,5 +25,10 @@ module.exports = {
   robokassaPassword1: process.env.ROBOKASSA_PASSWORD_1,
   robokassaPassword2: process.env.ROBOKASSA_PASSWORD_2,
   robokassaIsTest: process.env.ROBOKASSA_IS_TEST === 'true',
+  
+  // YooKassa
+  yookassaShopId: process.env.YOOKASSA_SHOP_ID,
+  yookassaSecretKey: process.env.YOOKASSA_SECRET_KEY,
+
   jwtSecret: process.env.JWT_SECRET || 'your_fallback_secret_change_me'
 };

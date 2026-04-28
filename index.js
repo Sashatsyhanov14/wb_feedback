@@ -75,8 +75,8 @@ app.get('/app', (req, res) => {
 // Initialize background jobs
 initJobs();
 
-// Launch Bot
-telegramService.launch();
+// Launch Bot (Polling disabled for users, only sending admin notifications)
+// telegramService.launch();
 
 // Health check
 app.get('/health', (req, res) => {

@@ -199,6 +199,14 @@ function showView(view) {
         if (mobileHeader) mobileHeader.style.display = '';
     }
 
+    // Google Analytics Virtual Page View
+    if (typeof gtag === 'function') {
+        gtag('event', 'page_view', { page_path: '/' + view });
+        if (view === 'login') {
+            gtag('event', 'view_login_page');
+        }
+    }
+
     // Update Nav active classes (Mobile & Desktop)
     const navItems = document.querySelectorAll('.tab-item');
     navItems.forEach(item => {
@@ -287,7 +295,7 @@ function renderLogin() {
                         <span class="material-symbols-outlined text-sm">verified_user</span>
                         <p class="text-[9px] font-bold uppercase tracking-[0.3em]">Secure Auth System</p>
                     </div>
-                    <p class="text-[10px] font-medium tracking-[0.1em]">© 2025 WB RESPONSE AI</p>
+                    <p class="text-[10px] font-medium tracking-[0.1em]">© 2026 WBREPLY AI</p>
                 </div>
             </div>
         </div>
@@ -331,14 +339,17 @@ async function handleTestLogin(provider) {
 }
 
 async function handleGoogleLogin() {
+    if (typeof gtag === 'function') gtag('event', 'login_google');
     window.location.href = '/api/auth/google';
 }
 
 async function handleVkLogin() {
+    if (typeof gtag === 'function') gtag('event', 'login_vk');
     window.location.href = '/api/auth/vk';
 }
 
 async function handleMagicLogin() {
+    if (typeof gtag === 'function') gtag('event', 'login_magic');
     const email = document.getElementById('magic-email').value;
     if (!email || !email.includes('@')) {
         return showToast('Введите корректный email', true);
@@ -690,6 +701,7 @@ function renderSubscription() {
 
 // Actions
 async function handleSaveSettings() {
+    if (typeof gtag === 'function') gtag('event', 'save_settings');
     state.settings.wb_token = document.getElementById('wb-token-input').value;
     state.settings.custom_instructions = document.getElementById('ai-instructions-input').value;
     
@@ -751,7 +763,7 @@ function renderInterface() {
                         <span class="material-symbols-outlined text-primary">info</span>
                         <div class="space-y-1">
                             <h4 class="text-text-main font-bold text-xs sm:text-sm uppercase tracking-widest">Версия ПО</h4>
-                            <p class="text-xs text-on-surface-variant">WB Response v2.4.0 (Стабильная сборка). Система готова к работе.</p>
+                            <p class="text-xs text-on-surface-variant">WBREPLY AI v2.4.0 (Стабильная сборка). Система готова к работе.</p>
                         </div>
                     </div>
                 </section>
@@ -776,6 +788,7 @@ async function handleSync() {
 
 
 async function handlePayment() {
+    if (typeof gtag === 'function') gtag('event', 'click_payment');
     showToast('Обработка...');
     try {
         const res = await fetch('/api/payments/create', { method: 'POST' });

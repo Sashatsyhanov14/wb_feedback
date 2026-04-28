@@ -1,92 +1,117 @@
 const express = require('express');
 const router = express.Router();
+const axios = require('axios');
 const crypto = require('crypto');
 const config = require('../config');
 const supabase = require('../db/supabase');
 const telegramService = require('../services/telegramService');
 const authMiddleware = require('../middleware/authMiddleware');
 
-const SUBSCRIPTION_PRICE = 749; // Fixed price
+const SUBSCRIPTION_PRICE = 749; // Фиксированная цена
 
-// 1. Create Payment URL
+// 1. Создание платежа (YooKassa)
 router.post('/create', authMiddleware, async (req, res) => {
   try {
     const sellerId = req.user.sellerId;
-
-    const invId = Date.now(); // Unique ID for this transaction
-    const mLogin = config.robokassaMerchantLogin;
-    const p1 = config.robokassaPassword1;
-    const isTest = config.robokassaIsTest ? 1 : 0;
     
-    // shp_userId is a custom parameter defined by Robokassa to track the user
-    const signature = crypto.createHash('md5')
-      .update(`${mLogin}:${SUBSCRIPTION_PRICE}:${invId}:${p1}:shp_userId=${sellerId}`)
-      .digest('hex');
+    if (!config.yookassaShopId || !config.yookassaSecretKey) {
+        throw new Error('YooKassa configuration is missing');
+    }
 
-    const url = `https://auth.robokassa.ru/Merchant/Index.aspx?` + 
-      `MerchantLogin=${mLogin}` +
-      `&OutSum=${SUBSCRIPTION_PRICE}` +
-      `&InvId=${invId}` +
-      `&Description=${encodeURIComponent('Подписка WBReply AI - 30 дней')}` +
-      `&SignatureValue=${signature}` +
-      `&shp_userId=${sellerId}` +
-      (isTest ? `&IsTest=1` : '');
+    const idempotenceKey = crypto.randomUUID();
+    const auth = Buffer.from(`${config.yookassaShopId}:${config.yookassaSecretKey}`).toString('base64');
 
-    res.json({ url });
+    const paymentData = {
+      amount: {
+        value: SUBSCRIPTION_PRICE.toFixed(2),
+        currency: 'RUB'
+      },
+      capture: true,
+      confirmation: {
+        type: 'redirect',
+        return_url: 'https://wbreplyai.ru/app#success'
+      },
+      description: `Подписка WBREPLY AI - 30 дней`,
+      metadata: {
+        sellerId: sellerId.toString()
+      }
+    };
+
+    console.log(`[YooKassa] Creating payment for seller: ${sellerId}`);
+
+    const response = await axios.post('https://api.yookassa.ru/v3/payments', paymentData, {
+      headers: {
+        'Idempotence-Key': idempotenceKey,
+        'Authorization': `Basic ${auth}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    res.json({ url: response.data.confirmation.confirmation_url });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error('[YooKassa] Create Error:', error.response?.data || error.message);
+    res.status(500).json({ error: 'Ошибка при создании платежа' });
   }
 });
 
-// 2. Result URL (Callback from Robokassa)
-// Robokassa calls this URL when payment is successful
-router.post('/robokassa/result', async (req, res) => {
+// 2. Webhook (Обработка уведомлений от ЮKassa)
+router.post('/yookassa/webhook', async (req, res) => {
   try {
-    const { OutSum, InvId, SignatureValue, shp_userId } = req.body;
-    const p2 = config.robokassaPassword2;
-
-    // Verify Signature
-    const mySignature = crypto.createHash('md5')
-      .update(`${OutSum}:${InvId}:${p2}:shp_userId=${shp_userId}`)
-      .digest('hex')
-      .toUpperCase();
-
-    if (SignatureValue.toUpperCase() !== mySignature) {
-      console.error('[Robokassa] Invalid signature received');
-      return res.send('error:bad signature');
+    const event = req.body;
+    
+    // Проверяем тип события
+    if (event.event !== 'payment.succeeded') {
+        return res.sendStatus(200); // Игнорируем другие события
     }
 
-    console.log(`[Robokassa] Payment success for user ${shp_userId}. Amount: ${OutSum}`);
+    const payment = event.object;
+    const sellerId = payment.metadata?.sellerId;
+    const amount = payment.amount?.value;
 
-    // Update Subscription in Supabase
+    if (!sellerId) {
+        console.error('[YooKassa Webhook] No sellerId in metadata');
+        return res.sendStatus(200);
+    }
+
+    console.log(`[YooKassa Webhook] Payment succeeded for seller ${sellerId}. Amount: ${amount}`);
+
+    // Продлеваем подписку в БД
     const { data: seller, error: sellerError } = await supabase
       .from('sellers')
       .select('subscription_expires_at')
-      .eq('id', shp_userId)
+      .eq('id', sellerId)
       .single();
 
-    if (!sellerError) {
-      const currentExpiry = seller.subscription_expires_at ? new Date(seller.subscription_expires_at) : new Date();
-      const baseDate = currentExpiry > new Date() ? currentExpiry : new Date();
-      const newExpiry = new Date(baseDate.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString();
-
-      await supabase
-        .from('sellers')
-        .update({ 
-          subscription_status: 'premium', 
-          subscription_expires_at: newExpiry 
-        })
-        .eq('id', shp_userId);
-
-      // Notify Admin
-      if (config.adminId) {
-        await telegramService.sendMessage(config.adminId, `💰 <b>Поступление оплаты!</b>\nЮзер: <code>${shp_userId}</code>\nСумма: ${OutSum} руб.`);
-      }
+    if (sellerError) {
+        console.error('[YooKassa Webhook] Seller lookup error:', sellerError);
+        return res.sendStatus(200);
     }
 
-    res.send(`OK${InvId}`); // Robokassa requirement
+    const currentExpiry = seller.subscription_expires_at ? new Date(seller.subscription_expires_at) : new Date();
+    const baseDate = currentExpiry > new Date() ? currentExpiry : new Date();
+    const newExpiry = new Date(baseDate.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString();
+
+    const { error: updateError } = await supabase
+      .from('sellers')
+      .update({ 
+        subscription_status: 'premium', 
+        subscription_expires_at: newExpiry 
+      })
+      .eq('id', sellerId);
+
+    if (updateError) {
+        console.error('[YooKassa Webhook] Update subscription error:', updateError);
+        return res.sendStatus(500);
+    }
+
+    // Уведомляем админа
+    if (config.adminId) {
+      await telegramService.sendMessage(config.adminId, `💰 <b>Оплата ЮKassa!</b>\nЮзер: <code>${sellerId}</code>\nСумма: ${amount} руб.`);
+    }
+
+    res.sendStatus(200);
   } catch (error) {
-    console.error('[Robokassa] Error:', error);
+    console.error('[YooKassa Webhook] Error:', error.message);
     res.status(500).send('error');
   }
 });
