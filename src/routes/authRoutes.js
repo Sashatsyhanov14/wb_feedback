@@ -368,15 +368,17 @@ router.get('/vk/callback', async (req, res) => {
   try {
     const host = req.headers.host;
     const protocol = host.includes('wbreplyai.ru') ? 'https' : (req.headers['x-forwarded-proto'] || req.protocol);
-    const redirectUri = config.vkRedirectUri || `${protocol}://${host}/api/auth/vk/callback`;
+    const redirectUri = `${protocol}://${host}/api/auth/vk/callback`;
     
+    console.log('VK Token Exchange with redirectUri:', redirectUri);
+
     // Exchange code for access token
     const tokenRes = await axios.get('https://oauth.vk.com/access_token', {
       params: {
         client_id: config.vkClientId,
         client_secret: config.vkClientSecret,
         redirect_uri: redirectUri,
-        code,
+        code: code,
       },
     });
 
