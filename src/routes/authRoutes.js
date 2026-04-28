@@ -80,6 +80,65 @@ router.post('/tg-callback', async (req, res) => {
   }
 });
 
+// 1.b. Telegram Login Callback (GET - for bot login_url)
+router.get('/tg-callback', async (req, res) => {
+  try {
+    const userData = req.query;
+    
+    if (!verifyTelegramHash(userData)) {
+      return res.redirect('/login?error=invalid_tg_hash');
+    }
+
+    const tgId = String(userData.id);
+
+    // Upsert user in database
+    let { data: seller, error } = await supabase
+      .from('sellers')
+      .select('id')
+      .eq('auth_provider', 'telegram')
+      .eq('auth_provider_id', tgId)
+      .maybeSingle();
+
+    if (!seller) {
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 3);
+
+      const { data: newSeller, error: insertError } = await supabase
+        .from('sellers')
+        .insert({
+          auth_provider: 'telegram',
+          auth_provider_id: tgId,
+          display_name: userData.first_name + (userData.last_name ? ' ' + userData.last_name : ''),
+          avatar_url: userData.photo_url || null,
+          subscription_status: 'trial',
+          subscription_expires_at: expiresAt.toISOString()
+        })
+        .select('id')
+        .single();
+        
+      if (insertError) throw insertError;
+      seller = newSeller;
+    }
+
+    const token = jwt.sign(
+      { sellerId: seller.id },
+      config.jwtSecret,
+      { expiresIn: '30d' }
+    );
+
+    res.cookie('auth_token', token, {
+      httpOnly: false,
+      secure: config.nodeEnv === 'production',
+      maxAge: 30 * 24 * 60 * 60 * 1000
+    });
+
+    res.redirect('/');
+  } catch (error) {
+    console.error('TG Auth Error:', error.message);
+    res.redirect('/login?error=tg_auth_failed');
+  }
+});
+
 // 2. Get Me (Check session)
 const authMiddleware = require('../middleware/authMiddleware');
 router.get('/me', authMiddleware, async (req, res) => {
@@ -230,4 +289,108 @@ router.get('/google/callback', async (req, res) => {
   }
 });
 
+// 6. VK Login
+router.get('/vk', (req, res) => {
+  const rootUrl = 'https://oauth.vk.com/authorize';
+  const options = {
+    client_id: config.vkClientId,
+    redirect_uri: config.vkRedirectUri,
+    display: 'page',
+    scope: 'email',
+    response_type: 'code',
+    v: '5.131',
+  };
+
+  const qs = new URLSearchParams(options);
+  res.redirect(`${rootUrl}?${qs.toString()}`);
+});
+
+// VK OAuth Callback
+router.get('/vk/callback', async (req, res) => {
+  const code = req.query.code;
+
+  if (!code) {
+    return res.redirect('/login?error=vk_no_code');
+  }
+
+  try {
+    // Exchange code for access token
+    const tokenRes = await axios.get('https://oauth.vk.com/access_token', {
+      params: {
+        client_id: config.vkClientId,
+        client_secret: config.vkClientSecret,
+        redirect_uri: config.vkRedirectUri,
+        code,
+      },
+    });
+
+    const { access_token, user_id, email } = tokenRes.data;
+
+    // Get user profile
+    const profileRes = await axios.get('https://api.vk.com/method/users.get', {
+      params: {
+        user_ids: user_id,
+        fields: 'photo_max,screen_name',
+        access_token,
+        v: '5.131',
+      },
+    });
+
+    if (!profileRes.data.response || !profileRes.data.response[0]) {
+      throw new Error('Failed to get VK profile');
+    }
+
+    const profile = profileRes.data.response[0];
+
+    // Upsert user in sellers table
+    let { data: seller, error: findError } = await supabase
+      .from('sellers')
+      .select('id')
+      .eq('auth_provider', 'vk')
+      .eq('auth_provider_id', String(user_id))
+      .maybeSingle();
+
+    if (!seller) {
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 3);
+
+      const { data: newSeller, error: insertError } = await supabase
+        .from('sellers')
+        .insert({
+          auth_provider: 'vk',
+          auth_provider_id: String(user_id),
+          email: email || null,
+          display_name: `${profile.first_name} ${profile.last_name}`,
+          avatar_url: profile.photo_max,
+          subscription_status: 'trial',
+          subscription_expires_at: expiresAt.toISOString()
+        })
+        .select('id')
+        .single();
+      
+      if (insertError) throw insertError;
+      seller = newSeller;
+    }
+
+    // Issue JWT
+    const token = jwt.sign(
+      { sellerId: seller.id },
+      config.jwtSecret,
+      { expiresIn: '30d' }
+    );
+
+    res.cookie('auth_token', token, {
+      httpOnly: false,
+      secure: config.nodeEnv === 'production',
+      maxAge: 30 * 24 * 60 * 60 * 1000
+    });
+
+    res.redirect('/');
+  } catch (error) {
+    console.error('VK Auth Error:', error.response?.data || error.message);
+    res.redirect('/login?error=vk_auth_failed');
+  }
+});
+
 module.exports = router;
+

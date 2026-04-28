@@ -14,6 +14,9 @@ module.exports = {
   googleClientId: process.env.GOOGLE_CLIENT_ID,
   googleClientSecret: process.env.GOOGLE_CLIENT_SECRET,
   googleRedirectUri: process.env.GOOGLE_REDIRECT_URI || 'https://wbreplyai.ru/api/auth/google/callback',
+  vkClientId: process.env.VK_CLIENT_ID,
+  vkClientSecret: process.env.VK_CLIENT_SECRET,
+  vkRedirectUri: process.env.VK_REDIRECT_URI || 'https://wbreplyai.ru/api/auth/vk/callback',
   adminId: '795056847',
   adminIdUsername: process.env.TELEGRAM_ADMIN_USERNAME || '@edh4hhr',
   

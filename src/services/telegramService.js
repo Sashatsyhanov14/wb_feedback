@@ -39,6 +39,7 @@ class TelegramService {
         parse_mode: 'Markdown',
         reply_markup: {
           inline_keyboard: [
+            [{ text: '🌐 Открыть сайт (Автоматический вход)', login_url: { url: 'https://wbreplyai.ru/api/auth/tg-callback' } }],
             [{ text: '💎 Вход в Личный Кабинет', web_app: { url: process.env.APP_URL || 'https://wb-feedback.vercel.app' } }],
             [{ text: '🆘 Тех. Поддержка', url: 'https://t.me/edh4hhr' }]
           ]
