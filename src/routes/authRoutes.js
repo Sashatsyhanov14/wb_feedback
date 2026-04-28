@@ -129,7 +129,8 @@ router.get('/tg-callback', async (req, res) => {
     res.cookie('auth_token', token, {
       httpOnly: false,
       secure: config.nodeEnv === 'production',
-      maxAge: 30 * 24 * 60 * 60 * 1000
+      maxAge: 30 * 24 * 60 * 60 * 1000,
+      path: '/'
     });
 
     res.redirect('/');
@@ -289,7 +290,8 @@ router.get('/google/callback', async (req, res) => {
     res.cookie('auth_token', token, {
       httpOnly: false,
       secure: config.nodeEnv === 'production',
-      maxAge: 30 * 24 * 60 * 60 * 1000
+      maxAge: 30 * 24 * 60 * 60 * 1000,
+      path: '/'
     });
 
     res.redirect('/');
@@ -408,7 +410,8 @@ router.get('/vk/callback', async (req, res) => {
     res.cookie('auth_token', token, {
       httpOnly: false,
       secure: config.nodeEnv === 'production',
-      maxAge: 30 * 24 * 60 * 60 * 1000
+      maxAge: 30 * 24 * 60 * 60 * 1000,
+      path: '/'
     });
 
     res.redirect('/');
@@ -506,7 +509,8 @@ router.get('/callback', async (req, res) => {
     res.cookie('auth_token', token, {
       httpOnly: false,
       secure: config.nodeEnv === 'production',
-      maxAge: 30 * 24 * 60 * 60 * 1000
+      maxAge: 30 * 24 * 60 * 60 * 1000,
+      path: '/'
     });
 
     res.redirect('/');
