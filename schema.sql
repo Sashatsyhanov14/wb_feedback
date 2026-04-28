@@ -57,3 +57,15 @@ alter table chat_history disable row level security;
 create index if not exists idx_review_logs_seller_id on review_logs(seller_id);
 create index if not exists idx_chat_history_seller_id on chat_history(seller_id);
 create index if not exists idx_sellers_auth on sellers(auth_provider, auth_provider_id);
+create table if not exists support_tickets (
+    id uuid default uuid_generate_v4() primary key,
+    seller_id uuid references sellers(id) on delete cascade,
+    type text not null, -- 'support' or 'feedback'
+    message text not null,
+    admin_reply text,
+    status text default 'open', -- 'open', 'replied', 'closed'
+    created_at timestamp with time zone default now(),
+    updated_at timestamp with time zone default now()
+);
+alter table support_tickets disable row level security;
+create index if not exists idx_support_tickets_seller_id on support_tickets(seller_id);

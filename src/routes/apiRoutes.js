@@ -322,4 +322,84 @@ router.post('/sync', authMiddleware, async (req, res) => {
   }
 });
 
+// Get support tickets for user
+router.get('/support', authMiddleware, async (req, res) => {
+  try {
+    const sellerId = req.user.sellerId;
+    const { data, error } = await supabase
+      .from('support_tickets')
+      .select('*')
+      .eq('seller_id', sellerId)
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    res.json(data || []);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Create a new support ticket / feedback
+router.post('/support', authMiddleware, async (req, res) => {
+  try {
+    const sellerId = req.user.sellerId;
+    const { type, message } = req.body;
+    
+    const { data, error } = await supabase
+      .from('support_tickets')
+      .insert({ seller_id: sellerId, type, message })
+      .select()
+      .single();
+      
+    if (error) throw error;
+    
+    if (config.adminId) {
+      await telegramService.sendMessage(config.adminId, `📬 <b>Новое обращение (${type})</b>\nОт: <code>${sellerId}</code>\nТекст: ${message}`);
+    }
+    res.json({ success: true, ticket: data });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Admin: Get all tickets
+router.get('/admin/support', authMiddleware, async (req, res) => {
+  try {
+    const sellerId = req.user.sellerId;
+    if (sellerId !== process.env.ADMIN_SELLER_ID && sellerId !== config.adminId) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+    const { data, error } = await supabase
+      .from('support_tickets')
+      .select('*, sellers(email, display_name)')
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    res.json(data || []);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Admin: Reply to a ticket
+router.post('/admin/support/:id/reply', authMiddleware, async (req, res) => {
+  try {
+    const sellerId = req.user.sellerId;
+    if (sellerId !== process.env.ADMIN_SELLER_ID && sellerId !== config.adminId) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+    const { reply } = req.body;
+    
+    const { data, error } = await supabase
+      .from('support_tickets')
+      .update({ admin_reply: reply, status: 'replied', updated_at: new Date().toISOString() })
+      .eq('id', req.params.id)
+      .select()
+      .single();
+      
+    if (error) throw error;
+    res.json({ success: true, ticket: data });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 module.exports = router;

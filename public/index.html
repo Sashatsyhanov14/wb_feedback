@@ -104,7 +104,7 @@
             flex-grow: 1;
             min-width: 0;
             padding-top: 5rem;
-            padding-bottom: 7rem;
+            padding-bottom: 10rem;
             background-color: var(--c-bg);
         }
 
@@ -232,6 +232,10 @@
                     <span class="material-symbols-outlined text-xl">settings</span>
                     <span class="nav-text">Система</span>
                 </a>
+                <a onclick="showView('admin')" class="tab-item items-center gap-4 cursor-pointer admin-only" style="display: none;">
+                    <span class="material-symbols-outlined text-xl">shield</span>
+                    <span class="nav-text">Админ</span>
+                </a>
             </nav>
             
             <div class="mt-auto border-t pt-6 flex flex-col gap-4" style="border-color: var(--c-border)">
@@ -278,6 +282,10 @@
         <a id="nav-interface" class="tab-item flex-1 flex flex-col items-center justify-center transition-all active:scale-95" onclick="showView('interface')">
             <span class="material-symbols-outlined text-xl">settings</span>
             <span class="text-[10px] font-black uppercase tracking-[0.2em] mt-1.5">Система</span>
+        </a>
+        <a id="nav-admin" class="tab-item flex-1 flex-col items-center justify-center transition-all active:scale-95 admin-only" style="display: none;" onclick="showView('admin')">
+            <span class="material-symbols-outlined text-xl">shield</span>
+            <span class="text-[10px] font-black uppercase tracking-[0.2em] mt-1.5">Админ</span>
         </a>
     </nav>
 

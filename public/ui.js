@@ -13,7 +13,9 @@ let state = {
     currentView: 'reviews',
     stats: { approved: 0, pending: 0, total: 0, approvedToday: 0 },
     adminStats: { totalSellers: 0, totalApproved: 0, newToday: 0, activeToday: 0, withoutToken: 0 },
-    adminUsers: []
+    adminUsers: [],
+    tickets: [],
+    adminTickets: []
 };
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -154,22 +156,28 @@ async function refreshData() {
             fetch(`/api/settings`).then(r => r.status === 200 ? r.json() : null),
             fetch(`/api/matrix`).then(r => r.status === 200 ? r.json() : null),
             fetch(`/api/stats`).then(r => r.status === 200 ? r.json() : null),
-            fetch(`/api/reviews`).then(r => r.status === 200 ? r.json() : null)
+            fetch(`/api/reviews`).then(r => r.status === 200 ? r.json() : null),
+            fetch(`/api/support`).then(r => r.status === 200 ? r.json() : null)
         ];
 
         if (state.sellerId.toString() === adminId) {
-            requests.push(fetch(`/api/admin/stats/${adminId}`).then(r => r.status === 200 ? r.json() : null));
-            requests.push(fetch(`/api/admin/users/${adminId}`).then(r => r.status === 200 ? r.json() : null));
+            requests.push(fetch(`/api/admin/stats`).then(r => r.status === 200 ? r.json() : null));
+            // Removed admin/users fetch to keep it simple, or kept if needed
+            requests.push(fetch(`/api/admin/support`).then(r => r.status === 200 ? r.json() : null));
+            
+            // Show Admin tab in UI if not visible
+            document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'flex');
         }
 
-        const [settings, matrix, stats, reviews, adminStats, adminUsers] = await Promise.all(requests);
+        const [settings, matrix, stats, reviews, tickets, adminStats, adminTickets] = await Promise.all(requests);
 
         if (settings) state.settings = { ...state.settings, ...settings };
         if (matrix) state.matrix = matrix;
         if (stats) state.stats = stats;
         if (reviews) state.reviews = reviews;
+        if (tickets) state.tickets = tickets;
         if (adminStats) state.adminStats = adminStats;
-        if (adminUsers) state.adminUsers = adminUsers;
+        if (adminTickets) state.adminTickets = adminTickets;
     } catch (e) {
         console.error('Refresh data error:', e);
     }
@@ -231,6 +239,8 @@ function showView(view) {
         content.innerHTML = renderSubscription();
     } else if (view === 'interface') {
         content.innerHTML = renderInterface();
+    } else if (view === 'admin') {
+        content.innerHTML = renderAdmin();
     } else if (view === 'login') {
         content.innerHTML = renderLogin();
     }
@@ -507,7 +517,7 @@ window.onTelegramAuth = async function(user) {
 
 function renderSettings() {
     return `
-        <div class="max-w-2xl mx-auto space-y-10 animate-in pb-10">
+        <div class="max-w-2xl mx-auto space-y-10 animate-in pb-20">
             <header class="text-left">
                 <p class="text-primary text-[10px] font-black uppercase tracking-[0.3em] mb-2">Конфигурация</p>
                 <h2 class="font-headline text-3xl sm:text-4xl font-bold text-text-main tracking-tight">Бизнес-настройка</h2>
@@ -559,7 +569,7 @@ function renderReviews() {
     }
 
     return `
-        <div class="w-full space-y-8 animate-in pb-10">
+        <div class="w-full space-y-8 animate-in pb-20">
             <header>
                 <p class="text-primary text-[10px] font-black uppercase tracking-[0.3em] mb-2">Активность</p>
                 <h2 class="font-headline text-2xl sm:text-3xl font-bold text-text-main tracking-tight">Лента ответов</h2>
@@ -641,7 +651,7 @@ function renderSubscription() {
     const expiredDateStr = expiresAt ? new Date(expiresAt).toLocaleDateString() : '—';
     
     return `
-        <div class="max-w-2xl mx-auto space-y-8 animate-in pb-8">
+        <div class="max-w-2xl mx-auto space-y-8 animate-in pb-20">
             <header>
                 <p class="text-primary text-[10px] font-black uppercase tracking-[0.3em] mb-2">Финансы и показатели</p>
                 <h2 class="font-headline text-2xl sm:text-3xl font-bold text-text-main tracking-tight">Обзор аккаунта</h2>
@@ -736,7 +746,7 @@ function renderInterface() {
     const isDark = document.documentElement.classList.contains('dark');
     
     return `
-        <div class="max-w-2xl mx-auto space-y-8 animate-in pb-10">
+        <div class="max-w-2xl mx-auto space-y-8 animate-in pb-20">
             <header>
                 <p class="text-primary text-[10px] font-black uppercase tracking-[0.3em] mb-2">Система</p>
                 <h2 class="font-headline text-2xl sm:text-3xl font-bold text-text-main tracking-tight">Параметры интерфейса</h2>
@@ -755,8 +765,58 @@ function renderInterface() {
                         </div>
                     </div>
 
-
                 </section>
+
+                <section class="premium-card p-5 sm:p-8 space-y-6">
+                    <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-outline-variant/30 pb-6">
+                        <div class="flex items-center gap-4">
+                            <span class="material-symbols-outlined text-primary text-2xl">support_agent</span>
+                            <div>
+                                <h4 class="text-text-main font-bold text-xs sm:text-sm uppercase tracking-widest">Служба поддержки</h4>
+                                <p class="text-[11px] text-on-surface-variant mt-1">Помощь с настройкой и ответы на вопросы</p>
+                            </div>
+                        </div>
+                        <button onclick="openSupportModal('support')" class="flex-shrink-0 text-[10px] font-black uppercase tracking-widest bg-bg-main border border-outline-variant hover:border-primary text-text-main px-6 py-3 rounded-lg transition-colors">
+                            Написать в чат
+                        </button>
+                    </div>
+
+                    <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                        <div class="flex items-center gap-4">
+                            <span class="material-symbols-outlined text-primary text-2xl">rate_review</span>
+                            <div>
+                                <h4 class="text-text-main font-bold text-xs sm:text-sm uppercase tracking-widest">Оставить отзыв</h4>
+                                <p class="text-[11px] text-on-surface-variant mt-1">Поделитесь впечатлениями о WBREPLY AI</p>
+                            </div>
+                        </div>
+                        <button onclick="openSupportModal('feedback')" class="flex-shrink-0 text-[10px] font-black uppercase tracking-widest bg-primary text-white dark:text-black px-6 py-3 rounded-lg transition-colors hover:brightness-110 shadow-lg shadow-primary/20">
+                            Оценить сервис
+                        </button>
+                    </div>
+                </section>
+
+                ${state.tickets && state.tickets.length > 0 ? `
+                <section class="premium-card p-5 sm:p-8 space-y-4">
+                    <h4 class="text-text-main font-bold text-xs sm:text-sm uppercase tracking-widest border-b border-outline-variant/30 pb-4 mb-4">История обращений</h4>
+                    <div class="space-y-4">
+                        ${state.tickets.map(t => `
+                            <div class="p-4 bg-bg-main border border-outline-variant rounded-lg space-y-2">
+                                <div class="flex justify-between items-center">
+                                    <span class="text-[10px] font-black uppercase tracking-widest ${t.type === 'support' ? 'text-blue-500' : 'text-purple-500'}">${t.type === 'support' ? 'Поддержка' : 'Отзыв'}</span>
+                                    <span class="text-[10px] text-on-surface-variant">${new Date(t.created_at).toLocaleDateString()}</span>
+                                </div>
+                                <p class="text-xs text-text-main">${t.message}</p>
+                                ${t.admin_reply ? `
+                                    <div class="mt-3 pl-3 border-l-2 border-primary space-y-1">
+                                        <p class="text-[9px] font-black uppercase tracking-widest text-primary">Ответ поддержки</p>
+                                        <p class="text-xs text-text-main">${t.admin_reply}</p>
+                                    </div>
+                                ` : '<p class="text-[9px] font-bold uppercase text-on-surface-variant mt-2">Ожидает ответа...</p>'}
+                            </div>
+                        `).join('')}
+                    </div>
+                </section>
+                ` : ''}
 
                 <section class="premium-card p-5 sm:p-8 border-primary/20 bg-primary/5">
                     <div class="flex items-start gap-4">
@@ -797,6 +857,132 @@ async function handlePayment() {
             window.location.href = data.url;
         } else { showToast('Ошибка платежа', true); }
     } catch (e) { showToast('Ошибка сети', true); }
+}
+
+// Support Modal Logic
+function openSupportModal(type) {
+    if (typeof gtag === 'function') gtag('event', 'click_' + type);
+    const existing = document.getElementById('support-modal');
+    if (existing) existing.remove();
+
+    const title = type === 'support' ? 'Служба поддержки' : 'Оставить отзыв';
+    const placeholder = type === 'support' ? 'Опишите вашу проблему или задайте вопрос...' : 'Что вам нравится в сервисе? Чего не хватает?';
+
+    const modal = document.createElement('div');
+    modal.id = 'support-modal';
+    modal.className = 'fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in';
+    modal.innerHTML = \`
+        <div class="premium-card w-full max-w-md p-6 space-y-5" onclick="event.stopPropagation()">
+            <div class="flex justify-between items-center">
+                <h3 class="font-headline text-xl font-bold tracking-tight text-text-main">\${title}</h3>
+                <button onclick="document.getElementById('support-modal').remove()" class="text-on-surface-variant hover:text-text-main transition-colors">
+                    <span class="material-symbols-outlined">close</span>
+                </button>
+            </div>
+            <textarea id="support-message" class="w-full h-32 bg-bg-main border border-outline-variant outline-none p-4 text-text-main text-sm rounded-lg focus:border-primary resize-none" placeholder="\${placeholder}"></textarea>
+            <button onclick="submitSupport('\${type}')" class="primary-btn w-full py-3 text-xs uppercase tracking-widest">Отправить</button>
+        </div>
+    \`;
+    modal.onclick = () => modal.remove();
+    document.body.appendChild(modal);
+}
+
+async function submitSupport(type) {
+    const msg = document.getElementById('support-message').value.trim();
+    if (!msg) return showToast('Введите сообщение', true);
+
+    try {
+        const res = await fetch('/api/support', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ type, message: msg })
+        });
+        if (res.ok) {
+            showToast('Сообщение отправлено!');
+            document.getElementById('support-modal').remove();
+            await refreshData();
+            if (state.currentView === 'admin') showView('admin');
+        } else {
+            showToast('Ошибка отправки', true);
+        }
+    } catch (e) { showToast('Ошибка сети', true); }
+}
+
+async function adminReply(ticketId) {
+    const replyText = prompt('Ответ пользователю:');
+    if (!replyText) return;
+
+    try {
+        const res = await fetch(\`/api/admin/support/\${ticketId}/reply\`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ reply: replyText })
+        });
+        if (res.ok) {
+            showToast('Ответ сохранен');
+            await refreshData();
+            showView('admin');
+        }
+    } catch (e) { showToast('Ошибка сети', true); }
+}
+
+function renderAdmin() {
+    const s = state.adminStats || {};
+    const tkts = state.adminTickets || [];
+    
+    return \`
+        <div class="max-w-4xl mx-auto space-y-10 animate-in pb-20">
+            <header>
+                <p class="text-primary text-[10px] font-black uppercase tracking-[0.3em] mb-2">Админ-панель</p>
+                <h2 class="font-headline text-3xl font-bold text-text-main tracking-tight">Управление</h2>
+            </header>
+
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div class="premium-card p-5">
+                    <p class="text-[9px] font-black uppercase tracking-widest text-on-surface-variant mb-2">Юзеры</p>
+                    <p class="text-3xl font-bold text-text-main">\${s.totalSellers || 0}</p>
+                </div>
+                <div class="premium-card p-5">
+                    <p class="text-[9px] font-black uppercase tracking-widest text-on-surface-variant mb-2">Ответов</p>
+                    <p class="text-3xl font-bold text-text-main">\${s.totalApproved || 0}</p>
+                </div>
+                <div class="premium-card p-5">
+                    <p class="text-[9px] font-black uppercase tracking-widest text-on-surface-variant mb-2">Без токена</p>
+                    <p class="text-3xl font-bold text-red-500">\${s.withoutToken || 0}</p>
+                </div>
+                <div class="premium-card p-5">
+                    <p class="text-[9px] font-black uppercase tracking-widest text-on-surface-variant mb-2">Тикеты</p>
+                    <p class="text-3xl font-bold text-primary">\${tkts.filter(t => t.status === 'open').length}</p>
+                </div>
+            </div>
+
+            <section class="premium-card overflow-hidden">
+                <div class="p-5 border-b border-outline-variant bg-surface/50">
+                    <h3 class="font-bold text-sm uppercase tracking-widest">Обращения и Отзывы</h3>
+                </div>
+                <div class="divide-y divide-outline-variant">
+                    \${tkts.length === 0 ? '<div class="p-8 text-center text-on-surface-variant text-sm">Нет обращений</div>' : 
+                    tkts.map(t => \`
+                        <div class="p-5 space-y-3 \${t.status === 'open' ? 'bg-primary/5' : ''}">
+                            <div class="flex justify-between items-start">
+                                <div>
+                                    <span class="text-[10px] font-black uppercase tracking-widest \${t.type === 'support' ? 'text-blue-500' : 'text-purple-500'}">\${t.type}</span>
+                                    <span class="text-xs text-on-surface-variant ml-3">\${new Date(t.created_at).toLocaleString()}</span>
+                                    <p class="text-xs font-bold text-text-main mt-1">\${t.sellers?.display_name || t.sellers?.email || 'Юзер'}</p>
+                                </div>
+                                \${t.status === 'open' ? 
+                                  \`<button onclick="adminReply('\${t.id}')" class="text-xs bg-primary text-white px-3 py-1 rounded font-bold">Ответить</button>\` : 
+                                  \`<span class="text-[10px] font-black uppercase text-green-500">Отвечено</span>\`
+                                }
+                            </div>
+                            <p class="text-sm text-text-main bg-bg-main p-3 rounded border border-outline-variant/30">\${t.message}</p>
+                            \${t.admin_reply ? \`<div class="ml-4 pl-4 border-l-2 border-primary space-y-1"><p class="text-[10px] font-black uppercase text-primary">Ваш ответ</p><p class="text-sm text-text-main">\${t.admin_reply}</p></div>\` : ''}
+                        </div>
+                    \`).join('')}
+                </div>
+            </section>
+        </div>
+    \`;
 }
 
 // Utils
