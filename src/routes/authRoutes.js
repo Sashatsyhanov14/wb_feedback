@@ -162,7 +162,7 @@ router.get('/me', authMiddleware, async (req, res) => {
 
 // 3. Logout
 router.post('/logout', (req, res) => {
-  res.clearCookie('auth_token');
+  res.clearCookie('auth_token', { path: '/' });
   res.json({ success: true });
 });
 

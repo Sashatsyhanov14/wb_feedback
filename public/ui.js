@@ -185,7 +185,11 @@ async function refreshData() {
 }
 
 async function handleLogout() {
-    await fetch('/api/auth/logout', { method: 'POST' });
+    try { await fetch('/api/auth/logout', { method: 'POST' }); } catch(e) {}
+    // Clear all auth data from client
+    localStorage.removeItem('auth_token');
+    document.cookie = 'auth_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+    state.sellerId = null;
     window.location.href = '/';
 }
 
@@ -551,7 +555,7 @@ function renderSettings() {
                     </div>
                 </section>
 
-                <button onclick="handleSaveSettings()" class="primary-btn w-full py-4 sm:py-5 text-xs uppercase tracking-[0.2em] shadow-lg active:scale-[0.99] transition-all">
+                <button id="save-settings-btn" onclick="handleSaveSettings()" class="primary-btn w-full py-4 sm:py-5 text-xs uppercase tracking-[0.2em] shadow-lg active:scale-[0.99] transition-all">
                     Применить настройки
                 </button>
             </div>
@@ -577,7 +581,7 @@ function renderReviews() {
             </header>
 
             <!-- Mobile card layout -->
-            <div class="sm:hidden flex flex-col max-h-[70vh] overflow-y-auto space-y-3 pb-6 px-1 pr-2" style="overscroll-behavior: contain;">
+            <div class="sm:hidden flex flex-col max-h-[70vh] overflow-y-auto min-h-0 space-y-3 pb-6 px-1 pr-2" style="overscroll-behavior: contain;">
                 ${state.reviews.map(review => {
                     const isAuto = review.status === 'auto_posted';
                     return `
@@ -611,7 +615,7 @@ function renderReviews() {
                     <div class="col-span-4">Ответ ИИ</div>
                     <div class="col-span-1 text-right">Статус</div>
                 </div>
-                <div class="divide-y divide-outline-variant overflow-y-auto flex-1 relative" style="overscroll-behavior: contain;">
+                <div class="divide-y divide-outline-variant overflow-y-auto min-h-0 flex-1 relative" style="overscroll-behavior: contain;">
                     ${state.reviews.map(review => {
                         const isAuto = review.status === 'auto_posted';
                         return `
@@ -698,7 +702,7 @@ function renderSubscription() {
                     </div>
                 </div>
                 
-                <button onclick="handlePayment()" class="primary-btn w-full py-4 sm:py-5 text-xs uppercase tracking-[0.2em] shadow-lg active:scale-[0.99] transition-all">
+                <button id="payment-btn" onclick="handlePayment()" class="primary-btn w-full py-4 sm:py-5 text-xs uppercase tracking-[0.2em] shadow-lg active:scale-[0.99] transition-all">
                     Активировать безлимит
                 </button>
                 
@@ -716,6 +720,13 @@ async function handleSaveSettings() {
     state.settings.wb_token = document.getElementById('wb-token-input').value;
     state.settings.custom_instructions = document.getElementById('ai-instructions-input').value;
     
+    const btn = document.getElementById('save-settings-btn');
+    const originalContent = btn ? btn.innerHTML : 'Применить настройки';
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="flex items-center justify-center gap-2"><span class="animate-spin material-symbols-outlined text-sm">sync</span> Сохранение...</span>';
+    }
+    
     try {
         const res = await fetch('/api/settings', {
             method: 'POST',
@@ -729,6 +740,12 @@ async function handleSaveSettings() {
             showToast('Ошибка сохранения', true);
         }
     } catch (e) { showToast('Ошибка сети', true); }
+    finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = originalContent;
+        }
+    }
 }
 
 function setTheme(theme) {
@@ -816,8 +833,16 @@ function renderInterface() {
     `;
 }
 
-async function handleSync() {
+async function handleSync(btnEl) {
     if (!state.settings.wb_token) return showToast('Сначала добавьте API токен', true);
+    
+    const btn = btnEl || event?.currentTarget;
+    const originalContent = btn ? btn.innerHTML : null;
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = 'Синхронизация...';
+    }
+
     showToast('Синхронизация...');
     try {
         const res = await fetch('/api/sync', { method: 'POST' });
@@ -827,20 +852,46 @@ async function handleSync() {
             showView('reviews');
         } else { showToast('Ошибка синхронизации', true); }
     } catch (e) { showToast('Ошибка сети', true); }
+    finally {
+        if (btn && originalContent) {
+            btn.disabled = false;
+            btn.innerHTML = originalContent;
+        }
+    }
 }
 
 
 
 async function handlePayment() {
     if (typeof gtag === 'function') gtag('event', 'click_payment');
+    
+    const btn = document.getElementById('payment-btn');
+    const originalContent = btn ? btn.innerHTML : 'Активировать безлимит';
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = 'Обработка...';
+    }
+
     showToast('Обработка...');
     try {
         const res = await fetch('/api/payments/create', { method: 'POST' });
         const data = await res.json();
         if (data.url) {
             window.location.href = data.url;
-        } else { showToast('Ошибка платежа', true); }
-    } catch (e) { showToast('Ошибка сети', true); }
+        } else { 
+            showToast('Ошибка платежа', true); 
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = originalContent;
+            }
+        }
+    } catch (e) { 
+        showToast('Ошибка сети', true); 
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = originalContent;
+        }
+    }
 }
 
 // Support Modal Logic
@@ -929,7 +980,7 @@ function openSupportModal(type) {
                 </div>
                 
                 <!-- Chat Area -->
-                <div id="chat-messages-area" class="flex-1 overflow-y-auto p-4 bg-bg-main/50 relative" style="overscroll-behavior: contain;">
+                <div id="chat-messages-area" class="flex-1 min-h-0 overflow-y-auto p-4 bg-bg-main/50 relative" style="overscroll-behavior: contain;">
                     ${messagesHtml}
                 </div>
                 
@@ -937,7 +988,7 @@ function openSupportModal(type) {
                 <div class="p-3 sm:p-4 border-t border-outline-variant/30 shrink-0 bg-surface">
                     <div class="flex gap-2">
                         <input id="support-message" type="text" class="flex-1 bg-bg-main border border-outline-variant outline-none px-4 py-3 text-text-main text-sm rounded-xl focus:border-primary transition-colors" placeholder="Сообщение..." onkeypress="if(event.key === 'Enter') submitSupport('support')">
-                        <button onclick="submitSupport('support')" class="bg-primary text-white w-12 h-12 rounded-xl flex items-center justify-center shrink-0 shadow-lg shadow-primary/20">
+                        <button id="support-send-btn" onclick="submitSupport('support')" class="bg-primary text-white w-12 h-12 rounded-xl flex items-center justify-center shrink-0 shadow-lg shadow-primary/20">
                             <span class="material-symbols-outlined">send</span>
                         </button>
                     </div>
@@ -957,7 +1008,7 @@ function openSupportModal(type) {
                 </div>
                 <textarea id="support-message" class="w-full h-36 bg-bg-main border border-outline-variant outline-none p-4 text-text-main text-sm rounded-xl focus:border-primary resize-none transition-colors" placeholder="${placeholder}"></textarea>
                 <div class="pt-2">
-                    <button onclick="submitSupport('${type}')" class="primary-btn w-full py-4 text-[11px] font-black uppercase tracking-[0.2em] rounded-xl shadow-lg shadow-primary/20 hover:shadow-primary/40 transition-all">Отправить</button>
+                    <button id="support-send-btn" onclick="submitSupport('${type}')" class="primary-btn w-full py-4 text-[11px] font-black uppercase tracking-[0.2em] rounded-xl shadow-lg shadow-primary/20 hover:shadow-primary/40 transition-all">Отправить</button>
                 </div>
             </div>
         `;
@@ -980,10 +1031,17 @@ function openSupportModal(type) {
 
 async function submitSupport(type) {
     const inputEl = document.getElementById('support-message');
+    const btn = document.getElementById('support-send-btn');
     const msg = inputEl.value.trim();
     if (!msg) return showToast('Введите сообщение', true);
 
     inputEl.disabled = true;
+    const originalContent = btn ? btn.innerHTML : null;
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="animate-spin material-symbols-outlined text-sm">sync</span>';
+        if (type !== 'support') btn.innerHTML = 'Отправка...';
+    }
 
     try {
         const res = await fetch('/api/support', {
@@ -1003,10 +1061,18 @@ async function submitSupport(type) {
         } else {
             showToast('Ошибка отправки', true);
             inputEl.disabled = false;
+            if (btn && originalContent) {
+                btn.disabled = false;
+                btn.innerHTML = originalContent;
+            }
         }
     } catch (e) { 
         showToast('Ошибка сети', true); 
         inputEl.disabled = false;
+        if (btn && originalContent) {
+            btn.disabled = false;
+            btn.innerHTML = originalContent;
+        }
     }
 }
 
@@ -1156,9 +1222,6 @@ function openAdminChat(userId) {
                     text: t.admin_reply,
                     time: t.updated_at ? new Date(t.updated_at) : new Date(t.created_at)
                 });
-            } else {
-                lastOpenTicketId = t.id;
-            }
         });
         
         events.sort((a, b) => a.time - b.time);
@@ -1188,13 +1251,25 @@ function openAdminChat(userId) {
         });
     }
 
+    let lastTicketId = userTickets.length > 0 ? userTickets[userTickets.length - 1].id : null;
     let inputHtml = '';
-    if (lastOpenTicketId) {
+    if (lastTicketId) {
         inputHtml = `
             <div class="border-t border-outline-variant/30 p-4 bg-surface shrink-0">
                 <div class="flex gap-2">
-                    <input id="reply-${lastOpenTicketId}" type="text" class="flex-1 bg-bg-main border border-outline-variant/50 rounded-xl px-4 py-3 text-sm text-text-main outline-none focus:border-primary shadow-inner" placeholder="Сообщение..." onkeypress="if(event.key === 'Enter') submitAdminReply('${lastOpenTicketId}')" />
-                    <button onclick="submitAdminReply('${lastOpenTicketId}')" class="bg-primary text-white px-6 py-3 rounded-xl font-bold uppercase tracking-widest shadow-md hover:bg-primary/90 active:scale-95 transition-all flex items-center justify-center">
+                    <input id="reply-${lastTicketId}" type="text" class="flex-1 bg-bg-main border border-outline-variant/50 rounded-xl px-4 py-3 text-sm text-text-main outline-none focus:border-primary shadow-inner" placeholder="Сообщение..." onkeypress="if(event.key === 'Enter') submitAdminReply('${lastTicketId}')" />
+                    <button id="reply-btn-${lastTicketId}" onclick="submitAdminReply('${lastTicketId}')" class="bg-primary text-white px-6 py-3 rounded-xl font-bold uppercase tracking-widest shadow-md hover:bg-primary/90 active:scale-95 transition-all flex items-center justify-center">
+                        <span class="material-symbols-outlined text-xl">send</span>
+                    </button>
+                </div>
+            </div>
+        `;
+    } else {
+        inputHtml = `
+            <div class="border-t border-outline-variant/30 p-4 bg-surface shrink-0">
+                <div class="flex gap-2">
+                    <input disabled type="text" class="flex-1 bg-bg-main border border-outline-variant/50 rounded-xl px-4 py-3 text-sm text-text-main opacity-50 cursor-not-allowed" placeholder="Нет обращений в поддержку..." />
+                    <button disabled class="bg-outline-variant text-white px-6 py-3 rounded-xl shadow-md opacity-50 cursor-not-allowed flex items-center justify-center">
                         <span class="material-symbols-outlined text-xl">send</span>
                     </button>
                 </div>
@@ -1216,7 +1291,7 @@ function openAdminChat(userId) {
                     <span class="material-symbols-outlined">close</span>
                 </button>
             </div>
-            <div id="admin-chat-messages" class="flex-1 overflow-y-auto p-4 sm:p-6 bg-bg-main/50 relative" style="overscroll-behavior: contain;">
+            <div id="admin-chat-messages" class="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6 bg-bg-main/50 relative" style="overscroll-behavior: contain;">
                 ${messagesHtml}
             </div>
             ${inputHtml}
@@ -1238,10 +1313,16 @@ function openAdminChat(userId) {
 
 async function submitAdminReply(ticketId) {
     const input = document.getElementById('reply-' + ticketId);
+    const btn = document.getElementById('reply-btn-' + ticketId);
     if (!input || !input.value.trim()) return;
     
     const reply = input.value.trim();
     input.disabled = true;
+    const originalContent = btn ? btn.innerHTML : null;
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="animate-spin material-symbols-outlined text-sm text-white">sync</span>';
+    }
     
     try {
         const res = await fetch(`/api/admin/support/${ticketId}/reply`, {
@@ -1264,10 +1345,18 @@ async function submitAdminReply(ticketId) {
         } else {
             showToast('Ошибка при отправке', true);
             input.disabled = false;
+            if (btn && originalContent) {
+                btn.disabled = false;
+                btn.innerHTML = originalContent;
+            }
         }
     } catch (e) {
         showToast('Ошибка сети', true);
         input.disabled = false;
+        if (btn && originalContent) {
+            btn.disabled = false;
+            btn.innerHTML = originalContent;
+        }
     }
 }
 
@@ -1337,7 +1426,16 @@ async function openAdminReviews(userId) {
                         </div>
                     </div>
                     <p class="text-sm text-text-main leading-relaxed italic">"${f.message}"</p>
-                    <div class="mt-3 text-right">
+                    ${f.admin_reply ? `
+                        <div class="mt-3 pl-3 border-l-2 border-primary space-y-1 bg-primary/5 p-3 rounded-r-xl">
+                            <p class="text-[9px] font-black uppercase tracking-widest text-primary flex items-center gap-1">
+                                <span class="material-symbols-outlined text-[10px]">support_agent</span> Ваш ответ
+                            </p>
+                            <p class="text-[13px] text-text-main leading-relaxed">${f.admin_reply}</p>
+                        </div>
+                    ` : ''}
+                    <div class="mt-3 flex justify-between items-center">
+                        <button id="feedback-reply-btn-${f.id}" onclick="promptFeedbackReply('${f.id}')" class="text-[10px] bg-primary text-white px-3 py-1.5 rounded-lg uppercase tracking-widest font-bold shadow-md hover:bg-primary/90 active:scale-95 transition-all">Ответить</button>
                         <span class="text-[9px] text-on-surface-variant uppercase tracking-widest tabular-nums">${new Date(f.created_at).toLocaleString()}</span>
                     </div>
                 </div>
@@ -1359,7 +1457,7 @@ async function openAdminReviews(userId) {
                         <span class="material-symbols-outlined">close</span>
                     </button>
                 </div>
-                <div class="flex-1 overflow-y-auto p-4 sm:p-6 bg-bg-main/50 relative" style="overscroll-behavior: contain;">
+                <div class="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6 bg-bg-main/50 relative" style="overscroll-behavior: contain;">
                     ${feedbackHtml}
                     ${reviews.length > 0 || userFeedbacks.length > 0 ? '<h4 class="text-xs font-bold uppercase tracking-widest text-on-surface-variant mb-3">Отзывы WB</h4>' : ''}
                     ${reviewsHtml}
@@ -1370,6 +1468,47 @@ async function openAdminReviews(userId) {
 
     } catch (e) {
         showToast('Ошибка загрузки отзывов', true);
+    }
+}
+
+async function promptFeedbackReply(ticketId) {
+    const btn = document.getElementById('feedback-reply-btn-' + ticketId);
+    const replyText = prompt('Ответ на отзыв (отправится пользователю в Telegram):');
+    if (!replyText) return;
+
+    const originalContent = btn ? btn.innerHTML : 'Ответить';
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = 'Отправка...';
+    }
+
+    try {
+        const res = await fetch(`/api/admin/support/${ticketId}/reply`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+            },
+            body: JSON.stringify({ reply: replyText })
+        });
+        
+        if (res.ok) {
+            showToast('Ответ отправлен');
+            await refreshData();
+            document.getElementById('admin-reviews-modal').remove();
+        } else {
+            showToast('Ошибка при отправке', true);
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = originalContent;
+            }
+        }
+    } catch (e) {
+        showToast('Ошибка сети', true);
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = originalContent;
+        }
     }
 }
 
