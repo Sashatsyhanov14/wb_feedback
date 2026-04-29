@@ -31,7 +31,7 @@ class ReviewService {
     }
 
     try {
-      console.log(`[ReviewService] Starting Sync for seller ${seller.telegram_chat_id}`);
+      console.log(`[ReviewService] Starting Sync for seller: ${seller.display_name || seller.email || seller.id}`);
       
       const response = await wbService.getReviews(false, 30, 0, { token: seller.wb_token });
       const reviews = response?.data?.feedbacks || [];

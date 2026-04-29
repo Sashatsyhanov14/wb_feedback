@@ -318,6 +318,53 @@ router.get('/admin/users/:id/reviews', authMiddleware, async (req, res) => {
   }
 });
 
+// Admin: Reply to support ticket
+router.post('/admin/support/:id/reply', authMiddleware, async (req, res) => {
+  try {
+    const adminId = req.user.sellerId;
+    if (adminId !== process.env.ADMIN_SELLER_ID && adminId !== config.adminId) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+    
+    const { reply } = req.body;
+    if (!reply) return res.status(400).json({ error: 'Reply text required' });
+    
+    const ticketId = req.params.id;
+    
+    // Update ticket with admin reply and mark as closed/resolved
+    const { data, error } = await supabase
+      .from('support_tickets')
+      .update({ 
+        admin_reply: reply,
+        status: 'closed',
+        updated_at: new Date()
+      })
+      .eq('id', ticketId)
+      .select();
+      
+    if (error) throw error;
+    
+    // Notify user via Telegram if possible
+    const ticket = data?.[0];
+    if (ticket && ticket.seller_id) {
+      const { data: user } = await supabase.from('sellers').select('telegram_chat_id').eq('id', ticket.seller_id).maybeSingle();
+      if (user && user.telegram_chat_id) {
+        try {
+          const telegramService = require('../services/telegramService');
+          await telegramService.sendMessage(user.telegram_chat_id, `✅ <b>Ответ поддержки:</b>\n\n"${reply}"\n\n<i>На ваш запрос был получен ответ.</i>`);
+        } catch (tgErr) {
+          console.error('[AdminSupportReply] Telegram notify error:', tgErr.message);
+        }
+      }
+    }
+    
+    res.json({ success: true });
+  } catch (error) {
+    console.error('[AdminSupportReply] Error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // GET Analytics data
 router.get('/analytics', authMiddleware, async (req, res) => {
   try {

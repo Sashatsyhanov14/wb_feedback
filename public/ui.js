@@ -1176,7 +1176,7 @@ function openAdminChat(userId) {
                     <span class="material-symbols-outlined">close</span>
                 </button>
             </div>
-            <div id="admin-chat-messages" class="flex-1 overflow-y-auto p-4 sm:p-6 bg-bg-main/50 relative">
+            <div id="admin-chat-messages" class="flex-1 overflow-y-auto p-4 sm:p-6 bg-bg-main/50 relative" style="overscroll-behavior: contain;">
                 ${messagesHtml}
             </div>
             ${inputHtml}
@@ -1184,9 +1184,16 @@ function openAdminChat(userId) {
     `;
     document.body.appendChild(modal);
     
-    // Auto-scroll to bottom
-    const messagesArea = document.getElementById('admin-chat-messages');
-    messagesArea.scrollTop = messagesArea.scrollHeight;
+    // Auto-scroll to bottom with small delay to ensure content is rendered
+    setTimeout(() => {
+        const messagesArea = document.getElementById('admin-chat-messages');
+        if (messagesArea) {
+            messagesArea.scrollTo({
+                top: messagesArea.scrollHeight,
+                behavior: 'smooth'
+            });
+        }
+    }, 100);
 }
 
 async function submitAdminReply(ticketId) {
@@ -1288,7 +1295,7 @@ async function openAdminReviews(userId) {
                         <span class="material-symbols-outlined">close</span>
                     </button>
                 </div>
-                <div class="flex-1 overflow-y-auto p-4 sm:p-6 bg-bg-main/50 relative">
+                <div class="flex-1 overflow-y-auto p-4 sm:p-6 bg-bg-main/50 relative" style="overscroll-behavior: contain;">
                     ${reviewsHtml}
                 </div>
             </div>
