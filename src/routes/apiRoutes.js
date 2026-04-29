@@ -295,6 +295,29 @@ router.get('/admin/users', authMiddleware, async (req, res) => {
   }
 });
 
+// Admin: Get user's reviews
+router.get('/admin/users/:id/reviews', authMiddleware, async (req, res) => {
+  try {
+    const adminId = req.user.sellerId;
+    if (adminId !== process.env.ADMIN_SELLER_ID && adminId !== config.adminId) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+    
+    const targetUserId = req.params.id;
+    const { data, error } = await supabase
+      .from('review_logs')
+      .select('*')
+      .eq('seller_id', targetUserId)
+      .order('created_at', { ascending: false })
+      .limit(100); // Limit to last 100 for performance
+      
+    if (error) throw error;
+    res.json(data || []);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // GET Analytics data
 router.get('/analytics', authMiddleware, async (req, res) => {
   try {

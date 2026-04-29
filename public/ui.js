@@ -881,10 +881,10 @@ function openSupportModal(type) {
                 `;
                 if (t.admin_reply) {
                     messagesHtml += `
-                        <div class="flex justify-start mb-5 animate-in">
-                            <div class="bg-surface-container-highest border border-outline-variant/30 text-text-main px-4 py-3 rounded-2xl rounded-tl-none max-w-[80%] min-w-[70px] text-sm shadow-sm relative mt-3 break-words leading-relaxed" style="overflow-wrap: anywhere; word-break: break-word;">
-                                <span class="absolute -top-3 left-2 text-[8px] font-black uppercase tracking-widest text-primary bg-bg-main px-2 py-0.5 rounded border border-outline-variant/30 z-10 shadow-sm">Поддержка</span>
-                                <div class="mt-1">${t.admin_reply}</div>
+                        <div class="flex justify-start mb-4 animate-in">
+                            <div class="bg-surface border border-outline-variant/50 text-text-main px-4 py-3 rounded-2xl rounded-tl-none max-w-[85%] min-w-[70px] text-sm shadow-md relative leading-relaxed" style="overflow-wrap: anywhere; word-break: break-word;">
+                                <div class="text-[13px] sm:text-sm text-text-main">${t.admin_reply}</div>
+                                <div class="text-[9px] text-on-surface-variant/70 text-right mt-1.5 font-bold tabular-nums">Вы</div>
                             </div>
                         </div>
                     `;
@@ -893,7 +893,7 @@ function openSupportModal(type) {
         }
 
         modal.innerHTML = `
-            <div class="bg-bg-main w-full h-[100dvh] sm:h-[85vh] sm:max-h-[700px] sm:rounded-2xl flex flex-col relative overflow-hidden shadow-2xl" style="max-width: 480px;" onclick="event.stopPropagation()">
+            <div class="bg-bg-main w-full h-full sm:h-[85vh] sm:max-h-[700px] sm:rounded-2xl flex flex-col relative overflow-hidden shadow-2xl" style="max-width: 480px;" onclick="event.stopPropagation()">
                 <!-- Header -->
                 <div class="flex justify-between items-center border-b border-outline-variant/30 p-4 shrink-0 bg-surface">
                     <div class="flex items-center gap-3">
@@ -1087,7 +1087,7 @@ function renderAdmin() {
                                     <button onclick="openAdminChat('${u.id}')" class="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-bg-main border border-primary text-primary px-4 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-colors hover:bg-primary/10">
                                         <span class="material-symbols-outlined text-sm">chat</span> Чат
                                     </button>
-                                    <button onclick="showToast('Просмотр отзывов юзера в разработке')" class="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-surface border border-outline-variant text-text-main px-4 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-colors hover:border-text-main">
+                                    <button onclick="openAdminReviews('${u.id}')" class="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-surface border border-outline-variant text-text-main px-4 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-colors hover:border-text-main">
                                         <span class="material-symbols-outlined text-sm">visibility</span> Отзывы
                                     </button>
                                 </div>
@@ -1114,6 +1114,8 @@ function openAdminChat(userId) {
     modal.onclick = () => modal.remove();
 
     let messagesHtml = '';
+    let lastOpenTicketId = null;
+
     if (userTickets.length === 0) {
         messagesHtml = '<div class="text-center opacity-50 mt-10 text-xs uppercase tracking-widest">Нет сообщений</div>';
     } else {
@@ -1123,9 +1125,8 @@ function openAdminChat(userId) {
             // User message
             messagesHtml += `
                 <div class="flex justify-start mb-4">
-                    <div class="bg-surface-container-highest border border-outline-variant/30 text-text-main px-4 py-3 rounded-2xl rounded-tl-none max-w-[80%] min-w-[70px] text-sm shadow-sm relative leading-relaxed" style="overflow-wrap: anywhere; word-break: break-word;">
-                        <span class="absolute -top-3 left-2 text-[8px] font-black uppercase tracking-widest text-on-surface-variant bg-bg-main px-2 py-0.5 rounded border border-outline-variant/30 z-10 shadow-sm">${t.type}</span>
-                        <div class="mt-1">${t.message}</div>
+                    <div class="bg-surface border border-outline-variant/50 text-text-main px-4 py-3 rounded-2xl rounded-tl-none max-w-[85%] min-w-[70px] text-sm shadow-md relative leading-relaxed" style="overflow-wrap: anywhere; word-break: break-word;">
+                        <div class="text-[13px] sm:text-sm text-text-main">${t.message || '<i>Пустое сообщение</i>'}</div>
                         <div class="text-[9px] text-on-surface-variant/70 text-right mt-1.5 font-bold tabular-nums">${time}</div>
                     </div>
                 </div>
@@ -1142,21 +1143,27 @@ function openAdminChat(userId) {
                     </div>
                 `;
             } else {
-                // Input form for this specific ticket
-                messagesHtml += `
-                    <div class="flex justify-end mb-6">
-                        <div class="w-[80%] flex flex-col gap-2">
-                            <textarea id="reply-${t.id}" class="w-full bg-bg-main border border-outline-variant rounded-xl p-3 text-sm text-text-main outline-none focus:border-primary resize-none h-20" placeholder="Напишите ответ..."></textarea>
-                            <button onclick="submitAdminReply('${t.id}')" class="self-end bg-primary text-white px-6 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest shadow-md shadow-primary/20 hover:brightness-110 active:scale-95 transition-all">Отправить ответ</button>
-                        </div>
-                    </div>
-                `;
+                lastOpenTicketId = t.id;
             }
         });
     }
 
+    let inputHtml = '';
+    if (lastOpenTicketId) {
+        inputHtml = `
+            <div class="border-t border-outline-variant/30 p-4 bg-surface shrink-0">
+                <div class="flex gap-2">
+                    <input id="reply-${lastOpenTicketId}" type="text" class="flex-1 bg-bg-main border border-outline-variant/50 rounded-xl px-4 py-3 text-sm text-text-main outline-none focus:border-primary shadow-inner" placeholder="Сообщение..." onkeypress="if(event.key === 'Enter') submitAdminReply('${lastOpenTicketId}')" />
+                    <button onclick="submitAdminReply('${lastOpenTicketId}')" class="bg-primary text-white px-6 py-3 rounded-xl font-bold uppercase tracking-widest shadow-md hover:bg-primary/90 active:scale-95 transition-all flex items-center justify-center">
+                        <span class="material-symbols-outlined text-xl">send</span>
+                    </button>
+                </div>
+            </div>
+        `;
+    }
+
     modal.innerHTML = `
-        <div class="bg-bg-main w-full h-[100dvh] sm:h-[85vh] sm:max-h-[700px] sm:rounded-2xl flex flex-col relative overflow-hidden shadow-2xl" style="max-width: 600px;" onclick="event.stopPropagation()">
+        <div class="bg-bg-main w-full h-full sm:h-[85vh] sm:max-h-[700px] sm:rounded-2xl flex flex-col relative overflow-hidden shadow-2xl" style="max-width: 600px;" onclick="event.stopPropagation()">
             <div class="flex justify-between items-center border-b border-outline-variant/30 p-4 shrink-0 bg-surface">
                 <div class="flex items-center gap-3">
                     <span class="material-symbols-outlined text-primary text-3xl">admin_panel_settings</span>
@@ -1172,6 +1179,7 @@ function openAdminChat(userId) {
             <div id="admin-chat-messages" class="flex-1 overflow-y-auto p-4 sm:p-6 bg-bg-main/50 relative">
                 ${messagesHtml}
             </div>
+            ${inputHtml}
         </div>
     `;
     document.body.appendChild(modal);
@@ -1213,6 +1221,82 @@ async function submitAdminReply(ticketId) {
     } catch (e) {
         showToast('Ошибка сети', true);
         input.disabled = false;
+    }
+}
+
+async function openAdminReviews(userId) {
+    const user = state.adminUsers.find(u => u.id === userId);
+    try {
+        const res = await fetch(`/api/admin/users/${userId}/reviews`, {
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` }
+        });
+        if (!res.ok) throw new Error('Network response was not ok');
+        const reviews = await res.json();
+
+        const modal = document.createElement('div');
+        modal.id = 'admin-reviews-modal';
+        modal.className = 'fixed inset-0 z-50 flex items-center justify-center sm:p-4 bg-black/80 backdrop-blur-sm animate-in';
+        modal.onclick = () => modal.remove();
+
+        let reviewsHtml = '';
+        if (reviews.length === 0) {
+            reviewsHtml = '<div class="text-center opacity-50 mt-10 text-xs uppercase tracking-widest">Нет отзывов</div>';
+        } else {
+            reviewsHtml = reviews.map(r => {
+                const isGood = r.rating >= 4;
+                const statusColor = r.status === 'approved' || r.status === 'auto_posted' ? 'text-green-500' : (r.status === 'pending' ? 'text-yellow-500' : 'text-on-surface-variant');
+                return `
+                    <div class="bg-surface border border-outline-variant/30 rounded-2xl p-4 sm:p-5 mb-4 shadow-sm hover:border-primary/30 transition-colors">
+                        <div class="flex justify-between items-start mb-3">
+                            <div class="flex items-center gap-2">
+                                <span class="material-symbols-outlined text-sm ${isGood ? 'text-green-500' : 'text-red-500'}" style="font-variation-settings: 'FILL' 1">
+                                    ${isGood ? 'sentiment_satisfied' : 'sentiment_dissatisfied'}
+                                </span>
+                                <span class="font-bold text-text-main text-sm">${r.rating} Звезд</span>
+                            </div>
+                            <span class="text-[9px] font-black uppercase tracking-widest ${statusColor} bg-bg-main px-2 py-0.5 rounded border border-outline-variant/30">${r.status}</span>
+                        </div>
+                        <p class="text-sm text-text-main mb-3 leading-relaxed">${r.review_text || '<i>Без текста</i>'}</p>
+                        ${r.ai_reply ? `
+                            <div class="mt-3 pl-3 border-l-2 border-primary space-y-1 bg-primary/5 p-3 rounded-r-xl">
+                                <p class="text-[9px] font-black uppercase tracking-widest text-primary flex items-center gap-1">
+                                    <span class="material-symbols-outlined text-[10px]">robot_2</span> Ответ ИИ
+                                </p>
+                                <p class="text-[13px] text-text-main leading-relaxed">${r.ai_reply}</p>
+                            </div>
+                        ` : ''}
+                        <div class="mt-4 flex justify-between items-center border-t border-outline-variant/30 pt-3">
+                            <span class="text-[9px] text-on-surface-variant uppercase tracking-widest tabular-nums">${new Date(r.created_at).toLocaleString()}</span>
+                            ${r.category ? `<span class="text-[9px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded uppercase">${r.category}</span>` : ''}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        modal.innerHTML = `
+            <div class="bg-bg-main w-full h-full sm:h-[85vh] sm:max-h-[700px] sm:rounded-2xl flex flex-col relative overflow-hidden shadow-2xl" style="max-width: 600px;" onclick="event.stopPropagation()">
+                <div class="flex justify-between items-center border-b border-outline-variant/30 p-4 shrink-0 bg-surface">
+                    <div class="flex items-center gap-3">
+                        <span class="material-symbols-outlined text-primary text-3xl">reviews</span>
+                        <div>
+                            <h3 class="font-headline text-sm font-bold tracking-tight text-text-main uppercase tracking-widest">Отзывы юзера</h3>
+                            <p class="text-[9px] text-on-surface-variant mt-0.5">${user?.display_name || user?.email || userId}</p>
+                        </div>
+                    </div>
+                    <button onclick="document.getElementById('admin-reviews-modal').remove()" class="text-on-surface-variant hover:text-text-main transition-colors p-2 rounded-lg bg-bg-main border border-outline-variant/30 flex items-center justify-center">
+                        <span class="material-symbols-outlined">close</span>
+                    </button>
+                </div>
+                <div class="flex-1 overflow-y-auto p-4 sm:p-6 bg-bg-main/50 relative">
+                    ${reviewsHtml}
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+
+    } catch (e) {
+        showToast('Ошибка загрузки отзывов', true);
     }
 }
 
