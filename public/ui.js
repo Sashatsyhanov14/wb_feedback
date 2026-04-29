@@ -577,11 +577,11 @@ function renderReviews() {
             </header>
 
             <!-- Mobile card layout -->
-            <div class="sm:hidden space-y-3">
+            <div class="sm:hidden flex flex-col max-h-[70vh] overflow-y-auto space-y-3 pb-6 px-1 pr-2" style="overscroll-behavior: contain;">
                 ${state.reviews.map(review => {
                     const isAuto = review.status === 'auto_posted';
                     return `
-                        <div class="premium-card p-4 space-y-3 relative overflow-hidden">
+                        <div class="premium-card p-4 space-y-3 relative overflow-hidden shrink-0">
                             ${isAuto ? '<div class="absolute left-0 top-0 bottom-0 w-1 bg-wb-purple"></div>' : ''}
                             <div class="flex items-center justify-between">
                                 <div class="flex items-center gap-2 min-w-0">
@@ -603,15 +603,15 @@ function renderReviews() {
             </div>
 
             <!-- Desktop table layout -->
-            <div class="hidden sm:block border border-outline-variant rounded-lg overflow-hidden">
-                <div class="grid grid-cols-12 gap-4 px-6 py-4 bg-bg-main border-b border-outline-variant text-[10px] font-black uppercase tracking-widest text-on-surface-variant">
+            <div class="hidden sm:flex flex-col border border-outline-variant rounded-lg bg-bg-main shadow-sm h-[70vh] max-h-[800px]">
+                <div class="grid grid-cols-12 gap-4 px-6 py-4 border-b border-outline-variant text-[10px] font-black uppercase tracking-widest text-on-surface-variant shrink-0 bg-surface z-10">
                     <div class="col-span-1">Рейтинг</div>
                     <div class="col-span-3">Товар</div>
                     <div class="col-span-3">Отзыв</div>
                     <div class="col-span-4">Ответ ИИ</div>
                     <div class="col-span-1 text-right">Статус</div>
                 </div>
-                <div class="divide-y divide-outline-variant">
+                <div class="divide-y divide-outline-variant overflow-y-auto flex-1 relative" style="overscroll-behavior: contain;">
                     ${state.reviews.map(review => {
                         const isAuto = review.status === 'auto_posted';
                         return `
@@ -869,22 +869,40 @@ function openSupportModal(type) {
                 </div>
             `;
         } else {
+            const events = [];
             supportTickets.forEach(t => {
-                const time = new Date(t.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-                messagesHtml += `
-                    <div class="flex justify-end mb-4 animate-in">
-                        <div class="bg-primary text-white px-4 py-3 rounded-2xl rounded-tr-none max-w-[80%] min-w-[70px] text-sm shadow-lg shadow-primary/10 relative" style="overflow-wrap: anywhere; word-break: break-word;">
-                            <div class="leading-relaxed">${t.message}</div>
-                            <div class="text-[9px] text-white/80 text-right mt-1.5 font-bold tabular-nums">${time}</div>
-                        </div>
-                    </div>
-                `;
+                events.push({
+                    isClient: true,
+                    text: t.message,
+                    time: new Date(t.created_at)
+                });
                 if (t.admin_reply) {
+                    events.push({
+                        isClient: false,
+                        text: t.admin_reply,
+                        time: t.updated_at ? new Date(t.updated_at) : new Date(t.created_at)
+                    });
+                }
+            });
+            events.sort((a, b) => a.time - b.time);
+
+            events.forEach(e => {
+                const timeStr = e.time.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                if (e.isClient) {
+                    messagesHtml += `
+                        <div class="flex justify-end mb-4 animate-in">
+                            <div class="bg-primary text-white px-4 py-3 rounded-2xl rounded-tr-none max-w-[80%] min-w-[70px] text-sm shadow-lg shadow-primary/10 relative" style="overflow-wrap: anywhere; word-break: break-word;">
+                                <div class="leading-relaxed">${e.text}</div>
+                                <div class="text-[9px] text-white/80 text-right mt-1.5 font-bold tabular-nums">${timeStr}</div>
+                            </div>
+                        </div>
+                    `;
+                } else {
                     messagesHtml += `
                         <div class="flex justify-start mb-4 animate-in">
                             <div class="bg-surface border border-outline-variant/50 text-text-main px-4 py-3 rounded-2xl rounded-tl-none max-w-[85%] min-w-[70px] text-sm shadow-md relative leading-relaxed" style="overflow-wrap: anywhere; word-break: break-word;">
-                                <div class="text-[13px] sm:text-sm text-text-main">${t.admin_reply}</div>
-                                <div class="text-[9px] text-on-surface-variant/70 text-right mt-1.5 font-bold tabular-nums">Вы</div>
+                                <div class="text-[13px] sm:text-sm text-text-main">${e.text}</div>
+                                <div class="text-[9px] text-on-surface-variant/70 text-right mt-1.5 font-bold tabular-nums">${timeStr}</div>
                             </div>
                         </div>
                     `;
@@ -1125,31 +1143,47 @@ function openAdminChat(userId) {
     if (userTickets.length === 0) {
         messagesHtml = '<div class="text-center opacity-50 mt-10 text-xs uppercase tracking-widest">Нет сообщений</div>';
     } else {
+        const events = [];
         userTickets.forEach(t => {
-            const time = new Date(t.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-            
-            // User message
-            messagesHtml += `
-                <div class="flex justify-start mb-4">
-                    <div class="bg-surface border border-outline-variant/50 text-text-main px-4 py-3 rounded-2xl rounded-tl-none max-w-[85%] min-w-[70px] text-sm shadow-md relative leading-relaxed" style="overflow-wrap: anywhere; word-break: break-word;">
-                        <div class="text-[13px] sm:text-sm text-text-main">${t.message || '<i>Пустое сообщение</i>'}</div>
-                        <div class="text-[9px] text-on-surface-variant/70 text-right mt-1.5 font-bold tabular-nums">${time}</div>
-                    </div>
-                </div>
-            `;
-            
-            // Admin reply
+            events.push({
+                isAdmin: false,
+                text: t.message || '<i>Пустое сообщение</i>',
+                time: new Date(t.created_at)
+            });
             if (t.admin_reply) {
+                events.push({
+                    isAdmin: true,
+                    text: t.admin_reply,
+                    time: t.updated_at ? new Date(t.updated_at) : new Date(t.created_at)
+                });
+            } else {
+                lastOpenTicketId = t.id;
+            }
+        });
+        
+        events.sort((a, b) => a.time - b.time);
+
+        events.forEach(e => {
+            const timeStr = e.time.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+            
+            if (!e.isAdmin) {
                 messagesHtml += `
-                    <div class="flex justify-end mb-4">
-                        <div class="bg-primary text-white px-4 py-3 rounded-2xl rounded-tr-none max-w-[80%] min-w-[70px] text-sm shadow-lg shadow-primary/10 relative" style="overflow-wrap: anywhere; word-break: break-word;">
-                            <div class="leading-relaxed">${t.admin_reply}</div>
-                            <div class="text-[9px] text-white/80 text-right mt-1.5 font-bold tabular-nums">Вы</div>
+                    <div class="flex justify-start mb-4">
+                        <div class="bg-surface border border-outline-variant/50 text-text-main px-4 py-3 rounded-2xl rounded-tl-none max-w-[85%] min-w-[70px] text-sm shadow-md relative leading-relaxed" style="overflow-wrap: anywhere; word-break: break-word;">
+                            <div class="text-[13px] sm:text-sm text-text-main">${e.text}</div>
+                            <div class="text-[9px] text-on-surface-variant/70 text-right mt-1.5 font-bold tabular-nums">${timeStr}</div>
                         </div>
                     </div>
                 `;
             } else {
-                lastOpenTicketId = t.id;
+                messagesHtml += `
+                    <div class="flex justify-end mb-4">
+                        <div class="bg-primary text-white px-4 py-3 rounded-2xl rounded-tr-none max-w-[80%] min-w-[70px] text-sm shadow-lg shadow-primary/10 relative" style="overflow-wrap: anywhere; word-break: break-word;">
+                            <div class="leading-relaxed">${e.text}</div>
+                            <div class="text-[9px] text-white/80 text-right mt-1.5 font-bold tabular-nums">${timeStr}</div>
+                        </div>
+                    </div>
+                `;
             }
         });
     }
