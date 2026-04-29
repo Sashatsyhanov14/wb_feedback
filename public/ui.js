@@ -1222,6 +1222,7 @@ function openAdminChat(userId) {
                     text: t.admin_reply,
                     time: t.updated_at ? new Date(t.updated_at) : new Date(t.created_at)
                 });
+            }
         });
         
         events.sort((a, b) => a.time - b.time);
