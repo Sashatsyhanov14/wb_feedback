@@ -7,7 +7,7 @@ const supabase = require('../db/supabase');
 const telegramService = require('../services/telegramService');
 const authMiddleware = require('../middleware/authMiddleware');
 
-const SUBSCRIPTION_PRICE = 749; // Фиксированная цена
+const SUBSCRIPTION_PRICE = 2; // ВРЕМЕННО 2 РУБЛЯ ДЛЯ ТЕСТА (было 749)
 
 // 1. Создание платежа (YooKassa)
 router.post('/create', authMiddleware, async (req, res) => {
