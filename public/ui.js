@@ -911,7 +911,7 @@ function openSupportModal(type) {
                 </div>
                 
                 <!-- Chat Area -->
-                <div id="chat-messages-area" class="flex-1 overflow-y-auto p-4 bg-bg-main/50 relative">
+                <div id="chat-messages-area" class="flex-1 overflow-y-auto p-4 bg-bg-main/50 relative" style="overscroll-behavior: contain;">
                     ${messagesHtml}
                 </div>
                 
@@ -949,8 +949,14 @@ function openSupportModal(type) {
     
     if (type === 'support') {
         const chatArea = document.getElementById('chat-messages-area');
-        if (chatArea) chatArea.scrollTop = chatArea.scrollHeight;
-        setTimeout(() => document.getElementById('support-message').focus(), 100);
+        if (chatArea) {
+            chatArea.scrollTop = chatArea.scrollHeight;
+        }
+        setTimeout(() => {
+            const input = document.getElementById('support-message');
+            if (input) input.focus();
+            if (chatArea) chatArea.scrollTop = chatArea.scrollHeight;
+        }, 100);
     }
 }
 
@@ -1010,7 +1016,7 @@ function renderAdmin() {
     let users = state.adminUsers || [];
     
     // Sort users: those with open tickets first, then by last_active_at
-    const usersWithOpenTickets = new Set(tkts.filter(t => t.status === 'open').map(t => t.seller_id));
+    const usersWithOpenTickets = new Set(tkts.filter(t => t.status === 'open' && t.type === 'support').map(t => t.seller_id));
     users.sort((a, b) => {
         const aOpen = usersWithOpenTickets.has(a.id);
         const bOpen = usersWithOpenTickets.has(b.id);
@@ -1103,7 +1109,7 @@ function renderAdmin() {
 
 function openAdminChat(userId) {
     const userTickets = (state.adminTickets || [])
-        .filter(t => t.seller_id === userId)
+        .filter(t => t.seller_id === userId && t.type === 'support')
         .sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
         
     const user = state.adminUsers.find(u => u.id === userId);
@@ -1281,6 +1287,30 @@ async function openAdminReviews(userId) {
             }).join('');
         }
 
+        const userFeedbacks = (state.adminTickets || [])
+            .filter(t => t.seller_id === userId && t.type === 'feedback')
+            .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+        let feedbackHtml = '';
+        if (userFeedbacks.length > 0) {
+            feedbackHtml = '<div class="mb-6"><h4 class="text-xs font-bold uppercase tracking-widest text-primary mb-3">Отзывы о платформе</h4>';
+            feedbackHtml += userFeedbacks.map(f => `
+                <div class="bg-primary/5 border border-primary/20 rounded-2xl p-4 sm:p-5 mb-3 shadow-sm relative">
+                    <div class="flex justify-between items-start mb-2">
+                        <div class="flex items-center gap-2">
+                            <span class="material-symbols-outlined text-primary text-sm">stars</span>
+                            <span class="font-bold text-text-main text-sm">Отзыв платформе</span>
+                        </div>
+                    </div>
+                    <p class="text-sm text-text-main leading-relaxed italic">"${f.message}"</p>
+                    <div class="mt-3 text-right">
+                        <span class="text-[9px] text-on-surface-variant uppercase tracking-widest tabular-nums">${new Date(f.created_at).toLocaleString()}</span>
+                    </div>
+                </div>
+            `).join('');
+            feedbackHtml += '</div><hr class="border-outline-variant/30 mb-6"/>';
+        }
+
         modal.innerHTML = `
             <div class="bg-bg-main w-full h-full sm:h-[85vh] sm:max-h-[700px] sm:rounded-2xl flex flex-col relative overflow-hidden shadow-2xl" style="max-width: 600px;" onclick="event.stopPropagation()">
                 <div class="flex justify-between items-center border-b border-outline-variant/30 p-4 shrink-0 bg-surface">
@@ -1296,6 +1326,8 @@ async function openAdminReviews(userId) {
                     </button>
                 </div>
                 <div class="flex-1 overflow-y-auto p-4 sm:p-6 bg-bg-main/50 relative" style="overscroll-behavior: contain;">
+                    ${feedbackHtml}
+                    ${reviews.length > 0 || userFeedbacks.length > 0 ? '<h4 class="text-xs font-bold uppercase tracking-widest text-on-surface-variant mb-3">Отзывы WB</h4>' : ''}
                     ${reviewsHtml}
                 </div>
             </div>
