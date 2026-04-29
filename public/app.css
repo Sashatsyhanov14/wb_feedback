@@ -312,3 +312,8 @@ input:checked + .slider:before { transform: translateX(20px); }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--c-border); border-radius: 10px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--c-primary); }
+
+/* Custom Height Constraints (Tailwind Fallbacks) */
+.custom-h-70vh { height: 70vh; max-height: 800px; }
+.custom-h-90vh { height: 90vh; max-height: 700px; }
+.custom-flex-scroll { flex: 1; height: 0; overflow-y: auto; }
