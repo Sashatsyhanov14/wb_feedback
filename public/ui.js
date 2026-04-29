@@ -581,7 +581,8 @@ function renderReviews() {
             </header>
 
             <!-- Mobile card layout -->
-            <div class="sm:hidden flex flex-col max-h-[70vh] overflow-y-auto min-h-0 space-y-3 pb-6 px-1 pr-2" style="overscroll-behavior: contain;">
+            <div class="sm:hidden flex flex-col h-[70vh] rounded-xl border border-outline-variant/30 bg-bg-main shadow-sm mb-6">
+                <div class="flex-1 overflow-y-auto h-0 p-2 space-y-3">
                 ${state.reviews.map(review => {
                     const isAuto = review.status === 'auto_posted';
                     return `
@@ -604,6 +605,7 @@ function renderReviews() {
                         </div>
                     `;
                 }).join('')}
+                </div>
             </div>
 
             <!-- Desktop table layout -->
@@ -615,7 +617,7 @@ function renderReviews() {
                     <div class="col-span-4">Ответ ИИ</div>
                     <div class="col-span-1 text-right">Статус</div>
                 </div>
-                <div class="divide-y divide-outline-variant overflow-y-auto min-h-0 flex-1 relative" style="overscroll-behavior: contain;">
+                <div class="divide-y divide-outline-variant overflow-y-auto h-0 flex-1 relative">
                     ${state.reviews.map(review => {
                         const isAuto = review.status === 'auto_posted';
                         return `
@@ -962,7 +964,7 @@ function openSupportModal(type) {
         }
 
         modal.innerHTML = `
-            <div class="bg-bg-main w-full h-full sm:h-[85vh] sm:max-h-[700px] sm:rounded-2xl flex flex-col relative overflow-hidden shadow-2xl" style="max-width: 480px;" onclick="event.stopPropagation()">
+            <div class="bg-bg-main w-full h-[90vh] sm:h-[85vh] sm:max-h-[700px] sm:rounded-2xl flex flex-col relative overflow-hidden shadow-2xl" style="max-width: 480px;" onclick="event.stopPropagation()">
                 <!-- Header -->
                 <div class="flex justify-between items-center border-b border-outline-variant/30 p-4 shrink-0 bg-surface">
                     <div class="flex items-center gap-3">
@@ -980,7 +982,7 @@ function openSupportModal(type) {
                 </div>
                 
                 <!-- Chat Area -->
-                <div id="chat-messages-area" class="flex-1 min-h-0 overflow-y-auto p-4 bg-bg-main/50 relative" style="overscroll-behavior: contain;">
+                <div id="chat-messages-area" class="flex-1 overflow-y-auto h-0 p-4 bg-bg-main/50 relative">
                     ${messagesHtml}
                 </div>
                 
@@ -1279,7 +1281,7 @@ function openAdminChat(userId) {
     }
 
     modal.innerHTML = `
-        <div class="bg-bg-main w-full h-full sm:h-[85vh] sm:max-h-[700px] sm:rounded-2xl flex flex-col relative overflow-hidden shadow-2xl" style="max-width: 600px;" onclick="event.stopPropagation()">
+        <div class="bg-bg-main w-full h-[90vh] sm:h-[85vh] sm:max-h-[700px] sm:rounded-2xl flex flex-col relative overflow-hidden shadow-2xl" style="max-width: 600px;" onclick="event.stopPropagation()">
             <div class="flex justify-between items-center border-b border-outline-variant/30 p-4 shrink-0 bg-surface">
                 <div class="flex items-center gap-3">
                     <span class="material-symbols-outlined text-primary text-3xl">admin_panel_settings</span>
@@ -1292,7 +1294,7 @@ function openAdminChat(userId) {
                     <span class="material-symbols-outlined">close</span>
                 </button>
             </div>
-            <div id="admin-chat-messages" class="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6 bg-bg-main/50 relative" style="overscroll-behavior: contain;">
+            <div id="admin-chat-messages" class="flex-1 overflow-y-auto h-0 p-4 sm:p-6 bg-bg-main/50 relative">
                 ${messagesHtml}
             </div>
             ${inputHtml}
@@ -1445,7 +1447,7 @@ async function openAdminReviews(userId) {
         }
 
         modal.innerHTML = `
-            <div class="bg-bg-main w-full h-full sm:h-[85vh] sm:max-h-[700px] sm:rounded-2xl flex flex-col relative overflow-hidden shadow-2xl" style="max-width: 600px;" onclick="event.stopPropagation()">
+            <div class="bg-bg-main w-full h-[90vh] sm:h-[85vh] sm:max-h-[700px] sm:rounded-2xl flex flex-col relative overflow-hidden shadow-2xl" style="max-width: 600px;" onclick="event.stopPropagation()">
                 <div class="flex justify-between items-center border-b border-outline-variant/30 p-4 shrink-0 bg-surface">
                     <div class="flex items-center gap-3">
                         <span class="material-symbols-outlined text-primary text-3xl">reviews</span>
@@ -1458,7 +1460,7 @@ async function openAdminReviews(userId) {
                         <span class="material-symbols-outlined">close</span>
                     </button>
                 </div>
-                <div class="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6 bg-bg-main/50 relative" style="overscroll-behavior: contain;">
+                <div class="flex-1 overflow-y-auto h-0 p-4 sm:p-6 bg-bg-main/50 relative">
                     ${feedbackHtml}
                     ${reviews.length > 0 || userFeedbacks.length > 0 ? '<h4 class="text-xs font-bold uppercase tracking-widest text-on-surface-variant mb-3">Отзывы WB</h4>' : ''}
                     ${reviewsHtml}
