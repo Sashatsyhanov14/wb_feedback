@@ -13,6 +13,19 @@ const SUBSCRIPTION_PRICE = 749; // Фиксированная цена
 router.post('/create', authMiddleware, async (req, res) => {
   try {
     const sellerId = req.user.sellerId;
+
+    // PROTECTION: Guest accounts must link a real identity before paying
+    const { data: seller } = await supabase
+      .from('sellers')
+      .select('auth_provider')
+      .eq('id', sellerId)
+      .single();
+    
+    if (seller && seller.auth_provider === 'guest') {
+      return res.status(403).json({ 
+        error: 'Привяжите аккаунт (Google или VK) в разделе «Аккаунт» перед оплатой' 
+      });
+    }
     
     if (!config.yookassaShopId || !config.yookassaSecretKey) {
         throw new Error('YooKassa configuration is missing');

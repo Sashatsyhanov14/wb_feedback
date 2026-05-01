@@ -19,16 +19,6 @@ let state = {
 };
 
 document.addEventListener('DOMContentLoaded', async () => {
-    // Handle token from URL query (for VK/Google OAuth redirect)
-    const urlParams = new URLSearchParams(window.location.search);
-    const urlToken = urlParams.get('token');
-    
-    if (urlToken) {
-        const cookieStr = `auth_token=${urlToken}; path=/; max-age=${30 * 24 * 60 * 60}; SameSite=Lax`;
-        document.cookie = cookieStr;
-        localStorage.setItem('auth_token', urlToken);
-        console.log('Token captured from URL query and saved');
-    }
 
     // Handle Supabase implicit flow hash (for Magic Link)
     // URL looks like: /app#access_token=...&token_type=bearer&type=magiclink
@@ -55,6 +45,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                     state.sellerId = data.sellerId;
                     magicLinkProcessed = true;
                     console.log('Magic link auth success, sellerId:', data.sellerId);
+                    
+                    if (data.isNew && typeof gtag === 'function') {
+                        gtag('event', 'sign_up', { method: 'magic_link' });
+                    }
                 } else {
                     console.error('Magic link verify failed:', await verifyRes.text());
                 }
@@ -67,19 +61,21 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     // Check for token in multiple places
+    const urlParams = new URLSearchParams(window.location.search);
+    const urlToken = urlParams.get('token');
     const cookieToken = document.cookie.split('; ').find(row => row.startsWith('auth_token='))?.split('=')[1];
     const localToken = localStorage.getItem('auth_token');
     const activeToken = urlToken || cookieToken || localToken;
     
-    // Clean up URL if token was present in query
-    if (urlToken) {
-        window.history.replaceState({}, document.title, window.location.pathname);
-    }
 
     const isTelegram = window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initData;
     
     if (!activeToken && !magicLinkProcessed && !isTelegram) {
-        showView('login');
+        if (urlParams.get('error')) {
+            showView('login');
+        } else {
+            window.location.href = '/api/auth/guest';
+        }
         return; // Skip API check
     }
 
@@ -88,13 +84,17 @@ document.addEventListener('DOMContentLoaded', async () => {
         await checkAuth();
     }
 
-    // 2. Initial View
+    // 2. Initial View — render immediately, then load data
     if (!state.sellerId) {
-        showView('login');
+        if (urlParams.get('error')) {
+            showView('login');
+        } else {
+            window.location.href = '/api/auth/guest';
+        }
     } else {
-        showView('reviews');
-        refreshData(); // Don't await to render faster
-        showView(state.currentView);
+        showView(state.currentView || 'reviews'); // render immediately so screen isn't blank
+        await refreshData(); // then load data (onboarding prompt may redirect inside)
+        showView(state.currentView || 'reviews'); // re-render with fresh data
     }
 
     // 3. Handle Payment Redirect Hash
@@ -179,6 +179,55 @@ async function refreshData() {
         if (adminStats) state.adminStats = adminStats;
         if (adminTickets) state.adminTickets = adminTickets;
         if (adminUsers) state.adminUsers = adminUsers;
+
+        // --- ONBOARDING & EXPIRED TRIAL PROMPTS ---
+        const isTrial = state.settings?.subscription_status === 'trial';
+        const expiresAt = state.settings?.subscription_expires_at ? new Date(state.settings.subscription_expires_at) : null;
+        const now = new Date();
+        const isExpired = isTrial && expiresAt && now > expiresAt;
+
+        if (isExpired && !window._expiredPromptShown) {
+            window._expiredPromptShown = true;
+            setTimeout(() => {
+                if (state.currentView !== 'account') showView('account');
+                
+                const toast = document.createElement('div');
+                toast.className = 'fixed top-4 left-1/2 -translate-x-1/2 z-[9999] bg-[#2A2D32] border border-red-500/40 shadow-2xl rounded-2xl px-5 py-4 flex gap-4 items-center max-w-[90vw] animate-slide-down';
+                toast.innerHTML = `
+                    <div class="bg-red-500/20 text-red-400 w-10 h-10 rounded-full flex items-center justify-center shrink-0">
+                        <span class="material-symbols-outlined font-black">timer_off</span>
+                    </div>
+                    <div class="flex-1">
+                        <h4 class="text-white font-bold text-sm tracking-wide">Тестовый период завершен</h4>
+                        <p class="text-on-surface-variant text-xs mt-1 leading-relaxed">Нейросеть приостановлена. Оплатите безлимитный доступ, чтобы продолжить работу!</p>
+                    </div>
+                    <button onclick="this.parentElement.remove()" class="text-on-surface-variant hover:text-white p-2 transition-colors"><span class="material-symbols-outlined text-sm">close</span></button>
+                `;
+                document.body.appendChild(toast);
+                setTimeout(() => { if(toast.parentElement) toast.remove(); }, 12000);
+            }, 500);
+        } else if ((!state.settings.wb_token || !state.settings.wb_token_valid) && !window._tokenPromptShown && !isExpired) {
+            window._tokenPromptShown = true;
+            setTimeout(() => {
+                if (state.currentView !== 'business') showView('business');
+                
+                const toast = document.createElement('div');
+                toast.className = 'fixed top-4 left-1/2 -translate-x-1/2 z-[9999] bg-[#2A2D32] border border-primary/40 shadow-2xl rounded-2xl px-5 py-4 flex gap-4 items-center max-w-[90vw] animate-slide-down';
+                toast.innerHTML = `
+                    <div class="bg-primary/20 text-primary w-10 h-10 rounded-full flex items-center justify-center shrink-0">
+                        <span class="material-symbols-outlined font-black">key</span>
+                    </div>
+                    <div class="flex-1">
+                        <h4 class="text-white font-bold text-sm tracking-wide">Добавьте API токен Wildberries</h4>
+                        <p class="text-on-surface-variant text-xs mt-1 leading-relaxed">Без него нейросеть не сможет работать. Укажите токен, чтобы активировать <strong class="text-white">3 дня бесплатного доступа</strong>!</p>
+                    </div>
+                    <button onclick="this.parentElement.remove()" class="text-on-surface-variant hover:text-white p-2 transition-colors"><span class="material-symbols-outlined text-sm">close</span></button>
+                `;
+                document.body.appendChild(toast);
+                setTimeout(() => { if(toast.parentElement) toast.remove(); }, 12000);
+            }, 500);
+        }
+
     } catch (e) {
         console.error('Refresh data error:', e);
     }
@@ -188,7 +237,7 @@ async function handleLogout() {
     try { await fetch('/api/auth/logout', { method: 'POST' }); } catch(e) {}
     // Clear all auth data from client
     localStorage.removeItem('auth_token');
-    document.cookie = 'auth_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+    document.cookie = 'auth_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax';
     state.sellerId = null;
     window.location.href = '/';
 }
@@ -268,11 +317,15 @@ function renderLogin() {
                         <span class="text-[#E1AF66]">AI</span>
                     </h2>
                     <p class="text-on-surface-variant text-sm font-medium tracking-wide">
-                        В один клик, без паролей и регистраций
+                        В один клик или без регистрации
                     </p>
                 </div>
-                
                 <div class="flex flex-col gap-4">
+                    <!-- Guest Button -->
+                    <button onclick="window.location.href='/api/auth/guest'" class="w-full h-14 flex items-center justify-center gap-4 bg-primary/10 hover:bg-primary/20 active:scale-[0.97] transition-all rounded-[12px] shadow-sm border border-primary/20 group">
+                        <span class="material-symbols-outlined text-primary group-hover:rotate-12 transition-transform">rocket_launch</span>
+                        <span class="text-sm font-bold text-primary">Попробовать без регистрации</span>
+                    </button>
                     <!-- Google Button -->
                     <button onclick="handleGoogleLogin()" class="w-full h-14 flex items-center justify-center gap-4 bg-white hover:bg-gray-100 active:scale-[0.97] transition-all rounded-[12px] shadow-sm border border-gray-200">
                         <svg style="width: 20px; height: 20px;" viewBox="0 0 48 48">
@@ -386,6 +439,40 @@ async function handleMagicLogin() {
         if (res.ok) {
             showToast('Ссылка отправлена на почту!');
             btn.innerHTML = '<span>Проверьте почту ✉️</span>';
+        } else {
+            showToast(data.error || 'Ошибка отправки', true);
+            btn.disabled = false;
+            btn.innerHTML = originalContent;
+        }
+    } catch (e) {
+        showToast('Ошибка сети', true);
+        btn.disabled = false;
+        btn.innerHTML = originalContent;
+    }
+}
+
+async function handleLinkMagic() {
+    const email = document.getElementById('link-email').value;
+    if (!email || !email.includes('@')) {
+        return showToast('Введите корректный email', true);
+    }
+
+    const btn = document.getElementById('link-email-btn');
+    const originalContent = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = 'Отправка...';
+
+    try {
+        const res = await fetch('/api/auth/magic', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email })
+        });
+        
+        const data = await res.json();
+        if (res.ok) {
+            showToast('Ссылка отправлена на почту! Перейдите по ней для привязки.');
+            btn.innerHTML = 'Проверьте почту ✉️';
         } else {
             showToast(data.error || 'Ошибка отправки', true);
             btn.disabled = false;
@@ -665,13 +752,63 @@ function renderSubscription() {
             </header>
 
             <!-- User Profile Card -->
-            <section class="premium-card p-5 sm:p-8 flex items-center gap-5">
-                <img src="${state.settings.avatar_url || 'https://api.dicebear.com/7.x/avataaars/svg?seed=' + state.sellerId}" alt="Avatar" class="w-16 h-16 rounded-full border border-outline-variant object-cover bg-surface/50">
-                <div class="space-y-1 min-w-0">
-                    <h3 class="text-text-main font-bold text-lg truncate">${state.settings.display_name || 'Пользователь'}</h3>
-                    <p class="text-xs text-on-surface-variant truncate">${state.settings.email || 'Нет Email'}</p>
+            <section class="premium-card p-5 sm:p-8 flex items-center justify-between gap-5">
+                <div class="flex items-center gap-5 min-w-0">
+                    <img src="${state.settings.avatar_url || 'https://api.dicebear.com/7.x/avataaars/svg?seed=' + state.sellerId}" alt="Avatar" class="w-16 h-16 rounded-full border border-outline-variant object-cover bg-surface/50">
+                    <div class="space-y-1 min-w-0">
+                        <h3 class="text-text-main font-bold text-lg truncate">${state.settings.display_name || 'Пользователь'}</h3>
+                        <p class="text-xs text-on-surface-variant truncate">${state.settings.email || (state.settings.auth_provider === 'guest' ? 'Временный аккаунт' : 'Нет Email')}</p>
+                    </div>
                 </div>
+                ${state.settings.auth_provider === 'guest' ? `
+                    <div class="flex flex-col gap-2 shrink-0">
+                        <span class="text-[9px] font-black uppercase tracking-[0.2em] text-primary text-right animate-pulse">Аккаунт не защищен</span>
+                    </div>
+                ` : `
+                    <div class="px-3 py-1 bg-green-500/10 border border-green-500/20 rounded-full shrink-0">
+                        <span class="text-[9px] font-black uppercase tracking-widest text-green-500">Защищен</span>
+                    </div>
+                `}
             </section>
+
+            ${state.settings.auth_provider === 'guest' ? `
+                <section class="premium-card p-6 border-primary/30 bg-primary/5 space-y-4">
+                    <div class="flex items-center gap-3">
+                        <span class="material-symbols-outlined text-primary">security</span>
+                        <h3 class="text-text-main font-bold text-sm uppercase tracking-widest">Привяжите аккаунт</h3>
+                    </div>
+                    <p class="text-xs text-on-surface-variant leading-relaxed">
+                        Чтобы не потерять настройки и историю ответов при смене браузера, привяжите постоянный аккаунт.
+                    </p>
+                    <div class="grid grid-cols-2 gap-3 mt-2">
+                        <button onclick="handleGoogleLogin()" class="flex items-center justify-center gap-2 bg-white text-gray-900 py-3 rounded-xl text-[11px] font-black uppercase tracking-widest hover:bg-gray-100 transition-all shadow-sm">
+                            <svg style="width: 16px; height: 16px;" viewBox="0 0 48 48">
+                                <path fill="#FFC107" d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12c0-6.627,5.373-12,12-12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C12.955,4,4,12.955,4,24c0,11.045,8.955,20,20,20c11.045,0,20-8.955,20-20C44,22.659,43.862,21.35,43.611,20.083z"></path>
+                                <path fill="#FF3D00" d="M6.306,14.691l6.571,4.819C14.655,15.108,18.961,12,24,12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C16.318,4,9.656,8.337,6.306,14.691z"></path>
+                                <path fill="#4CAF50" d="M24,44c5.166,0,9.86-1.977,13.409-5.192l-6.19-5.238C29.211,35.091,26.715,36,24,36c-5.202,0-9.619-3.317-11.283-7.946l-6.522,5.025C9.505,39.556,16.227,44,24,44z"></path>
+                                <path fill="#1976D2" d="M43.611,20.083H42V20H24v8h11.303c-0.792,2.237-2.231,4.166-4.087,5.571c0.001-0.001,0.002-0.001,0.003-0.002l6.19,5.238C36.971,39.205,44,34,44,24C44,22.659,43.862,21.35,43.611,20.083z"></path>
+                            </svg>
+                            Google
+                        </button>
+                        <button onclick="handleVkLogin()" class="flex items-center justify-center gap-2 bg-[#0077FF] text-white py-3 rounded-xl text-[11px] font-black uppercase tracking-widest hover:bg-[#0066DD] transition-all shadow-sm">
+                            <svg style="width: 18px; height: 18px;" viewBox="0 0 28 28" fill="none"><path d="M4.54 4.54C3 6.08 3 8.52 3 13.4v1.2c0 4.88 0 7.32 1.54 8.86C6.08 25 8.52 25 13.4 25h1.2c4.88 0 7.32 0 8.86-1.54C25 21.92 25 19.48 25 14.6v-1.2c0-4.88 0-7.32-1.54-8.86C21.92 3 19.48 3 14.6 3h-1.2C8.52 3 6.08 3 4.54 4.54z" fill="#0077FF"/><path d="M7.56 9.85h1.58c.25 0 .41.16.49.48.73 2.7 2.01 5.06 2.52 5.06.18 0 .26-.08.26-.54v-2.78c-.05-1-.58-1.08-.58-1.44 0-.18.15-.35.39-.35h2.49c.21 0 .29.11.29.46v3.74c0 .21.09.29.15.29.18 0 .33-.08.67-.43a14.22 14.22 0 001.94-3.31c.09-.21.24-.4.51-.4h1.58c.33 0 .41.17.33.46-.14.54-1.54 3.03-2.44 4.31-.14.21-.19.32 0 .57.14.18.59.57.89.91.56.63 1 1.16 1.11 1.53.12.37-.07.56-.44.56h-1.58c-.34 0-.5-.14-.75-.44-.61-.67-1.13-1.31-1.35-1.31-.13 0-.19.05-.19.31v1.01c0 .34-.11.43-.39.43-1.18 0-3.76-.07-5.63-2.72a19.7 19.7 0 01-2.47-5.17c-.09-.25 0-.42.33-.42z" fill="white"/></svg>
+                            VK ID
+                        </button>
+                    </div>
+                    
+                    <div class="relative py-3">
+                        <div class="absolute inset-0 flex items-center"><div class="w-full border-t border-outline-variant/20"></div></div>
+                        <div class="relative flex justify-center text-[9px] uppercase tracking-[0.2em] font-black"><span class="bg-[#1A1C20] px-3 text-on-surface-variant/40">или по email</span></div>
+                    </div>
+                    
+                    <div class="flex gap-2">
+                        <input id="link-email" type="email" placeholder="email@example.com" class="flex-1 bg-[#1A1C20] border border-outline-variant/30 focus:border-primary outline-none px-4 py-3 rounded-xl text-sm transition-all text-white placeholder-gray-500">
+                        <button id="link-email-btn" onclick="handleLinkMagic()" class="shrink-0 bg-[#2A2D32] text-white hover:bg-[#3A3D42] border border-outline-variant/20 px-6 py-3 rounded-xl text-[11px] font-bold uppercase tracking-widest transition-all shadow-sm">
+                            Привязать
+                        </button>
+                    </div>
+                </section>
+            ` : ''}
 
             <div class="grid grid-cols-2 gap-3 sm:gap-4">
                 <div class="premium-card p-5 sm:p-8">
@@ -707,6 +844,12 @@ function renderSubscription() {
                 <button id="payment-btn" onclick="handlePayment()" class="primary-btn w-full py-4 sm:py-5 text-xs uppercase tracking-[0.2em] shadow-lg active:scale-[0.99] transition-all">
                     Активировать безлимит
                 </button>
+                
+                ${state.settings.auth_provider === 'guest' ? `
+                    <div class="text-center mt-2 animate-pulse">
+                        <p class="text-[10px] text-primary uppercase font-bold tracking-widest">⚠️ Для оплаты привяжите аккаунт в блоке выше</p>
+                    </div>
+                ` : ''}
                 
                 <p class="text-[10px] text-center text-on-surface-variant uppercase font-bold tracking-widest">
                     Безопасная оплата • Мгновенная активация
@@ -867,6 +1010,13 @@ async function handleSync(btnEl) {
 async function handlePayment() {
     if (typeof gtag === 'function') gtag('event', 'click_payment');
     
+    // Block guests on frontend too
+    if (state.settings.auth_provider === 'guest') {
+        showToast('Пожалуйста, сначала привяжите аккаунт (Google, VK или Email) для оплаты', true);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        return;
+    }
+
     const btn = document.getElementById('payment-btn');
     const originalContent = btn ? btn.innerHTML : 'Активировать безлимит';
     if (btn) {
@@ -878,6 +1028,15 @@ async function handlePayment() {
     try {
         const res = await fetch('/api/payments/create', { method: 'POST' });
         const data = await res.json();
+        
+        if (res.status === 403) {
+            // Guest account — need to link first
+            showToast(data.error || 'Привяжите аккаунт перед оплатой', true);
+            if (btn) { btn.disabled = false; btn.innerHTML = originalContent; }
+            setTimeout(() => showView('subscription'), 1500);
+            return;
+        }
+        
         if (data.url) {
             window.location.href = data.url;
         } else { 

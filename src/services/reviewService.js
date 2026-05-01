@@ -174,6 +174,8 @@ class ReviewService {
       const { data: sellers } = await supabase.from('sellers').select('*');
       if (!sellers) return;
       for (const seller of sellers) {
+        // Skip guests and accounts without real WB token
+        if (seller.auth_provider === 'guest') continue;
         if (seller.wb_token && seller.wb_token !== 'pending') {
           await this.processSellerReviews(seller);
         }

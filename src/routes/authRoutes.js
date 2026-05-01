@@ -124,6 +124,7 @@ router.get('/tg-callback', async (req, res) => {
         throw new Error('User creation failed: No data returned');
       }
       seller = newSeller;
+      seller.is_new = true;
     }
 
     if (!seller || !seller.id) {
@@ -147,7 +148,7 @@ router.get('/tg-callback', async (req, res) => {
     });
     console.log('Cookie auth_token set. Redirecting to /app with token');
 
-    res.redirect(`/app?token=${token}`);
+    res.redirect(`/app?token=${token}${seller.is_new ? '&isNew=true' : ''}`);
   } catch (error) {
     console.error('TG Auth Error:', error.message);
     res.redirect('/login?error=tg_auth_failed');
@@ -162,8 +163,95 @@ router.get('/me', authMiddleware, async (req, res) => {
 
 // 3. Logout
 router.post('/logout', (req, res) => {
-  res.clearCookie('auth_token', { path: '/' });
+  const host = req.headers.host || '';
+  res.clearCookie('auth_token', { 
+    path: '/',
+    secure: host.includes('wbreplyai.ru'),
+    sameSite: 'Lax'
+  });
   res.json({ success: true });
+});
+
+// 4.b Guest Login (Zero friction entry — with anti-abuse)
+router.get('/guest', async (req, res) => {
+    try {
+        // --- PROTECTION 1: If user already has a valid session, reuse it ---
+        const existingToken = req.cookies.auth_token;
+        if (existingToken) {
+            try {
+                const decoded = jwt.verify(existingToken, config.jwtSecret);
+                if (decoded.sellerId) {
+                    // Check if this seller actually exists in DB
+                    const { data: existingSeller } = await supabase
+                        .from('sellers')
+                        .select('id')
+                        .eq('id', decoded.sellerId)
+                        .maybeSingle();
+                    if (existingSeller) {
+                        console.log('Guest route: user already has valid session, reusing:', decoded.sellerId);
+                        return res.redirect(`/app?token=${existingToken}`);
+                    }
+                }
+            } catch (e) { /* token expired/invalid, continue to create new */ }
+        }
+
+        // --- PROTECTION 2: Rate limit by IP — max 3 guest accounts per IP per day ---
+        const clientIp = req.ip || req.headers['x-forwarded-for'] || 'unknown';
+        const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+        
+        const { count: recentGuestCount } = await supabase
+            .from('sellers')
+            .select('id', { count: 'exact', head: true })
+            .eq('auth_provider', 'guest')
+            .like('auth_provider_id', `guest_%_${clientIp.replace(/[^a-zA-Z0-9.:]/g, '')}`)
+            .gte('created_at', oneDayAgo);
+
+        if (recentGuestCount && recentGuestCount >= 3) {
+            console.warn(`Guest rate limit hit for IP: ${clientIp} (${recentGuestCount} accounts today)`);
+            return res.redirect('/login?error=too_many_attempts');
+        }
+
+        // --- Create guest account with IP tag for audit ---
+        const ipTag = clientIp.replace(/[^a-zA-Z0-9.:]/g, '').substring(0, 30);
+        const guestId = 'guest_' + crypto.randomBytes(8).toString('hex') + '_' + ipTag;
+        const expiresAt = new Date();
+        expiresAt.setDate(expiresAt.getDate() + 3); // 3 days trial
+
+        const { data: seller, error: insertError } = await supabase
+          .from('sellers')
+          .insert({
+            auth_provider: 'guest',
+            auth_provider_id: guestId,
+            display_name: 'Гость',
+            subscription_status: 'trial',
+            subscription_expires_at: expiresAt.toISOString()
+          })
+          .select('id')
+          .single();
+          
+        if (insertError) throw insertError;
+
+        const token = jwt.sign(
+          { sellerId: seller.id },
+          config.jwtSecret,
+          { expiresIn: '30d' }
+        );
+
+        const host = req.headers.host;
+        res.cookie('auth_token', token, {
+          httpOnly: false,
+          secure: host.includes('wbreplyai.ru'), 
+          maxAge: 30 * 24 * 60 * 60 * 1000,
+          path: '/',
+          sameSite: 'Lax'
+        });
+
+        console.log(`Guest account created: ${seller.id} | IP: ${clientIp}`);
+        res.redirect(`/app?token=${token}&isNew=true`);
+    } catch (error) {
+        console.error('Guest Auth Error:', error.message);
+        res.redirect('/login?error=guest_failed');
+    }
 });
 
 // 4. Demo Login (for development testing)
@@ -270,13 +358,54 @@ router.get('/google/callback', async (req, res) => {
       }
     );
 
+    // LINKING LOGIC: Check if current user is a guest
+    let currentSellerId = null;
+    try {
+        const token = req.cookies.auth_token;
+        if (token) {
+            const decoded = jwt.verify(token, config.jwtSecret);
+            currentSellerId = decoded.sellerId;
+        }
+    } catch (e) {}
+
     // Upsert user in sellers table
     let { data: seller, error: findError } = await supabase
       .from('sellers')
-      .select('id')
+      .select('*')
       .eq('auth_provider', 'google')
       .eq('auth_provider_id', profile.id)
       .maybeSingle();
+
+    if (!seller && currentSellerId) {
+        // Check if current user is a guest
+        let { data: currentSeller } = await supabase
+            .from('sellers')
+            .select('*')
+            .eq('id', currentSellerId)
+            .single();
+        
+        if (currentSeller && currentSeller.auth_provider === 'guest') {
+            console.log('Linking Guest account to Google:', currentSellerId);
+            const { data: updatedSeller, error: updateError } = await supabase
+                .from('sellers')
+                .update({
+                    auth_provider: 'google',
+                    auth_provider_id: profile.id,
+                    email: profile.email,
+                    display_name: profile.name,
+                    avatar_url: profile.picture,
+                    joined_at: new Date().toISOString()
+                })
+                .eq('id', currentSellerId)
+                .select()
+                .single();
+            
+            if (!updateError) {
+                seller = updatedSeller;
+                seller.is_new = true;
+            }
+        }
+    }
 
     if (!seller) {
       const expiresAt = new Date();
@@ -304,6 +433,7 @@ router.get('/google/callback', async (req, res) => {
         throw new Error('Google User creation failed: No data returned');
       }
       seller = newSeller;
+      seller.is_new = true;
     }
 
     if (!seller || !seller.id) {
@@ -327,7 +457,7 @@ router.get('/google/callback', async (req, res) => {
     });
     console.log('Cookie auth_token set. Redirecting to /app with token');
 
-    res.redirect(`/app?token=${token}`);
+    res.redirect(`/app?token=${token}${seller.is_new ? '&isNew=true' : ''}`);
   } catch (error) {
     console.error('Google Auth Error:', error.response?.data || error.message);
     res.redirect('/login?error=google_auth_failed');
@@ -382,7 +512,8 @@ router.get('/vk/callback', async (req, res) => {
   const code = req.query.code;
   const deviceId = req.query.device_id || '';
   const state = req.query.state || '';
-  const codeVerifier = req.cookies.vk_pkce_verifier || '';
+  // Accept code_verifier from cookie (manual flow) OR query (SDK flow)
+  const codeVerifier = req.query.code_verifier || req.cookies.vk_pkce_verifier || '';
   
   console.log('VK Callback received. Code:', !!code, '| device_id:', !!deviceId, '| verifier from cookie:', !!codeVerifier);
 
@@ -457,12 +588,53 @@ router.get('/vk/callback', async (req, res) => {
     // Step 3: Upsert user in sellers table
     console.log('VK Auth Success. User ID:', vkUserId, '| Name:', vkFirstName, vkLastName);
 
+    // LINKING LOGIC: Check if current user is a guest
+    let currentSellerId = null;
+    try {
+        const token = req.cookies.auth_token;
+        if (token) {
+            const decoded = jwt.verify(token, config.jwtSecret);
+            currentSellerId = decoded.sellerId;
+        }
+    } catch (e) {}
+
     let { data: seller } = await supabase
       .from('sellers')
-      .select('id')
+      .select('*')
       .eq('auth_provider', 'vk')
       .eq('auth_provider_id', vkUserId)
       .maybeSingle();
+
+    if (!seller && currentSellerId) {
+        // Check if current user is a guest
+        let { data: currentSeller } = await supabase
+            .from('sellers')
+            .select('*')
+            .eq('id', currentSellerId)
+            .single();
+        
+        if (currentSeller && currentSeller.auth_provider === 'guest') {
+            console.log('Linking Guest account to VK:', currentSellerId);
+            const { data: updatedSeller, error: updateError } = await supabase
+                .from('sellers')
+                .update({
+                    auth_provider: 'vk',
+                    auth_provider_id: vkUserId,
+                    email: vkEmail,
+                    display_name: `${vkFirstName} ${vkLastName}`.trim() || 'VK User',
+                    avatar_url: vkAvatar,
+                    joined_at: new Date().toISOString() // Mark as real registration
+                })
+                .eq('id', currentSellerId)
+                .select()
+                .single();
+            
+            if (!updateError) {
+                seller = updatedSeller;
+                seller.is_new = true;
+            }
+        }
+    }
 
     if (!seller) {
       const expiresAt = new Date();
@@ -513,7 +685,8 @@ router.get('/vk/callback', async (req, res) => {
     });
     console.log('Cookie auth_token set. Redirecting to /app');
 
-    res.redirect(`/app?token=${token}`);
+    const isNew = req.query.isNewUser === 'true' || !seller.joined_at; // Logic to detect if it's a first-time login
+    res.redirect(`/app?token=${token}${isNew ? '&isNew=true' : ''}`);
   } catch (error) {
     const vkErr = error.response?.data;
     console.error('VK Auth Error Details:', JSON.stringify(vkErr, null, 2));
@@ -585,13 +758,56 @@ router.post('/magic-verify', async (req, res) => {
 
     console.log(`Magic Verify Success: ${email} | Provider: ${authProvider} | ID: ${authProviderId}`);
 
+    // LINKING LOGIC: Check if current user is a guest
+    let currentSellerId = null;
+    try {
+        const token = req.cookies.auth_token;
+        if (token) {
+            const decoded = jwt.verify(token, config.jwtSecret);
+            currentSellerId = decoded.sellerId;
+        }
+    } catch (e) {}
+
     // Upsert user in sellers table
     let { data: seller } = await supabase
       .from('sellers')
-      .select('id')
+      .select('*')
       .eq('auth_provider', authProvider)
       .eq('auth_provider_id', authProviderId)
       .maybeSingle();
+
+    let isNew = false;
+
+    if (!seller && currentSellerId) {
+        // Check if current user is a guest — link instead of creating new
+        let { data: currentSeller } = await supabase
+            .from('sellers')
+            .select('*')
+            .eq('id', currentSellerId)
+            .single();
+        
+        if (currentSeller && currentSeller.auth_provider === 'guest') {
+            console.log('Linking Guest account to email:', currentSellerId);
+            const { data: updatedSeller, error: updateError } = await supabase
+                .from('sellers')
+                .update({
+                    auth_provider: authProvider,
+                    auth_provider_id: authProviderId,
+                    email: email,
+                    display_name: user.user_metadata?.full_name || email.split('@')[0],
+                    avatar_url: user.user_metadata?.avatar_url || null,
+                    joined_at: new Date().toISOString()
+                })
+                .eq('id', currentSellerId)
+                .select()
+                .single();
+            
+            if (!updateError) {
+                seller = updatedSeller;
+                isNew = true;
+            }
+        }
+    }
 
     if (!seller) {
       console.log('New magic link user, creating seller record...');
@@ -617,6 +833,7 @@ router.post('/magic-verify', async (req, res) => {
         throw insertError;
       }
       seller = newSeller;
+      isNew = true;
     }
 
     if (!seller || !seller.id) {
@@ -640,7 +857,7 @@ router.post('/magic-verify', async (req, res) => {
     });
 
     console.log('Magic Verify: JWT issued for sellerId:', seller.id);
-    res.json({ success: true, token, sellerId: seller.id });
+    res.json({ success: true, token, sellerId: seller.id, isNew });
   } catch (error) {
     console.error('Magic Verify Error:', error.message);
     res.status(500).json({ error: error.message });
@@ -706,6 +923,7 @@ router.get('/callback', async (req, res) => {
         throw insertError;
       }
       seller = newSeller;
+      seller.is_new = true;
     }
 
     if (!seller || !seller.id) {
@@ -730,7 +948,7 @@ router.get('/callback', async (req, res) => {
     });
     
     console.log('Local auth_token cookie set. Redirecting to /app');
-    res.redirect(`/app?token=${token}`);
+    res.redirect(`/app?token=${token}${seller.is_new ? '&isNew=true' : ''}`);
   } catch (error) {
     console.error('Supabase Callback Detailed Error:', error.message);
     res.redirect(`/login?error=auth_failed&details=${encodeURIComponent(error.message)}`);
