@@ -606,12 +606,33 @@ window.onTelegramAuth = async function(user) {
 }
 
 function renderSettings() {
+    const isTokenMissing = !state.settings.wb_token || !state.settings.wb_token_valid;
+    
     return `
         <div class="max-w-2xl mx-auto space-y-10 animate-in pb-20">
             <header class="text-left">
                 <p class="text-primary text-[10px] font-black uppercase tracking-[0.3em] mb-2">Конфигурация</p>
                 <h2 class="font-headline text-3xl sm:text-4xl font-bold text-text-main tracking-tight">Бизнес-настройка</h2>
             </header>
+
+            ${isTokenMissing ? `
+                <div class="bg-primary/10 border-2 border-primary/40 rounded-2xl p-6 sm:p-8 text-center space-y-4 shadow-lg shadow-primary/5 animate-pulse-slow">
+                    <div class="w-16 h-16 mx-auto bg-primary/20 rounded-full flex items-center justify-center mb-4">
+                        <span class="material-symbols-outlined text-primary text-3xl font-black">key</span>
+                    </div>
+                    <div>
+                        <div class="flex items-center justify-center gap-2 mb-2">
+                            <h3 class="text-text-main font-headline text-xl sm:text-2xl font-bold">Для работы установите токен</h3>
+                            <button onclick="showTokenInfoModal()" class="text-primary hover:bg-primary/10 w-8 h-8 rounded-full flex items-center justify-center transition-colors">
+                                <span class="material-symbols-outlined text-xl">info</span>
+                            </button>
+                        </div>
+                        <p class="text-on-surface-variant text-sm leading-relaxed max-w-md mx-auto">
+                            Нейросеть не может работать без доступа к отзывам. Пожалуйста, добавьте ваш <strong class="text-text-main">Standard API ключ Wildberries</strong> ниже.
+                        </p>
+                    </div>
+                </div>
+            ` : ''}
 
             <div class="space-y-5">
                 <section class="premium-card p-5 sm:p-8 space-y-5">
@@ -1697,4 +1718,50 @@ function showToast(message, isError = false) {
         toast.classList.add('opacity-0');
         setTimeout(() => toast.remove(), 300);
     }, 2500);
+}
+
+function showTokenInfoModal() {
+    const existing = document.getElementById('token-info-modal');
+    if (existing) existing.remove();
+
+    const modal = document.createElement('div');
+    modal.id = 'token-info-modal';
+    modal.className = 'fixed inset-0 z-[99999] flex items-center justify-center p-4 sm:p-6 bg-black/60 backdrop-blur-sm animate-in';
+    modal.onclick = (e) => {
+        if (e.target === modal) modal.remove();
+    };
+
+    modal.innerHTML = `
+        <div class="bg-bg-main w-full sm:rounded-2xl flex flex-col relative overflow-hidden shadow-2xl" style="max-width: 480px;" onclick="event.stopPropagation()">
+            <!-- Header -->
+            <div class="flex justify-between items-center border-b border-outline-variant/30 p-4 shrink-0 bg-surface">
+                <div class="flex items-center gap-3">
+                    <span class="material-symbols-outlined text-primary text-3xl">api</span>
+                    <h3 class="font-headline text-sm font-bold tracking-tight text-text-main uppercase tracking-widest">Инструкция по токену</h3>
+                </div>
+                <button onclick="document.getElementById('token-info-modal').remove()" class="text-on-surface-variant hover:text-text-main transition-colors p-2 rounded-lg bg-bg-main border border-outline-variant/30 flex items-center justify-center">
+                    <span class="material-symbols-outlined">close</span>
+                </button>
+            </div>
+            
+            <!-- Content -->
+            <div class="p-6 space-y-5 text-sm text-on-surface-variant leading-relaxed">
+                <p>
+                    Для автоматической работы нейросети с вашими отзывами, нам необходим доступ на чтение и ответ через официальный API Wildberries.
+                </p>
+                <ol class="list-decimal pl-5 space-y-2">
+                    <li>Перейдите на портал разработчиков: <a href="https://dev.wildberries.ru/" target="_blank" class="text-primary font-bold hover:underline">dev.wildberries.ru</a></li>
+                    <li>Авторизуйтесь под своим аккаунтом продавца.</li>
+                    <li>Создайте новый токен (тип ключа: <b>Стандартный</b> / <b>Standard</b>).</li>
+                    <li>Скопируйте ключ и вставьте его в поле "API Токен Wildberries" в настройках нашего приложения.</li>
+                </ol>
+                <p class="pt-2 border-t border-outline-variant/30">
+                    <span class="font-bold text-text-main">Возникли трудности?</span><br>
+                    Если что-то не получается, пишите нам в <span onclick="document.getElementById('token-info-modal').remove(); showModal('support')" class="text-primary font-bold cursor-pointer hover:underline">поддержку</span>.
+                </p>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
 }
