@@ -188,44 +188,42 @@ async function refreshData() {
 
         if (isExpired && !window._expiredPromptShown) {
             window._expiredPromptShown = true;
-            setTimeout(() => {
-                if (state.currentView !== 'subscription') showView('subscription');
-                
-                const toast = document.createElement('div');
-                toast.className = 'fixed top-4 left-1/2 -translate-x-1/2 z-[9999] bg-[#2A2D32] border border-red-500/40 shadow-2xl rounded-2xl px-5 py-4 flex gap-4 items-center max-w-[90vw] animate-slide-down';
-                toast.innerHTML = `
-                    <div class="bg-red-500/20 text-red-400 w-10 h-10 rounded-full flex items-center justify-center shrink-0">
-                        <span class="material-symbols-outlined font-black">timer_off</span>
-                    </div>
-                    <div class="flex-1">
-                        <h4 class="text-white font-bold text-sm tracking-wide">Тестовый период завершен</h4>
-                        <p class="text-on-surface-variant text-xs mt-1 leading-relaxed">Нейросеть приостановлена. Оплатите безлимитный доступ, чтобы продолжить работу!</p>
-                    </div>
-                    <button onclick="this.parentElement.remove()" class="text-on-surface-variant hover:text-white p-2 transition-colors"><span class="material-symbols-outlined text-sm">close</span></button>
-                `;
-                document.body.appendChild(toast);
-                setTimeout(() => { if(toast.parentElement) toast.remove(); }, 12000);
-            }, 500);
+            state.currentView = 'subscription';
+            
+            const toast = document.createElement('div');
+            toast.className = 'fixed top-4 left-1/2 -translate-x-1/2 bg-[#2A2D32] border border-red-500/40 shadow-2xl rounded-2xl px-5 py-4 flex gap-4 items-center max-w-[90vw] animate-slide-down';
+            toast.style.zIndex = '9999';
+            toast.innerHTML = `
+                <div class="bg-red-500/20 text-red-400 w-10 h-10 rounded-full flex items-center justify-center shrink-0">
+                    <span class="material-symbols-outlined font-black">timer_off</span>
+                </div>
+                <div class="flex-1">
+                    <h4 class="text-white font-bold text-sm tracking-wide">Тестовый период завершен</h4>
+                    <p class="text-on-surface-variant text-xs mt-1 leading-relaxed">Нейросеть приостановлена. Оплатите безлимитный доступ, чтобы продолжить работу!</p>
+                </div>
+                <button onclick="this.parentElement.remove()" class="text-on-surface-variant hover:text-white p-2 transition-colors"><span class="material-symbols-outlined text-sm">close</span></button>
+            `;
+            document.body.appendChild(toast);
+            setTimeout(() => { if(toast.parentElement) toast.remove(); }, 12000);
         } else if ((!state.settings.wb_token || !state.settings.wb_token_valid) && !window._tokenPromptShown && !isExpired) {
             window._tokenPromptShown = true;
-            setTimeout(() => {
-                if (state.currentView !== 'settings') showView('settings');
-                
-                const toast = document.createElement('div');
-                toast.className = 'fixed top-4 left-1/2 -translate-x-1/2 z-[9999] bg-[#2A2D32] border border-primary/40 shadow-2xl rounded-2xl px-5 py-4 flex gap-4 items-center max-w-[90vw] animate-slide-down';
-                toast.innerHTML = `
-                    <div class="bg-primary/20 text-primary w-10 h-10 rounded-full flex items-center justify-center shrink-0">
-                        <span class="material-symbols-outlined font-black">key</span>
-                    </div>
-                    <div class="flex-1">
-                        <h4 class="text-white font-bold text-sm tracking-wide">Добавьте API токен Wildberries</h4>
-                        <p class="text-on-surface-variant text-xs mt-1 leading-relaxed">Без него нейросеть не сможет работать. Укажите токен, чтобы активировать <strong class="text-white">3 дня бесплатного доступа</strong>!</p>
-                    </div>
-                    <button onclick="this.parentElement.remove()" class="text-on-surface-variant hover:text-white p-2 transition-colors"><span class="material-symbols-outlined text-sm">close</span></button>
-                `;
-                document.body.appendChild(toast);
-                setTimeout(() => { if(toast.parentElement) toast.remove(); }, 12000);
-            }, 500);
+            state.currentView = 'settings';
+            
+            const toast = document.createElement('div');
+            toast.className = 'fixed top-4 left-1/2 -translate-x-1/2 bg-[#2A2D32] border border-primary/40 shadow-2xl rounded-2xl px-5 py-4 flex gap-4 items-center max-w-[90vw] animate-slide-down';
+            toast.style.zIndex = '9999';
+            toast.innerHTML = `
+                <div class="bg-primary/20 text-primary w-10 h-10 rounded-full flex items-center justify-center shrink-0">
+                    <span class="material-symbols-outlined font-black">key</span>
+                </div>
+                <div class="flex-1">
+                    <h4 class="text-white font-bold text-sm tracking-wide">Добавьте API токен Wildberries</h4>
+                    <p class="text-on-surface-variant text-xs mt-1 leading-relaxed">Без него нейросеть не сможет работать. Укажите токен, чтобы активировать <strong class="text-white">3 дня бесплатного доступа</strong>!</p>
+                </div>
+                <button onclick="this.parentElement.remove()" class="text-on-surface-variant hover:text-white p-2 transition-colors"><span class="material-symbols-outlined text-sm">close</span></button>
+            `;
+            document.body.appendChild(toast);
+            setTimeout(() => { if(toast.parentElement) toast.remove(); }, 12000);
         }
 
     } catch (e) {
