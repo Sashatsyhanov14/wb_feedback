@@ -189,7 +189,7 @@ async function refreshData() {
         if (isExpired && !window._expiredPromptShown) {
             window._expiredPromptShown = true;
             setTimeout(() => {
-                if (state.currentView !== 'account') showView('account');
+                if (state.currentView !== 'subscription') showView('subscription');
                 
                 const toast = document.createElement('div');
                 toast.className = 'fixed top-4 left-1/2 -translate-x-1/2 z-[9999] bg-[#2A2D32] border border-red-500/40 shadow-2xl rounded-2xl px-5 py-4 flex gap-4 items-center max-w-[90vw] animate-slide-down';
@@ -209,7 +209,7 @@ async function refreshData() {
         } else if ((!state.settings.wb_token || !state.settings.wb_token_valid) && !window._tokenPromptShown && !isExpired) {
             window._tokenPromptShown = true;
             setTimeout(() => {
-                if (state.currentView !== 'business') showView('business');
+                if (state.currentView !== 'settings') showView('settings');
                 
                 const toast = document.createElement('div');
                 toast.className = 'fixed top-4 left-1/2 -translate-x-1/2 z-[9999] bg-[#2A2D32] border border-primary/40 shadow-2xl rounded-2xl px-5 py-4 flex gap-4 items-center max-w-[90vw] animate-slide-down';
