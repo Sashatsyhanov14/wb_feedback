@@ -5,7 +5,97 @@ const supabase = require('../db/supabase');
 const wbService = require('../services/wbService');
 const telegramService = require('../services/telegramService');
 const authMiddleware = require('../middleware/authMiddleware');
+const aiService = require('../services/aiService');
 
+// In-memory daily test counter per seller
+const testCounters = {};
+function getTestCount(sellerId) {
+  const today = new Date().toDateString();
+  if (!testCounters[sellerId] || testCounters[sellerId].date !== today) {
+    testCounters[sellerId] = { date: today, count: 0 };
+  }
+  return testCounters[sellerId];
+}
+
+// AI Test Endpoint (Playground)
+router.post('/ai/test', authMiddleware, async (req, res) => {
+  try {
+    const sellerId = req.user.sellerId;
+    const { reviewText, productName, productDescription, characteristicsText, toneOfVoice, brandName, rating } = req.body;
+
+    if (!reviewText) {
+      return res.status(400).json({ error: 'Текст отзыва обязателен' });
+    }
+
+    const seller = await getSeller(sellerId);
+    if (!seller) return res.status(404).json({ error: 'Продавец не найден' });
+
+    // Rate limit: 5 tests/day for users without active subscription
+    const hasSubscription = seller.subscription_status === 'trial' || seller.subscription_status === 'active';
+    const isExpired = seller.subscription_expires_at && new Date() > new Date(seller.subscription_expires_at);
+    const isUnlimited = hasSubscription && !isExpired;
+
+    if (!isUnlimited) {
+      const counter = getTestCount(sellerId);
+      if (counter.count >= 5) {
+        return res.status(429).json({ 
+          error: 'Лимит тестов исчерпан (5 в день). Подключите токен WB, чтобы получить безлимитный доступ!',
+          limitReached: true,
+          testsUsed: counter.count,
+          testsMax: 5
+        });
+      }
+      counter.count++;
+    }
+
+    // Build custom context for the test
+    const mockProduct = { 
+      name: productName || 'Тестовый товар', 
+      description: productDescription || '',
+      characteristics: characteristicsText ? [{ name: 'Свойства', value: characteristicsText }] : []
+    };
+    
+    const mockMatrix = { 
+      product_name: productName || 'Тестовый товар' 
+    };
+
+    const customSettings = {
+      ...seller,
+      brand_name: brandName || seller.brand_name || 'Наш Магазин',
+      custom_instructions: toneOfVoice || seller.custom_instructions
+    };
+
+    const reviewInput = { 
+      text: reviewText, 
+      pros: '', 
+      cons: '',
+      rating: rating || null 
+    };
+
+    const response = await aiService.generateResponse(
+      reviewInput, 
+      mockProduct, 
+      mockMatrix, 
+      customSettings
+    );
+
+    // Track test in DB for admin analytics
+    try {
+      await supabase.from('support_tickets').insert({
+        seller_id: sellerId,
+        type: 'analytics',
+        message: 'ai_test_success'
+      });
+    } catch (trackErr) {
+      console.error('[Analytics] Failed to log AI test:', trackErr);
+    }
+
+    res.json(response);
+  } catch (error) {
+    console.error('AI Test error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
 // Helper to get seller by UUID
 async function getSeller(sellerId) {
   let { data: seller, error } = await supabase
@@ -138,6 +228,14 @@ router.post('/settings', authMiddleware, async (req, res) => {
     if (!seller) throw new Error('Could not find seller profile');
 
     const isFirstToken = !seller.wb_token && wb_token;
+    
+    // Check token validity if it's provided and new/changed
+    if (wb_token && wb_token !== seller.wb_token) {
+      const isValid = await wbService.validateToken(wb_token);
+      if (!isValid) {
+        return res.status(400).json({ error: 'Неверный API ключ Wildberries. Проверьте правильность или создайте новый.' });
+      }
+    }
 
     const { data, error } = await supabase
       .from('sellers')
@@ -259,6 +357,21 @@ router.get('/admin/stats', authMiddleware, async (req, res) => {
         .select('id', { count: 'exact', head: true })
         .in('status', ['approved', 'auto_posted']);
       totalApproved = taCount || 0;
+
+      // Count AI Tests from our analytics logs
+      const { count: testCount } = await supabase.from('support_tickets')
+        .select('id', { count: 'exact', head: true })
+        .eq('type', 'analytics')
+        .eq('message', 'ai_test_success');
+      totalTests = testCount || 0;
+
+      const { count: testTodayCount } = await supabase.from('support_tickets')
+        .select('id', { count: 'exact', head: true })
+        .eq('type', 'analytics')
+        .eq('message', 'ai_test_success')
+        .gte('created_at', todayISO);
+      testsToday = testTodayCount || 0;
+
     } catch (dbError) {
       console.error('[AdminStats] Database query error:', dbError);
     }
@@ -269,7 +382,9 @@ router.get('/admin/stats', authMiddleware, async (req, res) => {
       activeToday,
       withoutToken,
       totalApproved,
-      totalSubscribed
+      totalSubscribed,
+      totalTests,
+      testsToday
     });
   } catch (error) {
     res.status(500).json({ error: error.message || 'Internal Server Error' });

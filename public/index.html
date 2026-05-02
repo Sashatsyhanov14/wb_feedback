@@ -224,6 +224,10 @@
                     <span class="material-symbols-outlined text-xl">forum</span>
                     <span class="nav-text">Отзывы</span>
                 </a>
+                <a onclick="showView('ai')" class="tab-item flex items-center gap-4 cursor-pointer">
+                    <span class="material-symbols-outlined text-xl">psychology</span>
+                    <span class="nav-text">ИИ Тест</span>
+                </a>
                 <a onclick="showView('subscription')" class="tab-item flex items-center gap-4 cursor-pointer">
                     <span class="material-symbols-outlined text-xl">account_balance_wallet</span>
                     <span class="nav-text">Аккаунт</span>
@@ -259,7 +263,7 @@
                 <span class="material-symbols-outlined" style="color: var(--c-text-dim)">menu</span>
             </header>
 
-            <div id="content-view" class="max-w-4xl mx-auto px-6 pt-24 pb-32 lg:py-20 w-full">
+            <div id="content-view" class="w-full mx-auto px-4 sm:px-6 lg:px-8">
                 <!-- Content injected by ui.js -->
             </div>
         </main>
@@ -273,7 +277,11 @@
         </a>
         <a id="nav-reviews" class="tab-item flex-1 flex flex-col items-center justify-center transition-all active:scale-95" onclick="showView('reviews')">
             <span class="material-symbols-outlined text-xl">forum</span>
-            <span class="text-[10px] font-black uppercase tracking-[0.2em] mt-1.5">Отзывы</span>
+            <span class="nav-text mt-1.5" style="font-size: 8px;">Отзывы</span>
+        </a>
+        <a id="nav-ai" class="tab-item flex-1 flex flex-col items-center justify-center transition-all active:scale-95" onclick="showView('ai')">
+            <span class="material-symbols-outlined text-xl">psychology</span>
+            <span class="nav-text mt-1.5" style="font-size: 8px;">ИИ Тест</span>
         </a>
         <a id="nav-subscription" class="tab-item flex-1 flex flex-col items-center justify-center transition-all active:scale-95" onclick="showView('subscription')">
             <span class="material-symbols-outlined text-xl">account_balance_wallet</span>

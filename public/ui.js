@@ -92,9 +92,30 @@ document.addEventListener('DOMContentLoaded', async () => {
             window.location.href = '/api/auth/guest';
         }
     } else {
-        showView(state.currentView || 'reviews'); // render immediately so screen isn't blank
-        await refreshData(); // then load data (onboarding prompt may redirect inside)
-        showView(state.currentView || 'reviews'); // re-render with fresh data
+        // First visit ever → AI test tab
+        const hasVisited = localStorage.getItem('wb_has_visited');
+        if (!hasVisited) {
+            localStorage.setItem('wb_has_visited', '1');
+            showView('ai');
+        } else {
+            showView('ai'); // show test while loading
+        }
+        await refreshData();
+        
+        // Smart routing only if we don't have a view preference
+        const currentPath = window.location.hash.replace('#', '');
+        const validViews = ['settings', 'reviews', 'subscription', 'interface', 'admin', 'ai'];
+        
+        let targetView = state.currentView;
+        if (!targetView && validViews.includes(currentPath)) {
+            targetView = currentPath;
+        }
+        
+        if (!targetView) {
+            targetView = getSmartView();
+        }
+        
+        showView(targetView);
     }
 
     // 3. Handle Payment Redirect Hash
@@ -207,23 +228,7 @@ async function refreshData() {
             setTimeout(() => { if(toast.parentElement) toast.remove(); }, 12000);
         } else if ((!state.settings.wb_token || !state.settings.wb_token_valid) && !window._tokenPromptShown && !isExpired) {
             window._tokenPromptShown = true;
-            state.currentView = 'settings';
-            
-            const toast = document.createElement('div');
-            toast.className = 'fixed top-4 left-1/2 -translate-x-1/2 bg-[#2A2D32] border border-primary/40 shadow-2xl rounded-2xl px-5 py-4 flex gap-4 items-center max-w-[90vw] animate-slide-down';
-            toast.style.zIndex = '9999';
-            toast.innerHTML = `
-                <div class="bg-primary/20 text-primary w-10 h-10 rounded-full flex items-center justify-center shrink-0">
-                    <span class="material-symbols-outlined font-black">key</span>
-                </div>
-                <div class="flex-1">
-                    <h4 class="text-white font-bold text-sm tracking-wide">Добавьте API токен Wildberries</h4>
-                    <p class="text-on-surface-variant text-xs mt-1 leading-relaxed">Без него нейросеть не сможет работать. Укажите токен, чтобы активировать <strong class="text-white">3 дня бесплатного доступа</strong>!</p>
-                </div>
-                <button onclick="this.parentElement.remove()" class="text-on-surface-variant hover:text-white p-2 transition-colors"><span class="material-symbols-outlined text-sm">close</span></button>
-            `;
-            document.body.appendChild(toast);
-            setTimeout(() => { if(toast.parentElement) toast.remove(); }, 12000);
+            // Don't force view change — let smart routing handle it
         }
 
     } catch (e) {
@@ -240,8 +245,27 @@ async function handleLogout() {
     window.location.href = '/';
 }
 
+// Smart routing: determines which tab to show based on user state
+function getSmartView() {
+    const hasToken = state.settings.wb_token && state.settings.wb_token_valid;
+    const hasSubscription = state.settings.subscription_status === 'trial' || state.settings.subscription_status === 'active';
+    const expiresAt = state.settings.subscription_expires_at ? new Date(state.settings.subscription_expires_at) : null;
+    const isExpired = hasSubscription && expiresAt && new Date() > expiresAt;
+    const isFirstVisit = !localStorage.getItem('wb_has_tested');
+
+    // First visit and never tested → AI test
+    if (isFirstVisit) return 'ai';
+    // Expired subscription → subscription page
+    if (isExpired) return 'subscription';
+    // Has token → reviews
+    if (hasToken) return 'reviews';
+    // No token → settings (business)
+    return 'settings';
+}
+
 function showView(view) {
     state.currentView = view;
+    if (view !== 'login') window.location.hash = view;
     const content = document.getElementById('content-view');
     const nav = document.getElementById('main-nav');
     const sidebar = document.getElementById('desktop-sidebar');
@@ -293,8 +317,14 @@ function showView(view) {
         content.innerHTML = renderInterface();
     } else if (view === 'admin') {
         content.innerHTML = renderAdmin();
+    } else if (view === 'ai') {
+        content.innerHTML = renderAIPage();
     } else if (view === 'login') {
         content.innerHTML = renderLogin();
+    }
+
+    if (typeof gtag === 'function') {
+        gtag('event', 'view_' + view);
     }
 }
 
@@ -592,9 +622,9 @@ window.onTelegramAuth = async function(user) {
             const data = await res.json();
             state.sellerId = data.sellerId;
             showToast('Успешный вход');
-            showView('reviews');
+            showView('ai');
             await refreshData();
-            showView(state.currentView);
+            showView(getSmartView());
         } else {
             const data = await res.json();
             showToast(data.error || 'Ошибка входа', true);
@@ -606,7 +636,7 @@ window.onTelegramAuth = async function(user) {
 }
 
 function renderSettings() {
-    const isTokenMissing = !state.settings.wb_token || !state.settings.wb_token_valid;
+    const isTokenMissing = !state.settings.wb_token;
     
     return `
         <div class="max-w-2xl mx-auto space-y-10 animate-in pb-20">
@@ -636,18 +666,36 @@ function renderSettings() {
 
             <div class="space-y-5">
                 <section class="premium-card p-5 sm:p-8 space-y-5">
-                    <div class="space-y-2">
-                        <label class="text-xs font-bold uppercase tracking-widest text-on-surface-variant">API Токен Wildberries</label>
+                    <div class="space-y-4">
+                        <div class="flex flex-col gap-1.5">
+                            <label class="text-xs font-bold uppercase tracking-widest text-on-surface-variant">API Токен Wildberries</label>
+                            <p class="text-[13px] font-bold text-green-600 dark:text-green-500">Нам нужен токен с правами «Вопросы и отзывы» + «Контент»</p>
+                            <p class="text-[11px] text-on-surface-variant font-medium">Мы физически не имеем доступа к вашим ценам, заказам и финансам. Право «Контент» нужно только для чтения описания товара, чтобы ИИ отвечал экспертно.</p>
+                        </div>
+
                         <div class="relative">
                             <input id="wb-token-input" class="w-full bg-bg-main border border-outline-variant outline-none py-4 px-5 pr-12 text-text-main text-sm font-mono focus:border-primary transition-colors rounded-lg" 
-                                type="password" value="${state.settings.wb_token || ''}" placeholder="Вставьте ваш Standard API ключ">
+                                type="password" value="${state.settings.wb_token || ''}" placeholder="Вставьте ваш API ключ">
                             <button class="absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-primary transition-colors" onclick="toggleTokenVisibility()">
                                 <span id="token-visibility-icon" class="material-symbols-outlined text-lg">visibility</span>
                             </button>
                         </div>
-                        <p class="text-[10px] text-on-surface-variant leading-relaxed">
-                            Используйте ключ типа "Стандартный". Мы не имеем доступа к вашим продажам и финансам.
-                        </p>
+
+                        ${isTokenMissing ? `
+                            <div class="bg-primary/5 border border-primary/20 rounded-xl p-4 sm:p-5 space-y-3">
+                                <a href="https://seller.wildberries.ru/supplier-settings/access-to-api" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-2 text-primary font-bold hover:underline transition-all">
+                                    <span class="material-symbols-outlined text-sm">open_in_new</span>
+                                    Перейти в кабинет ВБ для создания токена
+                                </a>
+                                <ol class="list-decimal pl-4 sm:pl-5 text-[11px] sm:text-xs text-text-main space-y-2 opacity-90 leading-relaxed">
+                                    <li>Перейдите по ссылке в настройки API Wildberries.</li>
+                                    <li>Нажмите «Создать новый токен».</li>
+                                    <li>Введите любое имя (например, «WBReply»).</li>
+                                    <li>Выберите <b>две галочки: «Вопросы и отзывы»</b> и <b>«Контент»</b> (остальные не нужны — мы не трогаем цены, заказы и финансы!).</li>
+                                    <li>Нажмите «Создать», скопируйте токен и вставьте его сюда.</li>
+                                </ol>
+                            </div>
+                        ` : ''}
                     </div>
 
                     <div class="space-y-2">
@@ -762,13 +810,43 @@ function renderSubscription() {
     const diff = expiresAt ? new Date(expiresAt) - new Date() : 0;
     const daysLeft = Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
     const expiredDateStr = expiresAt ? new Date(expiresAt).toLocaleDateString() : '—';
+    // Premium block is at the bottom ONLY for active (paid) subscriptions with time left
+    const hasPremium = state.settings.subscription_status === 'active' && daysLeft > 0;
     
+    const premiumBlockHtml = `
+            <section class="premium-card p-6 sm:p-10 space-y-6 ${!hasPremium ? 'border-primary/50 shadow-[0_0_40px_rgba(var(--primary-rgb),0.15)] bg-gradient-to-br from-primary/5 to-transparent' : ''}">
+                <div class="space-y-3">
+                    <h2 class="font-headline text-2xl sm:text-3xl font-bold text-text-main tracking-tighter">Premium Доступ</h2>
+                    <div class="flex items-baseline gap-2">
+                        <span class="text-3xl sm:text-4xl font-bold text-primary">₽749</span>
+                        <span class="text-sm font-medium text-on-surface-variant">/ месяц</span>
+                    </div>
+                </div>
+                
+                <button id="payment-btn" onclick="handlePayment()" class="primary-btn w-full py-4 sm:py-5 text-xs uppercase tracking-[0.2em] shadow-lg active:scale-[0.99] transition-all">
+                    Активировать безлимит
+                </button>
+                
+                ${state.settings.auth_provider === 'guest' ? `
+                    <div class="text-center mt-2 animate-pulse">
+                        <p class="text-[10px] text-primary uppercase font-bold tracking-widest">⚠️ Для оплаты привяжите аккаунт ниже</p>
+                    </div>
+                ` : ''}
+                
+                <p class="text-[10px] text-center text-on-surface-variant uppercase font-bold tracking-widest">
+                    Безопасная оплата • Мгновенная активация
+                </p>
+            </section>
+    `;
+
     return `
         <div class="max-w-2xl mx-auto space-y-8 animate-in pb-20">
             <header>
                 <p class="text-primary text-[10px] font-black uppercase tracking-[0.3em] mb-2">Финансы и показатели</p>
                 <h2 class="font-headline text-2xl sm:text-3xl font-bold text-text-main tracking-tight">Обзор аккаунта</h2>
             </header>
+
+            ${!hasPremium ? premiumBlockHtml : ''}
 
             <!-- User Profile Card -->
             <section class="premium-card p-5 sm:p-8 flex items-center justify-between gap-5">
@@ -851,29 +929,7 @@ function renderSubscription() {
                 </div>
             </section>
 
-            <section class="premium-card p-6 sm:p-10 space-y-6">
-                <div class="space-y-3">
-                    <h2 class="font-headline text-2xl sm:text-3xl font-bold text-text-main tracking-tighter">Premium Доступ</h2>
-                    <div class="flex items-baseline gap-2">
-                        <span class="text-3xl sm:text-4xl font-bold text-primary">₽749</span>
-                        <span class="text-sm font-medium text-on-surface-variant">/ месяц</span>
-                    </div>
-                </div>
-                
-                <button id="payment-btn" onclick="handlePayment()" class="primary-btn w-full py-4 sm:py-5 text-xs uppercase tracking-[0.2em] shadow-lg active:scale-[0.99] transition-all">
-                    Активировать безлимит
-                </button>
-                
-                ${state.settings.auth_provider === 'guest' ? `
-                    <div class="text-center mt-2 animate-pulse">
-                        <p class="text-[10px] text-primary uppercase font-bold tracking-widest">⚠️ Для оплаты привяжите аккаунт в блоке выше</p>
-                    </div>
-                ` : ''}
-                
-                <p class="text-[10px] text-center text-on-surface-variant uppercase font-bold tracking-widest">
-                    Безопасная оплата • Мгновенная активация
-                </p>
-            </section>
+            ${hasPremium ? premiumBlockHtml : ''}
         </div>
     `;
 }
@@ -901,7 +957,8 @@ async function handleSaveSettings() {
             showToast('Конфигурация сохранена');
             await refreshData();
         } else {
-            showToast('Ошибка сохранения', true);
+            const errData = await res.json().catch(() => ({}));
+            showToast(errData.error || 'Ошибка сохранения', true);
         }
     } catch (e) { showToast('Ошибка сети', true); }
     finally {
@@ -1305,8 +1362,8 @@ function renderAdmin() {
                     <p class="text-2xl sm:text-3xl font-bold text-text-main">${s.totalSellers || 0}</p>
                 </div>
                 <div class="premium-card p-5">
-                    <p class="text-[9px] sm:text-[10px] font-black uppercase tracking-widest text-on-surface-variant mb-2">Вставили токен</p>
-                    <p class="text-2xl sm:text-3xl font-bold text-primary">${tokenCount}</p>
+                    <p class="text-[9px] sm:text-[10px] font-black uppercase tracking-widest text-on-surface-variant mb-2">Сделали тест</p>
+                    <p class="text-2xl sm:text-3xl font-bold text-primary">${s.totalTests || 0}</p>
                 </div>
                 <div class="premium-card p-5">
                     <p class="text-[9px] sm:text-[10px] font-black uppercase tracking-widest text-on-surface-variant mb-2">С подпиской</p>
@@ -1616,7 +1673,7 @@ async function openAdminReviews(userId) {
                         </div>
                     ` : ''}
                     <div class="mt-3 flex justify-between items-center">
-                        <button id="feedback-reply-btn-${f.id}" onclick="promptFeedbackReply('${f.id}')" class="text-[10px] bg-primary text-white px-3 py-1.5 rounded-lg uppercase tracking-widest font-bold shadow-md hover:bg-primary/90 active:scale-95 transition-all">Ответить</button>
+                        <button id="feedback-reply-btn-${f.id}" onclick="promptFeedbackReply('${f.id}'); if(typeof gtag === 'function') gtag('event', 'click_admin_feedback_reply');" class="text-[10px] bg-primary text-white px-3 py-1.5 rounded-lg uppercase tracking-widest font-bold shadow-md hover:bg-primary/90 active:scale-95 transition-all">Ответить</button>
                         <span class="text-[9px] text-on-surface-variant uppercase tracking-widest tabular-nums">${new Date(f.created_at).toLocaleString()}</span>
                     </div>
                 </div>
@@ -1757,11 +1814,244 @@ function showTokenInfoModal() {
                 </ol>
                 <p class="pt-2 border-t border-outline-variant/30">
                     <span class="font-bold text-text-main">Возникли трудности?</span><br>
-                    Если что-то не получается, пишите нам в <span onclick="document.getElementById('token-info-modal').remove(); showModal('support')" class="text-primary font-bold cursor-pointer hover:underline">поддержку</span>.
+                    Если что-то не получается, пишите нам в <span onclick="document.getElementById('token-info-modal').remove(); showModal('support'); if(typeof gtag === 'function') gtag('event', 'click_support_from_token');" class="text-primary font-bold cursor-pointer hover:underline">поддержку</span>.
                 </p>
             </div>
         </div>
     `;
 
     document.body.appendChild(modal);
+}
+
+function renderAIPage() {
+    const defaultToV = state.settings.custom_instructions || 'Вежливый владелец бренда. Обращайся на Вы. Пиши кратко и по делу, без эмодзи.';
+    const hasToken = state.settings.wb_token && state.settings.wb_token_valid;
+    const hasSubscription = (state.settings.subscription_status === 'trial' || state.settings.subscription_status === 'active');
+    const expiresAt = state.settings.subscription_expires_at ? new Date(state.settings.subscription_expires_at) : null;
+    const isUnlimited = hasSubscription && expiresAt && new Date() <= expiresAt;
+    
+    return `
+        <div class="max-w-7xl mx-auto space-y-8 animate-in pb-24 px-0 sm:px-4">
+            <header class="px-4 sm:px-0">
+                <p class="text-primary text-[10px] font-black uppercase tracking-[0.3em] mb-2">Лаборатория</p>
+                <h2 class="font-headline text-2xl sm:text-3xl font-bold text-text-main tracking-tight">ИИ Тест</h2>
+                <p class="text-on-surface-variant text-sm mt-2 leading-relaxed">Проверьте, как нейросеть отвечает на отзывы. ${isUnlimited ? '<span class="text-green-500 font-bold">Безлимит ∞</span>' : '<span class="text-primary font-bold">5 бесплатных тестов в день</span>'}</p>
+            </header>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8 items-start">
+                
+                <!-- Левая колонка: Ввод -->
+                <section class="premium-card p-6 sm:p-8 space-y-6 lg:sticky lg:top-4 mx-4 sm:mx-0">
+                    
+                    <div class="space-y-2">
+                        <label class="text-[10px] font-black uppercase tracking-widest text-primary">Отзыв покупателя</label>
+                        <textarea id="test-review-input" class="w-full bg-bg-main border-2 border-primary/20 outline-none p-4 text-text-main text-sm leading-relaxed h-28 focus:border-primary transition-colors resize-none rounded-lg shadow-inner" 
+                            placeholder="Текст отзыва...">Ремень просто пушка! Кожа мягкая, пахнет приятно. Мужу очень понравился. Спасибо за качество!</textarea>
+                    </div>
+
+                    <div class="space-y-2">
+                        <label class="text-[10px] font-black uppercase tracking-widest text-on-surface-variant">Оценка покупателя</label>
+                        <div class="flex items-center gap-1" id="test-ai-rating-stars">
+                            ${[1,2,3,4,5].map(n => `
+                                <button type="button" onclick="setTestRating(${n})" data-star="${n}" class="test-star-btn group transition-all duration-200 p-1 rounded-lg hover:bg-primary/10">
+                                    <svg class="w-8 h-8 sm:w-9 sm:h-9 transition-all duration-200 ${n <= 5 ? 'text-primary drop-shadow-[0_0_6px_rgba(var(--primary-rgb),0.4)]' : 'text-outline-variant'}" viewBox="0 0 24 24" fill="currentColor">
+                                        <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/>
+                                    </svg>
+                                </button>
+                            `).join('')}
+                            <span id="test-ai-rating-label" class="ml-3 text-xs font-bold text-primary tabular-nums">5 из 5</span>
+                        </div>
+                        <input type="hidden" id="test-ai-rating" value="5">
+                    </div>
+
+                    <!-- Спойлер (Тонкие настройки) -->
+                    <details class="group border border-outline-variant/30 rounded-xl bg-bg-main/50 overflow-hidden" onclick="if(typeof gtag === 'function') gtag('event', 'click_test_settings_spoiler')">
+                        <summary class="cursor-pointer p-4 text-xs font-bold text-on-surface-variant flex items-center justify-between select-none list-none hover:bg-on-surface-variant/5 transition-colors">
+                            <span class="flex items-center gap-2">
+                                <span class="material-symbols-outlined text-[16px]">tune</span>
+                                Тонкие настройки (Товар & Тон)
+                            </span>
+                            <span class="material-symbols-outlined transition-transform duration-300 group-open:rotate-180">expand_more</span>
+                        </summary>
+                        <div class="p-4 sm:p-6 border-t border-outline-variant/30 space-y-5 bg-bg-main/30">
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div class="space-y-2">
+                                    <label class="text-[10px] font-black uppercase tracking-widest text-on-surface-variant">Название</label>
+                                    <input id="test-ai-product-name" type="text" class="w-full bg-bg-main border border-outline-variant outline-none p-3 text-text-main text-xs rounded-lg focus:border-primary" 
+                                        placeholder="Напр: Платье" value="Кожаный ремень">
+                                </div>
+                                <div class="space-y-2">
+                                    <label class="text-[10px] font-black uppercase tracking-widest text-on-surface-variant">Бренд</label>
+                                    <input id="test-ai-brand" type="text" class="w-full bg-bg-main border border-outline-variant outline-none p-3 text-text-main text-xs rounded-lg focus:border-primary" 
+                                        placeholder="Напр: Бренд" value="${state.settings.brand_name || 'Наш Магазин'}">
+                                </div>
+                            </div>
+                            <div class="space-y-2">
+                                <label class="text-[10px] font-black uppercase tracking-widest text-on-surface-variant">Описание (характеристика)</label>
+                                <textarea id="test-ai-product-desc" class="w-full bg-bg-main border border-outline-variant outline-none p-3 text-text-main text-xs leading-relaxed h-16 focus:border-primary transition-colors resize-none rounded-lg" 
+                                    placeholder="Опишите товар...">Натуральная кожа, надежная фурнитура.</textarea>
+                            </div>
+                            <div class="space-y-2">
+                                <label class="text-[10px] font-black uppercase tracking-widest text-on-surface-variant">Tone of Voice (Инструкции)</label>
+                                <textarea id="test-ai-tov" class="w-full bg-bg-main border border-outline-variant outline-none p-3 text-text-main text-xs leading-relaxed h-20 focus:border-primary transition-colors resize-none rounded-lg" 
+                                    placeholder="Как отвечать?">${defaultToV}</textarea>
+                            </div>
+                        </div>
+                    </details>
+
+                    <!-- Плавающая кнопка для мобилок -->
+                    <div class="fixed bottom-20 left-4 right-4 z-40 lg:static lg:bottom-auto lg:left-auto lg:right-auto lg:z-auto">
+                        <button id="test-ai-btn" onclick="handleTestAI(); if(typeof gtag === 'function') gtag('event', 'click_test_ai_generate');" class="primary-btn w-full py-4 text-xs uppercase tracking-[0.2em] shadow-[0_4px_20px_rgba(var(--primary-rgb),0.4)] lg:shadow-lg active:scale-[0.99] transition-all flex items-center justify-center gap-3">
+                            <span class="material-symbols-outlined text-lg">magic_button</span>
+                            Сгенерировать ответ
+                        </button>
+                    </div>
+                </section>
+
+                <!-- Правая колонка: Результат -->
+                <div class="flex flex-col space-y-6 mx-4 sm:mx-0">
+                    <div id="test-ai-result" class="hidden animate-in fade-in slide-in-from-bottom-4">
+                        <section class="premium-card p-6 sm:p-8 space-y-4 border-primary/20 bg-primary/5">
+                            <div class="flex items-center gap-3">
+                                <span class="material-symbols-outlined text-primary">robot_2</span>
+                                <h3 class="text-text-main font-bold text-sm uppercase tracking-widest">Результат генерации</h3>
+                            </div>
+                            <div id="test-ai-text" class="text-sm text-text-main leading-relaxed italic"></div>
+                            
+                            <div class="flex gap-4 pt-4 border-t border-outline-variant/20">
+                                <div class="flex-1">
+                                    <p class="text-[9px] font-black text-on-surface-variant uppercase mb-1">Тональность</p>
+                                    <div id="test-ai-sentiment" class="text-[11px] font-bold text-primary uppercase"></div>
+                                </div>
+                                <div class="flex-1">
+                                    <p class="text-[9px] font-black text-on-surface-variant uppercase mb-1">Категория</p>
+                                    <div id="test-ai-category" class="text-[11px] font-bold text-text-main uppercase"></div>
+                                </div>
+                            </div>
+                        </section>
+                    </div>
+
+                    <!-- CTA: Next Step -->
+                    ${!hasToken ? `
+                    <section class="premium-card p-6 sm:p-8 border-2 border-primary/30 bg-primary/5 space-y-4 shadow-[0_0_30px_rgba(var(--primary-rgb),0.1)]" id="test-cta-block" style="display: none;">
+                        <div class="flex items-start gap-4">
+                            <div class="w-12 h-12 bg-primary/20 rounded-full flex items-center justify-center shrink-0">
+                                <span class="material-symbols-outlined text-primary text-2xl">rocket_launch</span>
+                            </div>
+                            <div class="flex-1 space-y-2">
+                                <h3 class="text-text-main font-bold text-base">Понравилось? Подключите к своим отзывам!</h3>
+                                <p class="text-on-surface-variant text-xs leading-relaxed">Добавьте API-токен Wildberries, и нейросеть начнет автоматически отвечать на все ваши отзывы 24/7. Первые <strong class="text-text-main">3 дня — бесплатно!</strong></p>
+                            </div>
+                        </div>
+                        <button onclick="showView('settings'); if(typeof gtag === 'function') gtag('event', 'click_cta_connect_token');" class="primary-btn w-full py-4 text-xs uppercase tracking-[0.2em] shadow-lg active:scale-[0.99] transition-all flex items-center justify-center gap-3 mt-2">
+                            <span class="material-symbols-outlined text-lg">key</span>
+                            Подключить токен WB
+                        </button>
+                    </section>
+                    ` : ''}
+
+                    <!-- Заглушка (пока нет результата) -->
+                    <div id="test-ai-placeholder" class="premium-card p-8 text-center flex flex-col items-center justify-center min-h-[300px] border-dashed border-2 border-outline-variant/30 opacity-70 transition-all duration-300">
+                        <div class="w-16 h-16 rounded-full bg-bg-main flex items-center justify-center mb-4">
+                            <span class="material-symbols-outlined text-3xl text-on-surface-variant">edit_note</span>
+                        </div>
+                        <h4 class="text-text-main font-bold mb-2">Здесь появится ответ ИИ</h4>
+                        <p class="text-on-surface-variant text-xs max-w-[250px] leading-relaxed">Напишите отзыв слева и нажмите сгенерировать, чтобы увидеть магию.</p>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    `;
+}
+
+function setTestRating(n) {
+    document.getElementById('test-ai-rating').value = n;
+    document.getElementById('test-ai-rating-label').textContent = n + ' из 5';
+    document.querySelectorAll('#test-ai-rating-stars .test-star-btn').forEach(btn => {
+        const star = parseInt(btn.dataset.star);
+        const svg = btn.querySelector('svg');
+        if (star <= n) {
+            svg.classList.remove('text-outline-variant');
+            svg.classList.add('text-primary', 'drop-shadow-[0_0_6px_rgba(var(--primary-rgb),0.4)]');
+        } else {
+            svg.classList.add('text-outline-variant');
+            svg.classList.remove('text-primary', 'drop-shadow-[0_0_6px_rgba(var(--primary-rgb),0.4)]');
+        }
+    });
+}
+
+async function handleTestAI() {
+    const reviewText = document.getElementById('test-review-input').value;
+    const characteristicsText = '';
+    const productName = document.getElementById('test-ai-product-name').value;
+    const productDescription = document.getElementById('test-ai-product-desc').value;
+    const toneOfVoice = document.getElementById('test-ai-tov').value;
+    const brandName = document.getElementById('test-ai-brand').value;
+    const rating = parseInt(document.getElementById('test-ai-rating').value) || 5;
+
+    if (!reviewText) return showToast('Введите текст отзыва', true);
+
+    const btn = document.getElementById('test-ai-btn');
+    const resultDiv = document.getElementById('test-ai-result');
+    const originalContent = btn.innerHTML;
+
+    btn.disabled = true;
+    btn.innerHTML = '<span class="animate-spin material-symbols-outlined">sync</span><span>Магия в процессе...</span>';
+    resultDiv.classList.add('hidden');
+
+    try {
+        const res = await fetch('/api/ai/test', {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+            },
+            body: JSON.stringify({ 
+                reviewText,
+                productName,
+                productDescription,
+                characteristicsText,
+                toneOfVoice,
+                brandName,
+                rating
+            })
+        });
+
+        if (res.ok) {
+            const data = await res.json();
+            if(typeof gtag === 'function') gtag('event', 'test_ai_success');
+            localStorage.setItem('wb_has_tested', '1');
+            document.getElementById('test-ai-text').innerText = `"${data.text || 'Ошибка генерации'}"`;
+            document.getElementById('test-ai-sentiment').innerText = data.sentiment || '—';
+            document.getElementById('test-ai-category').innerText = data.category || '—';
+            
+            // UI Switch: hide placeholder, show result & CTA
+            const placeholder = document.getElementById('test-ai-placeholder');
+            if (placeholder) placeholder.style.display = 'none';
+            resultDiv.classList.remove('hidden');
+            
+            const cta = document.getElementById('test-cta-block');
+            if (cta) cta.style.display = 'block';
+
+            // Scroll on mobile, but keep layout stable on desktop
+            if (window.innerWidth < 1024) {
+                resultDiv.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        } else if (res.status === 429) {
+            const err = await res.json();
+            showToast(err.error || 'Лимит тестов исчерпан', true);
+            // Show CTA block if hidden
+            const cta = document.getElementById('test-cta-block');
+            if (cta) cta.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        } else {
+            const err = await res.json();
+            showToast(err.error || 'Ошибка сети', true);
+        }
+    } catch (e) {
+        showToast('Ошибка сервера', true);
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalContent;
+    }
 }
