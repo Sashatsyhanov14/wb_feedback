@@ -1846,7 +1846,7 @@ function renderAIPage() {
                     <div class="space-y-2">
                         <label class="text-[10px] font-black uppercase tracking-widest text-primary">Отзыв покупателя</label>
                         <textarea id="test-review-input" class="w-full bg-bg-main border-2 border-primary/20 outline-none p-4 text-text-main text-sm leading-relaxed h-28 focus:border-primary transition-colors resize-none rounded-lg shadow-inner" 
-                            placeholder="Текст отзыва...">Ремень просто пушка! Кожа мягкая, пахнет приятно. Мужу очень понравился. Спасибо за качество!</textarea>
+                            placeholder="Текст отзыва...">Прислали другой цвет, коробка вся мятая, а продавец игнорит вторую неделю! Ужасное отношение к покупателям.</textarea>
                     </div>
 
                     <div class="space-y-2">
@@ -1854,14 +1854,14 @@ function renderAIPage() {
                         <div class="flex items-center gap-1" id="test-ai-rating-stars">
                             ${[1,2,3,4,5].map(n => `
                                 <button type="button" onclick="setTestRating(${n})" data-star="${n}" class="test-star-btn group transition-all duration-200 p-1 rounded-lg hover:bg-primary/10">
-                                    <svg class="w-8 h-8 sm:w-9 sm:h-9 transition-all duration-200 ${n <= 5 ? 'text-primary drop-shadow-[0_0_6px_rgba(var(--primary-rgb),0.4)]' : 'text-outline-variant'}" viewBox="0 0 24 24" fill="currentColor">
+                                    <svg class="w-8 h-8 sm:w-9 sm:h-9 transition-all duration-200 ${n <= 1 ? 'text-primary drop-shadow-[0_0_6px_rgba(var(--primary-rgb),0.4)]' : 'text-outline-variant'}" viewBox="0 0 24 24" fill="currentColor">
                                         <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/>
                                     </svg>
                                 </button>
                             `).join('')}
-                            <span id="test-ai-rating-label" class="ml-3 text-xs font-bold text-primary tabular-nums">5 из 5</span>
+                            <span id="test-ai-rating-label" class="ml-3 text-xs font-bold text-primary tabular-nums">1 из 5</span>
                         </div>
-                        <input type="hidden" id="test-ai-rating" value="5">
+                        <input type="hidden" id="test-ai-rating" value="1">
                     </div>
 
                     <!-- Спойлер (Тонкие настройки) -->
@@ -1878,7 +1878,7 @@ function renderAIPage() {
                                 <div class="space-y-2">
                                     <label class="text-[10px] font-black uppercase tracking-widest text-on-surface-variant">Название</label>
                                     <input id="test-ai-product-name" type="text" class="w-full bg-bg-main border border-outline-variant outline-none p-3 text-text-main text-xs rounded-lg focus:border-primary" 
-                                        placeholder="Напр: Платье" value="Кожаный ремень">
+                                        placeholder="Напр: Платье" value="Платье шелковое">
                                 </div>
                                 <div class="space-y-2">
                                     <label class="text-[10px] font-black uppercase tracking-widest text-on-surface-variant">Бренд</label>
@@ -1889,7 +1889,7 @@ function renderAIPage() {
                             <div class="space-y-2">
                                 <label class="text-[10px] font-black uppercase tracking-widest text-on-surface-variant">Описание (характеристика)</label>
                                 <textarea id="test-ai-product-desc" class="w-full bg-bg-main border border-outline-variant outline-none p-3 text-text-main text-xs leading-relaxed h-16 focus:border-primary transition-colors resize-none rounded-lg" 
-                                    placeholder="Опишите товар...">Натуральная кожа, надежная фурнитура.</textarea>
+                                    placeholder="Опишите товар...">Натуральный шелк, деликатная ткань.</textarea>
                             </div>
                             <div class="space-y-2">
                                 <label class="text-[10px] font-black uppercase tracking-widest text-on-surface-variant">Tone of Voice (Инструкции)</label>
