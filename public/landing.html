@@ -164,11 +164,68 @@
             </p>
 
             <div class="flex flex-col sm:flex-row items-center justify-center gap-4 reveal" style="transition-delay: 300ms">
-                <a href="/api/auth/guest" onclick="gtag('event', 'click_start_hero')" class="btn-premium w-full sm:w-auto text-bg px-12 py-5 rounded-2xl font-black text-xs uppercase tracking-[0.2em]">
+                <a href="/api/auth/guest" onclick="gtag('event', 'click_start_hero')" class="btn-premium w-full sm:w-auto text-bg px-12 py-5 rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-lg">
                     Запустить 3 дня бесплатно
                 </a>
+                <a href="/api/auth/guest#ai" onclick="gtag('event', 'click_sandbox_hero')" class="glass w-full sm:w-auto text-white px-12 py-5 rounded-2xl font-black text-xs uppercase tracking-[0.2em] border border-white/10 hover:bg-white/5 transition-all card-hover">
+                    Тест-драйв без регистрации
+                </a>
             </div>
-            <p class="mt-6 text-gray-500 text-[10px] font-bold uppercase tracking-widest reveal" style="transition-delay: 400ms">Без привязки карты • Отмена в 1 клик</p>
+            <div class="mt-6 flex flex-col items-center gap-2 reveal" style="transition-delay: 400ms">
+                <p class="text-primary/80 text-[10px] font-bold uppercase tracking-widest">
+                    <span class="material-symbols-outlined text-[12px] inline-block align-text-bottom mr-1">science</span>
+                    Доступно 5 бесплатных проверок вашего отзыва
+                </p>
+                <p class="text-gray-600 text-[9px] font-bold uppercase tracking-widest">Без привязки карты • Отмена в 1 клик</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section id="features" class="py-32 px-6">
+        <div class="max-w-7xl mx-auto">
+            <div class="flex flex-col md:flex-row justify-between items-end gap-8 mb-20 reveal">
+                <div class="max-w-2xl">
+                    <h2 class="text-4xl md:text-5xl font-display font-bold text-white tracking-tight">
+                        Забудь про рутину <br/> и <span class="text-primary">шаблонные отписки.</span>
+                    </h2>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <!-- Comparison 1 -->
+                <div class="glass p-10 rounded-[2rem] border border-border card-hover reveal" style="transition-delay: 100ms">
+                    <div class="w-14 h-14 bg-red-500/10 rounded-2xl flex items-center justify-center mb-8">
+                        <span class="material-symbols-outlined text-red-500 text-3xl">person_cancel</span>
+                    </div>
+                    <h3 class="text-xl font-bold text-white mb-4">Живой менеджер</h3>
+                    <p class="text-gray-500 leading-relaxed font-light text-sm">
+                        Просит от 30 000 ₽/мес, спит по ночам, выгорает и может нахамить клиенту на эмоциях.
+                    </p>
+                </div>
+
+                <!-- Comparison 2 -->
+                <div class="glass p-10 rounded-[2rem] border border-border card-hover reveal" style="transition-delay: 200ms">
+                    <div class="w-14 h-14 bg-orange-500/10 rounded-2xl flex items-center justify-center mb-8">
+                        <span class="material-symbols-outlined text-orange-500 text-3xl">smart_toy</span>
+                    </div>
+                    <h3 class="text-xl font-bold text-white mb-4">Обычный бот</h3>
+                    <p class="text-gray-500 leading-relaxed font-light text-sm">
+                        Отвечает как тупой робот. Спамит фразой «Спасибо за покупку!», бесит покупателей и убивает лояльность к бренду.
+                    </p>
+                </div>
+
+                <!-- Comparison 3 -->
+                <div class="glass p-10 rounded-[2rem] border border-primary/30 bg-primary/5 card-hover reveal" style="transition-delay: 300ms">
+                    <div class="w-14 h-14 bg-primary/20 rounded-2xl flex items-center justify-center mb-8">
+                        <span class="material-symbols-outlined text-primary text-3xl">bolt</span>
+                    </div>
+                    <h3 class="text-xl font-bold text-white mb-4">Wbreply AI</h3>
+                    <p class="text-gray-400 leading-relaxed font-light text-sm">
+                        Работает 24/7. Отвечает как живой человек, анализирует текст отзыва и строго соблюдает твой стиль (извиняется за брак, шутит или отвечает сухо — всё по твоей инструкции).
+                    </p>
+                </div>
+            </div>
         </div>
     </section>
 
@@ -223,54 +280,58 @@
 
 
 
-    <!-- Features Section -->
-    <section id="features" class="py-32 px-6">
-        <div class="max-w-7xl mx-auto">
-            <div class="flex flex-col md:flex-row justify-between items-end gap-8 mb-20 reveal">
-                <div class="max-w-2xl">
-                    <h2 class="text-4xl md:text-5xl font-display font-bold text-white tracking-tight">
-                        Забудь про рутину <br/> и <span class="text-primary">шаблонные отписки.</span>
+    <!-- Interactive Sandbox CTA -->
+    <section class="py-24 px-6 relative z-10">
+        <div class="max-w-5xl mx-auto glass rounded-[3rem] p-10 md:p-16 border border-primary/20 bg-gradient-to-br from-primary/5 to-transparent relative overflow-hidden reveal">
+            <div class="absolute -top-32 -left-32 w-96 h-96 bg-primary/20 blur-[100px] rounded-full pointer-events-none"></div>
+            
+            <div class="flex flex-col md:flex-row items-center justify-between gap-12 relative z-10">
+                <div class="flex-1 text-center md:text-left">
+                    <p class="text-primary text-[10px] font-black uppercase tracking-[0.4em] mb-4">Интерактивная лаборатория</p>
+                    <h2 class="text-3xl md:text-4xl font-display font-bold text-white tracking-tight mb-6">
+                        Не верите? <br><span class="text-primary">Испытайте ИИ прямо сейчас.</span>
                     </h2>
-                </div>
-            </div>
-
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-                <!-- Comparison 1 -->
-                <div class="glass p-10 rounded-[2rem] border border-border card-hover reveal" style="transition-delay: 100ms">
-                    <div class="w-14 h-14 bg-red-500/10 rounded-2xl flex items-center justify-center mb-8">
-                        <span class="material-symbols-outlined text-red-500 text-3xl">person_cancel</span>
-                    </div>
-                    <h3 class="text-xl font-bold text-white mb-4">Живой менеджер</h3>
-                    <p class="text-gray-500 leading-relaxed font-light text-sm">
-                        Просит от 30 000 ₽/мес, спит по ночам, выгорает и может нахамить клиенту на эмоциях.
+                    <p class="text-gray-400 text-sm leading-relaxed mb-8 max-w-md mx-auto md:mx-0">
+                        Скопируйте самый сложный, токсичный или нестандартный отзыв от вашего клиента. Вставьте его в нашу песочницу и посмотрите, как нейросеть изящно и профессионально выйдет из ситуации.
                     </p>
-                </div>
-
-                <!-- Comparison 2 -->
-                <div class="glass p-10 rounded-[2rem] border border-border card-hover reveal" style="transition-delay: 200ms">
-                    <div class="w-14 h-14 bg-orange-500/10 rounded-2xl flex items-center justify-center mb-8">
-                        <span class="material-symbols-outlined text-orange-500 text-3xl">smart_toy</span>
+                    
+                    <div class="flex flex-col sm:flex-row items-center gap-4 justify-center md:justify-start">
+                        <a href="/api/auth/guest#ai" onclick="gtag('event', 'click_sandbox_banner')" class="btn-premium text-bg px-8 py-4 rounded-xl font-black text-[11px] sm:text-xs uppercase tracking-[0.15em] flex items-center gap-2">
+                            <span class="material-symbols-outlined text-[18px]">science</span>
+                            Провести тест-драйв
+                        </a>
+                        <p class="text-primary/60 text-[10px] font-bold uppercase tracking-widest hidden sm:block">
+                            5 проверок бесплатно
+                        </p>
                     </div>
-                    <h3 class="text-xl font-bold text-white mb-4">Обычный бот</h3>
-                    <p class="text-gray-500 leading-relaxed font-light text-sm">
-                        Отвечает как тупой робот. Спамит фразой «Спасибо за покупку!», бесит покупателей и убивает лояльность к бренду.
-                    </p>
                 </div>
-
-                <!-- Comparison 3 -->
-                <div class="glass p-10 rounded-[2rem] border border-primary/30 bg-primary/5 card-hover reveal" style="transition-delay: 300ms">
-                    <div class="w-14 h-14 bg-primary/20 rounded-2xl flex items-center justify-center mb-8">
-                        <span class="material-symbols-outlined text-primary text-3xl">bolt</span>
-                    </div>
-                    <h3 class="text-xl font-bold text-white mb-4">Wbreply AI</h3>
-                    <p class="text-gray-400 leading-relaxed font-light text-sm">
-                        Работает 24/7. Отвечает как живой человек, анализирует текст отзыва и строго соблюдает твой стиль (извиняется за брак, шутит или отвечает сухо — всё по твоей инструкции).
-                    </p>
+                
+                <div class="flex-1 w-full max-w-sm relative mx-auto">
+                    <a href="/api/auth/guest#ai" onclick="gtag('event', 'click_sandbox_mockup')" class="block bg-surface border border-white/10 p-6 rounded-2xl shadow-2xl relative transform md:rotate-2 hover:rotate-0 transition-transform duration-500 card-hover">
+                        <div class="flex gap-2 mb-6">
+                            <div class="w-3 h-3 rounded-full bg-red-500/80"></div>
+                            <div class="w-3 h-3 rounded-full bg-yellow-500/80"></div>
+                            <div class="w-3 h-3 rounded-full bg-green-500/80"></div>
+                        </div>
+                        <div class="mb-4">
+                            <p class="text-[9px] text-gray-500 font-bold uppercase tracking-widest mb-2">Отзыв покупателя</p>
+                            <div class="space-y-2 opacity-70">
+                                <div class="w-3/4 h-2 bg-white/10 rounded"></div>
+                                <div class="w-full h-2 bg-white/10 rounded"></div>
+                                <div class="w-5/6 h-2 bg-white/10 rounded"></div>
+                            </div>
+                        </div>
+                        <div class="flex items-center justify-center p-3 border border-dashed border-primary/30 rounded-xl bg-primary/5 cursor-pointer group">
+                            <p class="text-[10px] text-primary font-bold tracking-widest uppercase flex items-center gap-2">
+                                <span class="material-symbols-outlined text-[14px] group-hover:translate-x-1 transition-transform">arrow_forward</span>
+                                Перейти в дашборд
+                            </p>
+                        </div>
+                    </a>
                 </div>
             </div>
         </div>
     </section>
-
 
 
     <!-- How it works -->
@@ -287,7 +348,11 @@
                 <div class="relative z-10 text-center reveal">
                     <div class="w-20 h-20 bg-bg border border-border rounded-full flex items-center justify-center mx-auto mb-8 text-2xl font-black text-primary">01</div>
                     <h4 class="text-white font-bold mb-4">Подключите API</h4>
-                    <p class="text-gray-500 text-sm font-light">Добавьте стандартный API-ключ Wildberries в личном кабинете.</p>
+                    <p class="text-gray-500 text-sm font-light mb-2">Добавьте стандартный API-ключ Wildberries в личном кабинете.</p>
+                    <p class="text-primary/80 text-[10px] font-bold uppercase tracking-widest leading-relaxed">
+                        <span class="material-symbols-outlined text-[12px] inline-block align-text-bottom mr-1">lock</span>
+                        Только права «Вопросы и отзывы» и «Контент».<br>Без доступа к ценам и финансам.
+                    </p>
                 </div>
 
                 <div class="relative z-10 text-center reveal" style="transition-delay: 100ms">
