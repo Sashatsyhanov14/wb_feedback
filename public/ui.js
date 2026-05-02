@@ -1824,7 +1824,7 @@ function showTokenInfoModal() {
 }
 
 function renderAIPage() {
-    const defaultToV = state.settings.custom_instructions || 'Вежливый владелец бренда. Обращайся на Вы. Пиши кратко и по делу, без эмодзи.';
+    const defaultToV = state.settings.custom_instructions || 'Вежливый владелец бренда. Обращайся на Вы. Пиши кратко и по делу. Никогда не проси писать в личку/мессенджеры (запрещено WB).';
     const hasToken = state.settings.wb_token && state.settings.wb_token_valid;
     const hasSubscription = (state.settings.subscription_status === 'trial' || state.settings.subscription_status === 'active');
     const expiresAt = state.settings.subscription_expires_at ? new Date(state.settings.subscription_expires_at) : null;
@@ -1900,7 +1900,7 @@ function renderAIPage() {
                     </details>
 
                     <!-- Плавающая кнопка для мобилок -->
-                    <div class="fixed bottom-20 left-4 right-4 z-40 lg:static lg:bottom-auto lg:left-auto lg:right-auto lg:z-auto">
+                    <div class="fixed bottom-24 left-4 right-4 z-40 lg:static lg:bottom-auto lg:left-auto lg:right-auto lg:z-auto">
                         <button id="test-ai-btn" onclick="handleTestAI(); if(typeof gtag === 'function') gtag('event', 'click_test_ai_generate');" class="primary-btn w-full py-4 text-xs uppercase tracking-[0.2em] shadow-[0_4px_20px_rgba(var(--primary-rgb),0.4)] lg:shadow-lg active:scale-[0.99] transition-all flex items-center justify-center gap-3">
                             <span class="material-symbols-outlined text-lg">magic_button</span>
                             Сгенерировать ответ
