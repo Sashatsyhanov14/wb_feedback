@@ -141,7 +141,7 @@ router.get('/tg-callback', async (req, res) => {
     const host = req.headers.host;
     res.cookie('auth_token', token, {
       httpOnly: false,
-      secure: host.includes('wbreplyai.ru'), 
+      secure: config.nodeEnv === 'production' || req.headers['x-forwarded-proto'] === 'https' || req.protocol === 'https', 
       maxAge: 30 * 24 * 60 * 60 * 1000,
       path: '/',
       sameSite: 'Lax'
@@ -163,10 +163,10 @@ router.get('/me', authMiddleware, async (req, res) => {
 
 // 3. Logout
 router.post('/logout', (req, res) => {
-  const host = req.headers.host || '';
+  const isHttps = req.headers['x-forwarded-proto'] === 'https' || req.protocol === 'https';
   res.clearCookie('auth_token', { 
     path: '/',
-    secure: host.includes('wbreplyai.ru'),
+    secure: isHttps || config.nodeEnv === 'production',
     sameSite: 'Lax'
   });
   res.json({ success: true });
@@ -207,7 +207,7 @@ router.get('/guest', async (req, res) => {
             .gte('created_at', oneDayAgo);
 
         if (recentGuestCount && recentGuestCount >= 3) {
-            console.warn(`Guest rate limit hit for IP: ${clientIp} (${recentGuestCount} accounts today)`);
+            console.warn(`[GuestAuth] Rate limit hit for IP: ${clientIp} (${recentGuestCount} accounts today)`);
             return res.redirect('/login?error=too_many_attempts');
         }
 
@@ -237,19 +237,21 @@ router.get('/guest', async (req, res) => {
           { expiresIn: '30d' }
         );
 
-        const host = req.headers.host;
+        const isProd = config.nodeEnv === 'production';
+        const isHttps = req.headers['x-forwarded-proto'] === 'https' || req.protocol === 'https';
+
         res.cookie('auth_token', token, {
           httpOnly: false,
-          secure: host.includes('wbreplyai.ru'), 
+          secure: isHttps || isProd, 
           maxAge: 30 * 24 * 60 * 60 * 1000,
           path: '/',
           sameSite: 'Lax'
         });
 
-        console.log(`Guest account created: ${seller.id} | IP: ${clientIp}`);
+        console.log(`[GuestAuth] Success: ${seller.id} | IP: ${clientIp}`);
         res.redirect(`/app?token=${token}&isNew=true`);
     } catch (error) {
-        console.error('Guest Auth Error:', error.message);
+        console.error('[GuestAuth] Critical Error:', error.message, error.stack);
         res.redirect('/login?error=guest_failed');
     }
 });
@@ -450,7 +452,7 @@ router.get('/google/callback', async (req, res) => {
 
     res.cookie('auth_token', token, {
       httpOnly: false,
-      secure: host.includes('wbreplyai.ru'), 
+      secure: config.nodeEnv === 'production' || req.headers['x-forwarded-proto'] === 'https' || req.protocol === 'https', 
       maxAge: 30 * 24 * 60 * 60 * 1000,
       path: '/',
       sameSite: 'Lax'
@@ -484,9 +486,10 @@ router.get('/vk', (req, res) => {
   const state = crypto.randomBytes(24).toString('base64url');
 
   // Store code_verifier in httpOnly cookie (5 min TTL)
+  const isHttps = req.headers['x-forwarded-proto'] === 'https' || req.protocol === 'https';
   res.cookie('vk_pkce_verifier', codeVerifier, {
     httpOnly: true,
-    secure: host.includes('wbreplyai.ru'),
+    secure: isHttps || config.nodeEnv === 'production',
     maxAge: 5 * 60 * 1000,
     path: '/',
     sameSite: 'Lax'
@@ -678,7 +681,7 @@ router.get('/vk/callback', async (req, res) => {
 
     res.cookie('auth_token', token, {
       httpOnly: false,
-      secure: host.includes('wbreplyai.ru'), 
+      secure: config.nodeEnv === 'production' || req.headers['x-forwarded-proto'] === 'https' || req.protocol === 'https', 
       maxAge: 30 * 24 * 60 * 60 * 1000,
       path: '/',
       sameSite: 'Lax'

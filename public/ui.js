@@ -18,6 +18,20 @@ let state = {
     adminTickets: []
 };
 
+// Helper for API calls with token
+async function apiFetch(url, options = {}) {
+    const cookieToken = document.cookie.split('; ').find(row => row.startsWith('auth_token='))?.split('=')[1];
+    const localToken = localStorage.getItem('auth_token');
+    const token = localToken || cookieToken;
+    
+    const headers = { ...options.headers };
+    if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+    }
+    
+    return fetch(url, { ...options, headers });
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
 
     // Handle Supabase implicit flow hash (for Magic Link)
@@ -32,7 +46,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         
         if (supabaseToken) {
             try {
-                const verifyRes = await fetch('/api/auth/magic-verify', {
+                const verifyRes = await apiFetch('/api/auth/magic-verify', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ access_token: supabaseToken })
@@ -63,30 +77,48 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Check for token in multiple places
     const urlParams = new URLSearchParams(window.location.search);
     const urlToken = urlParams.get('token');
+    
+    // IF we have a token in URL, save it immediately before anything else
+    if (urlToken) {
+        console.log('Token found in URL, saving to cookies and localStorage');
+        document.cookie = `auth_token=${urlToken}; path=/; max-age=${30 * 24 * 60 * 60}; SameSite=Lax`;
+        localStorage.setItem('auth_token', urlToken);
+        // We don't clean the URL yet to allow other logic (like isNew) to see it
+    }
+
     const cookieToken = document.cookie.split('; ').find(row => row.startsWith('auth_token='))?.split('=')[1];
     const localToken = localStorage.getItem('auth_token');
     const activeToken = urlToken || cookieToken || localToken;
     
 
     const isTelegram = window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initData;
+    const isLoginPage = window.location.pathname === '/login';
     
     if (!activeToken && !magicLinkProcessed && !isTelegram) {
-        if (urlParams.get('error')) {
+        if (isLoginPage || urlParams.get('error')) {
+            // We're on /login already (or have an error param) — show login, don't loop
             showView('login');
         } else {
+            // Only auto-redirect to guest creation from /app (first visit)
             window.location.href = '/api/auth/guest';
         }
-        return; // Skip API check
+        return; 
     }
 
     // 1. Check Auth (Web or Mini App)
     if (!magicLinkProcessed) {
-        await checkAuth();
+        await checkAuth(activeToken);
     }
 
     // 2. Initial View — render immediately, then load data
     if (!state.sellerId) {
-        if (urlParams.get('error')) {
+        // If we already had a token (from URL or storage) but /me rejected it,
+        // do NOT redirect to /api/auth/guest again — that creates an infinite loop.
+        // Show the login page so the user can try another method.
+        if (activeToken) {
+            console.warn('[Init] Had a token but checkAuth failed — showing login (not redirecting to guest again)');
+            showView('login');
+        } else if (urlParams.get('error')) {
             showView('login');
         } else {
             window.location.href = '/api/auth/guest';
@@ -128,44 +160,52 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 });
 
-async function checkAuth() {
+async function checkAuth(providedToken) {
     try {
         const cookieToken = document.cookie.split('; ').find(row => row.startsWith('auth_token='))?.split('=')[1];
         const localToken = localStorage.getItem('auth_token');
-        const token = cookieToken || localToken;
+        const token = providedToken || localToken || cookieToken;
         
-        console.log('Checking auth with token:', !!token);
+        console.log('[checkAuth] token present:', !!token, '| source:', providedToken ? 'provided' : (localToken ? 'localStorage' : (cookieToken ? 'cookie' : 'none')));
 
-        const headers = {};
-        if (token) {
-            headers['Authorization'] = `Bearer ${token}`;
+        if (!token) {
+            console.warn('[checkAuth] No token available, skipping /me call');
+            return;
         }
 
-        const res = await fetch('/api/auth/me', { headers });
+        // Explicitly pass the token to the fetch call — do NOT rely on apiFetch's
+        // cookie/localStorage lookup, because in Incognito the cookie we just set
+        // may not be readable in the same tick.
+        const res = await fetch('/api/auth/me', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
         
         if (res.ok) {
             const data = await res.json();
             state.sellerId = data.sellerId;
-            console.log('Auth success, sellerId:', state.sellerId);
-        } else if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initData) {
-            // Automatic login for Mini App
-            const tg = window.Telegram.WebApp;
-            tg.expand();
-            tg.ready();
-            
-            const rawData = tg.initDataUnsafe;
-            const resAuth = await fetch('/api/auth/tg-callback', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(rawData.user)
-            });
-            if (resAuth.ok) {
-                const data = await resAuth.json();
-                state.sellerId = data.sellerId;
+            console.log('[checkAuth] Auth success, sellerId:', state.sellerId);
+        } else {
+            console.warn('[checkAuth] /me returned', res.status);
+            if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initData) {
+                // Automatic login for Mini App
+                const tg = window.Telegram.WebApp;
+                tg.expand();
+                tg.ready();
+                
+                const rawData = tg.initDataUnsafe;
+                const resAuth = await fetch('/api/auth/tg-callback', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(rawData.user)
+                });
+                if (resAuth.ok) {
+                    const data = await resAuth.json();
+                    state.sellerId = data.sellerId;
+                }
             }
         }
     } catch (e) {
-        console.error('Auth check error:', e);
+        console.error('[checkAuth] Error:', e);
     }
 }
 
@@ -174,17 +214,17 @@ async function refreshData() {
     try {
         const adminId = '68cfdf5a-25fb-43f5-8672-c03d1bddc29b';
         const requests = [
-            fetch(`/api/settings`).then(r => r.status === 200 ? r.json() : null),
-            fetch(`/api/matrix`).then(r => r.status === 200 ? r.json() : null),
-            fetch(`/api/stats`).then(r => r.status === 200 ? r.json() : null),
-            fetch(`/api/reviews`).then(r => r.status === 200 ? r.json() : null),
-            fetch(`/api/support`).then(r => r.status === 200 ? r.json() : null)
+            apiFetch(`/api/settings`).then(r => r.status === 200 ? r.json() : null),
+            apiFetch(`/api/matrix`).then(r => r.status === 200 ? r.json() : null),
+            apiFetch(`/api/stats`).then(r => r.status === 200 ? r.json() : null),
+            apiFetch(`/api/reviews`).then(r => r.status === 200 ? r.json() : null),
+            apiFetch(`/api/support`).then(r => r.status === 200 ? r.json() : null)
         ];
 
         if (state.sellerId.toString() === adminId) {
-            requests.push(fetch(`/api/admin/stats`).then(r => r.status === 200 ? r.json() : null));
-            requests.push(fetch(`/api/admin/support`).then(r => r.status === 200 ? r.json() : null));
-            requests.push(fetch(`/api/admin/users`).then(r => r.status === 200 ? r.json() : null));
+            requests.push(apiFetch(`/api/admin/stats`).then(r => r.status === 200 ? r.json() : null));
+            requests.push(apiFetch(`/api/admin/support`).then(r => r.status === 200 ? r.json() : null));
+            requests.push(apiFetch(`/api/admin/users`).then(r => r.status === 200 ? r.json() : null));
             
             // Show Admin tab in UI if not visible
             document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'flex');
@@ -237,7 +277,7 @@ async function refreshData() {
 }
 
 async function handleLogout() {
-    try { await fetch('/api/auth/logout', { method: 'POST' }); } catch(e) {}
+    try { await apiFetch('/api/auth/logout', { method: 'POST' }); } catch(e) {}
     // Clear all auth data from client
     localStorage.removeItem('auth_token');
     document.cookie = 'auth_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax';
@@ -348,6 +388,24 @@ function renderLogin() {
                         В один клик или без регистрации
                     </p>
                 </div>
+
+                ${(() => {
+                    const params = new URLSearchParams(window.location.search);
+                    const error = params.get('error');
+                    if (!error) return '';
+                    
+                    let message = 'Произошла ошибка при входе';
+                    if (error === 'too_many_attempts') message = 'Слишком много попыток. Пожалуйста, войдите через Google или VK.';
+                    if (error === 'guest_failed') message = 'Не удалось создать гостевой аккаунт';
+                    
+                    return `
+                        <div class="bg-red-500/10 border border-red-500/20 rounded-xl p-4 flex items-start gap-3 animate-in">
+                            <span class="material-symbols-outlined text-red-500 text-lg">error</span>
+                            <p class="text-xs font-bold text-red-500 leading-tight">${message}</p>
+                        </div>
+                    `;
+                })()}
+
                 <div class="flex flex-col gap-4">
                     <!-- Guest Button -->
                     <button onclick="window.location.href='/api/auth/guest'" class="w-full h-14 flex items-center justify-center gap-4 bg-primary/10 hover:bg-primary/20 active:scale-[0.97] transition-all rounded-[12px] shadow-sm border border-primary/20 group">
@@ -401,7 +459,7 @@ function renderLogin() {
 async function handleTestLogin(provider) {
     showToast(`Вход через ${provider} (Тестовый режим)...`);
     try {
-        const res = await fetch('/api/auth/demo', {
+        const res = await apiFetch('/api/auth/demo', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' }
         });
@@ -457,7 +515,7 @@ async function handleMagicLogin() {
     btn.innerHTML = '<span class="animate-spin material-symbols-outlined">sync</span><span>Отправка...</span>';
 
     try {
-        const res = await fetch('/api/auth/magic', {
+        const res = await apiFetch('/api/auth/magic', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ email })
@@ -491,7 +549,7 @@ async function handleLinkMagic() {
     btn.innerHTML = 'Отправка...';
 
     try {
-        const res = await fetch('/api/auth/magic', {
+        const res = await apiFetch('/api/auth/magic', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ email })
@@ -612,7 +670,7 @@ function initVkOAuthList() {
 
 window.onTelegramAuth = async function(user) {
     try {
-        const res = await fetch('/api/auth/tg-callback', {
+        const res = await apiFetch('/api/auth/tg-callback', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(user)
@@ -948,7 +1006,7 @@ async function handleSaveSettings() {
     }
     
     try {
-        const res = await fetch('/api/settings', {
+        const res = await apiFetch('/api/settings', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(state.settings)
@@ -1066,7 +1124,7 @@ async function handleSync(btnEl) {
 
     showToast('Синхронизация...');
     try {
-        const res = await fetch('/api/sync', { method: 'POST' });
+        const res = await apiFetch('/api/sync', { method: 'POST' });
         if (res.ok) {
             showToast('Готово');
             await refreshData();
@@ -1102,7 +1160,7 @@ async function handlePayment() {
 
     showToast('Обработка...');
     try {
-        const res = await fetch('/api/payments/create', { method: 'POST' });
+        const res = await apiFetch('/api/payments/create', { method: 'POST' });
         const data = await res.json();
         
         if (res.status === 403) {
@@ -1281,7 +1339,7 @@ async function submitSupport(type) {
     }
 
     try {
-        const res = await fetch('/api/support', {
+        const res = await apiFetch('/api/support', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ type, message: msg })
@@ -1318,7 +1376,7 @@ async function adminReply(ticketId) {
     if (!replyText) return;
 
     try {
-        const res = await fetch(`/api/admin/support/${ticketId}/reply`, {
+        const res = await apiFetch(`/api/admin/support/${ticketId}/reply`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ reply: replyText })
@@ -1563,11 +1621,10 @@ async function submitAdminReply(ticketId) {
     }
     
     try {
-        const res = await fetch(`/api/admin/support/${ticketId}/reply`, {
+        const res = await apiFetch(`/api/admin/support/${ticketId}/reply`, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+                'Content-Type': 'application/json'
             },
             body: JSON.stringify({ reply })
         });
@@ -1601,9 +1658,7 @@ async function submitAdminReply(ticketId) {
 async function openAdminReviews(userId) {
     const user = state.adminUsers.find(u => u.id === userId);
     try {
-        const res = await fetch(`/api/admin/users/${userId}/reviews`, {
-            headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` }
-        });
+        const res = await apiFetch(`/api/admin/users/${userId}/reviews`);
         if (!res.ok) throw new Error('Network response was not ok');
         const reviews = await res.json();
 
@@ -1721,11 +1776,10 @@ async function promptFeedbackReply(ticketId) {
     }
 
     try {
-        const res = await fetch(`/api/admin/support/${ticketId}/reply`, {
+        const res = await apiFetch(`/api/admin/support/${ticketId}/reply`, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+                'Content-Type': 'application/json'
             },
             body: JSON.stringify({ reply: replyText })
         });
@@ -2001,11 +2055,10 @@ async function handleTestAI() {
     resultDiv.classList.add('hidden');
 
     try {
-        const res = await fetch('/api/ai/test', {
+        const res = await apiFetch('/api/ai/test', {
             method: 'POST',
             headers: { 
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+                'Content-Type': 'application/json'
             },
             body: JSON.stringify({ 
                 reviewText,
