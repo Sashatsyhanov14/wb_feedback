@@ -1838,10 +1838,10 @@ function renderAIPage() {
                 <p class="text-on-surface-variant text-sm mt-2 leading-relaxed">Проверьте, как нейросеть отвечает на отзывы. ${isUnlimited ? '<span class="text-green-500 font-bold">Безлимит ∞</span>' : '<span class="text-primary font-bold">5 бесплатных тестов в день</span>'}</p>
             </header>
 
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8 items-start">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8 items-start px-4 sm:px-0">
                 
                 <!-- Левая колонка: Ввод -->
-                <section class="premium-card p-6 sm:p-8 space-y-6 lg:sticky lg:top-4 mx-4 sm:mx-0">
+                <section class="premium-card p-6 sm:p-8 space-y-6 lg:sticky lg:top-4">
                     
                     <div class="space-y-2">
                         <label class="text-[10px] font-black uppercase tracking-widest text-primary">Отзыв покупателя</label>
@@ -1899,9 +1899,9 @@ function renderAIPage() {
                         </div>
                     </details>
 
-                    <!-- Плавающая кнопка для мобилок -->
-                    <div class="fixed bottom-24 left-4 right-4 z-40 lg:static lg:bottom-auto lg:left-auto lg:right-auto lg:z-auto">
-                        <button id="test-ai-btn" onclick="handleTestAI(); if(typeof gtag === 'function') gtag('event', 'click_test_ai_generate');" class="primary-btn w-full py-4 text-xs uppercase tracking-[0.2em] shadow-[0_4px_20px_rgba(var(--primary-rgb),0.4)] lg:shadow-lg active:scale-[0.99] transition-all flex items-center justify-center gap-3">
+                    <!-- Кнопка для мобилок и десктопа -->
+                    <div class="pt-2">
+                        <button id="test-ai-btn" onclick="handleTestAI(); if(typeof gtag === 'function') gtag('event', 'click_test_ai_generate');" class="primary-btn w-full py-4 text-xs uppercase tracking-[0.2em] shadow-lg active:scale-[0.99] transition-all flex items-center justify-center gap-3">
                             <span class="material-symbols-outlined text-lg">magic_button</span>
                             Сгенерировать ответ
                         </button>
@@ -1909,7 +1909,7 @@ function renderAIPage() {
                 </section>
 
                 <!-- Правая колонка: Результат -->
-                <div class="flex flex-col space-y-6 mx-4 sm:mx-0">
+                <div class="flex flex-col space-y-6">
                     <div id="test-ai-result" class="hidden animate-in fade-in slide-in-from-bottom-4">
                         <section class="premium-card p-6 sm:p-8 space-y-4 border-primary/20 bg-primary/5">
                             <div class="flex items-center gap-3">
