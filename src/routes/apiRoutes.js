@@ -492,7 +492,7 @@ router.post('/shops', authMiddleware, async (req, res) => {
     // Check shop limit
     const { data: seller } = await supabase
       .from('sellers')
-      .select('max_shops')
+      .select('max_shops, subscription_status')
       .eq('id', sellerId)
       .single();
       
@@ -501,7 +501,7 @@ router.post('/shops', authMiddleware, async (req, res) => {
       .select('id', { count: 'exact', head: true })
       .eq('seller_id', sellerId);
       
-    const limit = seller?.max_shops || 1;
+    const limit = seller?.subscription_status === 'trial' ? 5 : (seller?.max_shops || 1);
     if (shopCount >= limit) {
       return res.status(403).json({ error: `Достигнут лимит магазинов для вашего тарифа (${limit}). Перейдите на тариф выше.` });
     }
@@ -539,6 +539,20 @@ router.put('/shops/:id', authMiddleware, async (req, res) => {
       .single();
 
     if (fetchError || !shop) return res.status(403).json({ error: 'Доступ запрещен' });
+
+    // Grant or reset 3-day trial if wb_token is added
+    if (updateData.wb_token && updateData.wb_token !== 'pending') {
+      const { data: seller } = await supabase.from('sellers').select('subscription_status').eq('id', sellerId).single();
+      if (seller && (seller.subscription_status === 'free' || seller.subscription_status === 'trial')) {
+        const expiresAt = new Date();
+        expiresAt.setDate(expiresAt.getDate() + 3);
+        await supabase.from('sellers').update({
+          subscription_status: 'trial',
+          subscription_expires_at: expiresAt.toISOString()
+        }).eq('id', sellerId);
+        console.log(`[Shop] Granted/Reset 3-day trial for seller ${sellerId} upon adding token.`);
+      }
+    }
 
     const { data, error } = await supabase
       .from('shops')

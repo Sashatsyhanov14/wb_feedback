@@ -22,30 +22,26 @@ router.post('/logout', (req, res) => {
   res.json({ success: true });
 });
 
-// 4.b Guest Login (Zero friction entry — with anti-abuse)
+// 4.b Guest Login (Zero friction entry — restricted to AI test)
 router.get('/guest', async (req, res) => {
     try {
-        // --- PROTECTION 1: If user already has a valid session, reuse it ---
         const existingToken = req.cookies.auth_token;
         if (existingToken) {
             try {
                 const decoded = jwt.verify(existingToken, config.jwtSecret);
                 if (decoded.sellerId) {
-                    // Check if this seller actually exists in DB
                     const { data: existingSeller } = await supabase
                         .from('sellers')
                         .select('id')
                         .eq('id', decoded.sellerId)
                         .maybeSingle();
                     if (existingSeller) {
-                        console.log('Guest route: user already has valid session, reusing:', decoded.sellerId);
-                        return res.redirect(`/app?token=${existingToken}`);
+                        return res.redirect(`/app?token=${existingToken}#ai`);
                     }
                 }
-            } catch (e) { /* token expired/invalid, continue to create new */ }
+            } catch (e) { }
         }
 
-        // --- PROTECTION 2: Rate limit by IP — max 3 guest accounts per IP per day ---
         const clientIp = req.ip || req.headers['x-forwarded-for'] || 'unknown';
         const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
         
@@ -56,52 +52,42 @@ router.get('/guest', async (req, res) => {
             .like('auth_provider_id', `guest_%_${clientIp.replace(/[^a-zA-Z0-9.:]/g, '')}`)
             .gte('created_at', oneDayAgo);
 
-        if (recentGuestCount && recentGuestCount >= 3) {
-            console.warn(`[GuestAuth] Rate limit hit for IP: ${clientIp} (${recentGuestCount} accounts today)`);
+        if (recentGuestCount && recentGuestCount >= 10) {
             return res.redirect('/login?error=too_many_attempts');
         }
 
-        // --- Create guest account with IP tag for audit ---
         const ipTag = clientIp.replace(/[^a-zA-Z0-9.:]/g, '').substring(0, 30);
         const guestId = 'guest_' + crypto.randomBytes(8).toString('hex') + '_' + ipTag;
-        const expiresAt = new Date();
-        expiresAt.setDate(expiresAt.getDate() + 3); // 3 days trial
-
+        
+        // Guest doesn't get a trial, just 'guest' status
         const { data: seller, error: insertError } = await supabase
           .from('sellers')
           .insert({
             auth_provider: 'guest',
             auth_provider_id: guestId,
             display_name: 'Гость',
-            subscription_status: 'trial',
-            subscription_expires_at: expiresAt.toISOString()
+            subscription_status: 'guest'
           })
           .select('id')
           .single();
           
         if (insertError) throw insertError;
 
-        const token = jwt.sign(
-          { sellerId: seller.id },
-          config.jwtSecret,
-          { expiresIn: '30d' }
-        );
-
+        const token = jwt.sign({ sellerId: seller.id }, config.jwtSecret, { expiresIn: '7d' });
         const isProd = config.nodeEnv === 'production';
         const isHttps = req.headers['x-forwarded-proto'] === 'https' || req.protocol === 'https';
 
         res.cookie('auth_token', token, {
           httpOnly: false,
           secure: isHttps || isProd, 
-          maxAge: 30 * 24 * 60 * 60 * 1000,
+          maxAge: 7 * 24 * 60 * 60 * 1000,
           path: '/',
           sameSite: 'Lax'
         });
 
-        console.log(`[GuestAuth] Success: ${seller.id} | IP: ${clientIp}`);
-        res.redirect(`/app?token=${token}&isNew=true`);
+        res.redirect(`/app?token=${token}#ai`);
     } catch (error) {
-        console.error('[GuestAuth] Critical Error:', error.message, error.stack);
+        console.error('[GuestAuth] Error:', error.message);
         res.redirect('/login?error=guest_failed');
     }
 });

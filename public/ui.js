@@ -265,17 +265,40 @@ async function refreshData() {
         // Update UI components that depend on data
         showView(state.currentView);
 
-        // --- ONBOARDING & EXPIRED TRIAL PROMPTS ---
-        // Subscription is now on seller level (state.settings)
-        const isTrial = state.settings.subscription_status === 'trial';
+        // --- EXPIRED PROMPTS & BANNER ---
+        const status = state.settings.subscription_status;
         const expiresAt = state.settings.subscription_expires_at ? new Date(state.settings.subscription_expires_at) : null;
         const now = new Date();
-        const isExpired = isTrial && expiresAt && now > expiresAt;
+        const isExpired = (status === 'trial' || status === 'premium') && expiresAt && now > expiresAt;
 
-        if (isExpired && !window._expiredPromptShown) {
+        if (isExpired && !window._expiredPromptShown && state.settings.auth_provider !== 'guest') {
             window._expiredPromptShown = true;
             state.currentView = 'subscription';
-            showToast('Тестовый период завершен', true);
+            showToast('Срок действия подписки завершен', true);
+            showView('subscription');
+        }
+
+        // Render Persistent Expiration Banner
+        let banner = document.getElementById('expiration-banner');
+        if (isExpired && state.settings.auth_provider !== 'guest') {
+            if (!banner) {
+                banner = document.createElement('div');
+                banner.id = 'expiration-banner';
+                banner.className = 'w-full bg-red-500/10 border-b border-red-500/20 px-6 py-4 flex items-center justify-between z-50 animate-in';
+                const mainContent = document.querySelector('main');
+                if (mainContent) mainContent.prepend(banner);
+            }
+            banner.innerHTML = `
+                <div class="flex items-center gap-3">
+                    <span class="material-symbols-outlined text-red-500">warning</span>
+                    <span class="text-[11px] font-bold text-red-500 tracking-wide uppercase">Срок действия подписки истек. Бот приостановлен.</span>
+                </div>
+                <button onclick="showView('subscription')" class="bg-red-500 hover:bg-red-600 text-white text-[10px] font-black uppercase tracking-widest px-4 py-2 rounded-lg transition-colors shadow-lg">
+                    Продлить
+                </button>
+            `;
+        } else if (banner) {
+            banner.remove();
         }
 
     } catch (e) {
@@ -295,11 +318,29 @@ async function handleLogout() {
 
 // Smart routing: determines which tab to show based on user state
 function getSmartView() {
-    // Default view for agencies
+    if (state.settings?.auth_provider === 'guest') {
+        return 'ai';
+    }
+    
+    if (!state.shops || state.shops.length === 0) {
+        return 'settings';
+    }
+    
+    const status = state.settings?.subscription_status;
+    const expiresAt = state.settings?.subscription_expires_at ? new Date(state.settings.subscription_expires_at) : null;
+    if ((status === 'trial' || status === 'premium') && expiresAt && new Date() > expiresAt) {
+        return 'subscription';
+    }
+    
     return 'settings';
 }
 
 function showView(view) {
+    if (state.settings?.auth_provider === 'guest' && view !== 'login' && view !== 'ai') {
+        showToast('Эта функция доступна только после регистрации', true);
+        return showView('login');
+    }
+
     state.currentView = view;
     if (view !== 'login') window.location.hash = view;
     const content = document.getElementById('content-view');
@@ -378,9 +419,6 @@ function renderLogin() {
                         </svg>
                         <span class="text-[#E1AF66]">AI</span>
                     </h2>
-                    <p class="text-on-surface-variant text-sm font-medium tracking-wide">
-                        В один клик или без регистрации
-                    </p>
                 </div>
 
                 ${(() => {
@@ -390,7 +428,7 @@ function renderLogin() {
                     
                     let message = 'Произошла ошибка при входе';
                     if (error === 'too_many_attempts') message = 'Слишком много попыток. Пожалуйста, войдите через Google или VK.';
-                    if (error === 'guest_failed') message = 'Не удалось создать гостевой аккаунт';
+                    if (error === 'guest_failed') message = 'Не удалось создать аккаунт';
                     
                     return `
                         <div class="bg-red-500/10 border border-red-500/20 rounded-xl p-4 flex items-start gap-3 animate-in">
@@ -404,7 +442,7 @@ function renderLogin() {
                     <!-- Guest Button -->
                     <button onclick="window.location.href='/api/auth/guest'" class="w-full h-14 flex items-center justify-center gap-4 bg-primary/10 hover:bg-primary/20 active:scale-[0.97] transition-all rounded-[12px] shadow-sm border border-primary/20 group">
                         <span class="material-symbols-outlined text-primary group-hover:rotate-12 transition-transform">rocket_launch</span>
-                        <span class="text-sm font-bold text-primary">Попробовать без регистрации</span>
+                        <span class="text-sm font-bold text-primary">Песочница без регистрации</span>
                     </button>
                     <!-- Google Button -->
                     <button onclick="handleGoogleLogin()" class="w-full h-14 flex items-center justify-center gap-4 bg-white hover:bg-gray-100 active:scale-[0.97] transition-all rounded-[12px] shadow-sm border border-gray-200">
@@ -1359,7 +1397,14 @@ async function handleCreateShop(btn) {
             editShop(newShop.id);
         } else {
             const errorData = await res.json();
-            showToast(errorData.error || 'Ошибка при создании магазина', true);
+            if (res.status === 403 && (errorData.error.includes('Превышен') || errorData.error.includes('лимит'))) {
+                const modal = document.getElementById('add-shop-modal');
+                if (modal) modal.remove();
+                showToast('Достигнут лимит магазинов. Выберите новый тариф.', true);
+                showView('subscription');
+            } else {
+                showToast(errorData.error || 'Ошибка при создании магазина', true);
+            }
         }
     } catch (e) {
         showToast('Ошибка сети', true);
@@ -2431,6 +2476,18 @@ function renderAIPage() {
                 <p class="text-on-surface-variant text-sm mt-2 leading-relaxed">Проверьте, как нейросеть отвечает на отзывы. ${isUnlimited ? '<span class="text-green-500 font-bold">Безлимит ∞</span>' : '<span class="text-primary font-bold">5 бесплатных тестов в день</span>'}</p>
             </header>
 
+            ${state.settings?.auth_provider === 'guest' ? `
+            <div class="px-4 sm:px-0 mb-6 animate-in">
+                <div class="bg-primary/10 border border-primary/20 rounded-xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+                    <div>
+                        <h3 class="text-sm font-bold text-primary">Гостевой режим</h3>
+                        <p class="text-xs text-on-surface-variant mt-1">Доступна только песочница. Зарегистрируйтесь, чтобы получить 3 дня полного доступа ко всем функциям.</p>
+                    </div>
+                    <button onclick="showView('login')" class="primary-btn px-6 py-3 text-xs w-full sm:w-auto shrink-0 shadow-lg hover:-translate-y-1 transition-transform">Регистрация</button>
+                </div>
+            </div>
+            ` : ''}
+
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8 items-start px-4 sm:px-0">
                 
                 <!-- Левая колонка: Ввод -->
@@ -2632,10 +2689,16 @@ async function handleTestAI() {
             }
         } else if (res.status === 429) {
             const err = await res.json();
-            showToast(err.error || 'Лимит тестов исчерпан', true);
-            // Show CTA block if hidden
+            showToast('Демо-лимит исчерпан! Перенаправляем на регистрацию...', true);
+            
             const cta = document.getElementById('test-cta-block');
-            if (cta) cta.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            if (cta) cta.style.display = 'block';
+
+            if (state.settings?.auth_provider === 'guest') {
+                setTimeout(() => showView('login'), 2000);
+            } else {
+                if (cta) cta.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
         } else {
             const err = await res.json();
             showToast(err.error || 'Ошибка сети', true);
