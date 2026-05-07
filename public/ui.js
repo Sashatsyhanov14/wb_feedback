@@ -825,7 +825,21 @@ function renderShopEdit(shopId) {
             <div class="space-y-12">
                 <div class="space-y-4">
                     <div class="flex flex-col gap-1.5">
-                        <label class="text-xs font-bold uppercase tracking-widest text-on-surface-variant">API Токен Wildberries</label>
+                        <div class="flex items-center gap-2">
+                            <label class="text-xs font-bold uppercase tracking-widest text-on-surface-variant">API Токен Wildberries</label>
+                            <button onclick="document.getElementById('api-instructions').classList.toggle('hidden')" class="w-4 h-4 rounded-full border border-primary text-primary flex items-center justify-center font-bold text-[10px] hover:bg-primary/20 transition-all cursor-pointer">i</button>
+                        </div>
+                        
+                        <div id="api-instructions" class="hidden premium-card p-4 my-2 bg-primary/5 border border-primary/20 text-xs text-on-surface-variant leading-relaxed space-y-3">
+                            <p class="font-bold text-text-main uppercase tracking-widest text-[10px]">Как получить токен:</p>
+                            <ol class="list-decimal pl-5 space-y-2 text-on-surface-variant">
+                                <li>Откройте портал селлера: <a href="https://seller.wildberries.ru/supplier-settings/access-to-api" target="_blank" class="text-primary hover:underline font-bold transition-all">Настройки → Доступ к API</a></li>
+                                <li>Нажмите <b>«Создать новый токен»</b>.</li>
+                                <li>Введите любое имя (например, WBReply) и обязательно отметьте галочками два пункта: <span class="text-white font-medium">«Отзывы и вопросы»</span> и <span class="text-white font-medium">«Контент»</span>.</li>
+                                <li>Скопируйте созданный ключ и вставьте его в поле ниже.</li>
+                            </ol>
+                        </div>
+                        
                         <p class="text-[11px] text-on-surface-variant font-medium">Нужны права «Вопросы и отзывы» + «Контент».</p>
                     </div>
 
@@ -1341,11 +1355,11 @@ async function handleCreateShop(btn) {
             const newShop = await res.json();
             document.getElementById('add-shop-modal').remove();
             showToast('Магазин успешно создан');
-            state.activeShopId = newShop.id;
             await refreshData();
-            showView('settings');
+            editShop(newShop.id);
         } else {
-            showToast('Ошибка при создании магазина', true);
+            const errorData = await res.json();
+            showToast(errorData.error || 'Ошибка при создании магазина', true);
         }
     } catch (e) {
         showToast('Ошибка сети', true);

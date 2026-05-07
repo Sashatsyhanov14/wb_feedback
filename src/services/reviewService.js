@@ -88,7 +88,6 @@ class ReviewService {
         rating: feedback.productValuation
       };
       
-      // Use shop as the 'seller' object for aiService (it has brand_name, custom_instructions)
       const aiData = await aiService.generateResponse(reviewContext, productMetadata, productMatrix, shop, { crossSellName });
       if (!aiData || !aiData.text) return;
 
