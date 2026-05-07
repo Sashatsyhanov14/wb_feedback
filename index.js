@@ -3,7 +3,6 @@ const path = require('path');
 const config = require('./src/config');
 const apiRoutes = require('./src/routes/apiRoutes');
 const paymentRoutes = require('./src/routes/paymentRoutes');
-const telegramService = require('./src/services/telegramService');
 const { initJobs, processAll } = require('./src/jobs/reviewCron');
 require('dotenv').config();
 
@@ -26,28 +25,6 @@ app.get('/api/cron', async (req, res) => {
   res.json({ success: true, timestamp: new Date() });
 });
 
-// Telegram Webhook setup (Manual trigger)
-app.get('/api/setup', async (req, res) => {
-  try {
-    const protocol = req.headers['x-forwarded-proto'] || 'https';
-    const host = req.headers.host;
-    const webhookUrl = `${protocol}://${host}/api/bot`;
-    
-    console.log(`Manual setup triggered. Setting webhook to: ${webhookUrl}`);
-    await telegramService.bot.telegram.setWebhook(webhookUrl);
-    
-    res.json({ 
-      success: true, 
-      webhookUrl, 
-      message: 'Бот успешно привязан к этому серверу! Теперь он должен отвечать на /start.' 
-    });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// Telegram Webhook recipient
-app.post('/api/bot', (req, res) => telegramService.handleUpdate(req, res));
 
 // Routes
 app.use('/api/auth', authRoutes);
@@ -75,8 +52,6 @@ app.get('/app', (req, res) => {
 // Initialize background jobs
 initJobs();
 
-// Launch Bot (Polling disabled for users, only sending admin notifications)
-// telegramService.launch();
 
 // Health check
 app.get('/health', (req, res) => {

@@ -22,24 +22,39 @@ async function cleanupGuests() {
   try {
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
     
+    // Find old guest accounts
     const { data: staleGuests, error } = await supabase
       .from('sellers')
       .select('id')
       .eq('auth_provider', 'guest')
-      .lt('created_at', sevenDaysAgo)
-      .or('wb_token.is.null,wb_token.eq.');
+      .lt('created_at', sevenDaysAgo);
 
     if (error) throw error;
     if (!staleGuests || staleGuests.length === 0) return;
 
-    const ids = staleGuests.map(g => g.id);
+    // Filter: only delete guests who have no shops with a real WB token
+    const idsToDelete = [];
+    for (const guest of staleGuests) {
+      const { data: shops } = await supabase
+        .from('shops')
+        .select('id, wb_token')
+        .eq('seller_id', guest.id);
+      
+      const hasRealToken = (shops || []).some(s => s.wb_token && s.wb_token !== '' && s.wb_token !== 'pending');
+      if (!hasRealToken) {
+        idsToDelete.push(guest.id);
+      }
+    }
+
+    if (idsToDelete.length === 0) return;
+
     const { error: delError } = await supabase
       .from('sellers')
       .delete()
-      .in('id', ids);
+      .in('id', idsToDelete);
 
     if (delError) throw delError;
-    console.log(`[Cleanup] Deleted ${ids.length} abandoned guest accounts`);
+    console.log(`[Cleanup] Deleted ${idsToDelete.length} abandoned guest accounts`);
   } catch (err) {
     console.error('[Cleanup] Guest cleanup error:', err.message);
   }

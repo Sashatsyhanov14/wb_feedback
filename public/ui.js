@@ -1,21 +1,26 @@
 let state = {
     sellerId: null,
+    shops: [],
+    activeShopId: null,
     settings: {
-        wb_token: '',
-        custom_instructions: '',
-        is_auto_reply_enabled: true,
-        respond_to_bad_reviews: false,
+        // Seller-level (auth + subscription)
         subscription_status: 'free',
-        subscription_expires_at: null
+        subscription_expires_at: null,
+        auth_provider: null,
+        display_name: '',
+        email: '',
+        avatar_url: ''
     },
     reviews: [],
     matrix: [],
-    currentView: 'reviews',
+    currentView: 'settings',
     stats: { approved: 0, pending: 0, total: 0, approvedToday: 0 },
-    adminStats: { totalSellers: 0, totalApproved: 0, newToday: 0, activeToday: 0, withoutToken: 0 },
-    adminUsers: [],
     tickets: [],
-    adminTickets: []
+    globalStats: { todayProcessed: 0, totalProcessed: 0, hoursSaved: 0, greenZoneCount: 0, redZone: [] },
+    shopSearch: '',
+    selectedShops: [],
+    registryView: 'grid',
+    reviewsFilterShopId: null // null means All Shops
 };
 
 // Helper for API calls with token
@@ -213,68 +218,71 @@ async function refreshData() {
     if (!state.sellerId) return;
     try {
         const adminId = '68cfdf5a-25fb-43f5-8672-c03d1bddc29b';
-        const requests = [
-            apiFetch(`/api/settings`).then(r => r.status === 200 ? r.json() : null),
-            apiFetch(`/api/matrix`).then(r => r.status === 200 ? r.json() : null),
-            apiFetch(`/api/stats`).then(r => r.status === 200 ? r.json() : null),
-            apiFetch(`/api/reviews`).then(r => r.status === 200 ? r.json() : null),
-            apiFetch(`/api/support`).then(r => r.status === 200 ? r.json() : null)
-        ];
+        
+        // 1. Fetch seller settings (auth + subscription) and shops in parallel
+        const [sellerRes, shopsRes] = await Promise.all([
+            apiFetch('/api/settings'),
+            apiFetch('/api/shops')
+        ]);
 
-        if (state.sellerId.toString() === adminId) {
-            requests.push(apiFetch(`/api/admin/stats`).then(r => r.status === 200 ? r.json() : null));
-            requests.push(apiFetch(`/api/admin/support`).then(r => r.status === 200 ? r.json() : null));
-            requests.push(apiFetch(`/api/admin/users`).then(r => r.status === 200 ? r.json() : null));
-            
-            // Show Admin tab in UI if not visible
-            document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'flex');
+        if (sellerRes.ok) {
+            const sellerData = await sellerRes.json();
+            state.settings = { ...state.settings, ...sellerData };
         }
 
-        const [settings, matrix, stats, reviews, tickets, adminStats, adminTickets, adminUsers] = await Promise.all(requests);
+        if (shopsRes.ok) {
+            state.shops = await shopsRes.json();
+            if (state.shops.length > 0 && !state.activeShopId) {
+                state.activeShopId = state.shops[0].id;
+            }
+        }
 
-        if (settings) state.settings = { ...state.settings, ...settings };
-        if (matrix) state.matrix = matrix;
-        if (stats) state.stats = stats;
-        if (reviews) state.reviews = reviews;
-        if (tickets) state.tickets = tickets;
-        if (adminStats) state.adminStats = adminStats;
-        if (adminTickets) state.adminTickets = adminTickets;
-        if (adminUsers) state.adminUsers = adminUsers;
+        // 2. Fetch remaining data
+        const reqs = {
+            reviews: apiFetch(state.reviewsFilterShopId ? `/api/reviews?shopId=${state.reviewsFilterShopId}` : '/api/reviews').then(r => r.ok ? r.json() : []),
+            support: apiFetch(`/api/support`).then(r => r.ok ? r.json() : []),
+            globalStats: apiFetch(`/api/stats/global`).then(r => r.ok ? r.json() : null)
+        };
+
+        if (state.activeShopId) {
+            reqs.matrix = apiFetch(`/api/matrix?shopId=${state.activeShopId}`).then(r => r.ok ? r.json() : []);
+            reqs.stats = apiFetch(`/api/stats?shopId=${state.activeShopId}`).then(r => r.ok ? r.json() : null);
+        }
+
+        const keys = Object.keys(reqs);
+        const results = await Promise.all(Object.values(reqs));
+        
+        const data = {};
+        keys.forEach((key, i) => data[key] = results[i]);
+
+        // Apply results to state
+        if (data.reviews) state.reviews = data.reviews;
+        if (data.support) state.tickets = data.support;
+        if (data.globalStats) state.globalStats = data.globalStats;
+        if (data.matrix) state.matrix = data.matrix;
+        if (data.stats) state.stats = data.stats;
+
+        // Update UI components that depend on data
+        showView(state.currentView);
 
         // --- ONBOARDING & EXPIRED TRIAL PROMPTS ---
-        const isTrial = state.settings?.subscription_status === 'trial';
-        const expiresAt = state.settings?.subscription_expires_at ? new Date(state.settings.subscription_expires_at) : null;
+        // Subscription is now on seller level (state.settings)
+        const isTrial = state.settings.subscription_status === 'trial';
+        const expiresAt = state.settings.subscription_expires_at ? new Date(state.settings.subscription_expires_at) : null;
         const now = new Date();
         const isExpired = isTrial && expiresAt && now > expiresAt;
 
         if (isExpired && !window._expiredPromptShown) {
             window._expiredPromptShown = true;
             state.currentView = 'subscription';
-            
-            const toast = document.createElement('div');
-            toast.className = 'fixed top-4 left-1/2 -translate-x-1/2 bg-[#2A2D32] border border-red-500/40 shadow-2xl rounded-2xl px-5 py-4 flex gap-4 items-center max-w-[90vw] animate-slide-down';
-            toast.style.zIndex = '9999';
-            toast.innerHTML = `
-                <div class="bg-red-500/20 text-red-400 w-10 h-10 rounded-full flex items-center justify-center shrink-0">
-                    <span class="material-symbols-outlined font-black">timer_off</span>
-                </div>
-                <div class="flex-1">
-                    <h4 class="text-white font-bold text-sm tracking-wide">Тестовый период завершен</h4>
-                    <p class="text-on-surface-variant text-xs mt-1 leading-relaxed">Нейросеть приостановлена. Оплатите безлимитный доступ, чтобы продолжить работу!</p>
-                </div>
-                <button onclick="this.parentElement.remove()" class="text-on-surface-variant hover:text-white p-2 transition-colors"><span class="material-symbols-outlined text-sm">close</span></button>
-            `;
-            document.body.appendChild(toast);
-            setTimeout(() => { if(toast.parentElement) toast.remove(); }, 12000);
-        } else if ((!state.settings.wb_token || !state.settings.wb_token_valid) && !window._tokenPromptShown && !isExpired) {
-            window._tokenPromptShown = true;
-            // Don't force view change — let smart routing handle it
+            showToast('Тестовый период завершен', true);
         }
 
     } catch (e) {
         console.error('Refresh data error:', e);
     }
 }
+
 
 async function handleLogout() {
     try { await apiFetch('/api/auth/logout', { method: 'POST' }); } catch(e) {}
@@ -287,19 +295,7 @@ async function handleLogout() {
 
 // Smart routing: determines which tab to show based on user state
 function getSmartView() {
-    const hasToken = state.settings.wb_token && state.settings.wb_token_valid;
-    const hasSubscription = state.settings.subscription_status === 'trial' || state.settings.subscription_status === 'active';
-    const expiresAt = state.settings.subscription_expires_at ? new Date(state.settings.subscription_expires_at) : null;
-    const isExpired = hasSubscription && expiresAt && new Date() > expiresAt;
-    const isFirstVisit = !localStorage.getItem('wb_has_tested');
-
-    // First visit and never tested → AI test
-    if (isFirstVisit) return 'ai';
-    // Expired subscription → subscription page
-    if (isExpired) return 'subscription';
-    // Has token → reviews
-    if (hasToken) return 'reviews';
-    // No token → settings (business)
+    // Default view for agencies
     return 'settings';
 }
 
@@ -355,8 +351,6 @@ function showView(view) {
         content.innerHTML = renderSubscription();
     } else if (view === 'interface') {
         content.innerHTML = renderInterface();
-    } else if (view === 'admin') {
-        content.innerHTML = renderAdmin();
     } else if (view === 'ai') {
         content.innerHTML = renderAIPage();
     } else if (view === 'login') {
@@ -694,111 +688,255 @@ window.onTelegramAuth = async function(user) {
 }
 
 function renderSettings() {
-    const isTokenMissing = !state.settings.wb_token;
-    
+    if (state.shops.length === 0) {
+        return `
+            <div class="max-w-2xl mx-auto py-20 text-center animate-in">
+                <div class="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-6">
+                    <span class="material-symbols-outlined text-primary text-4xl">storefront</span>
+                </div>
+                <h2 class="text-2xl font-bold mb-4">У вас пока нет магазинов</h2>
+                <p class="text-on-surface-variant mb-8">Добавьте свой первый магазин Wildberries, чтобы начать автоматизацию ответов.</p>
+                <button onclick="showAddShopModal()" class="primary-btn px-10 py-4 text-xs uppercase tracking-widest">Добавить магазин</button>
+            </div>
+        `;
+    }
+
+    if (state.editingShopId) {
+        return renderShopEdit(state.editingShopId);
+    }
+
+    const filteredShops = state.shops.filter(s => 
+        s.name.toLowerCase().includes(state.shopSearch.toLowerCase())
+    );
+
     return `
-        <div class="max-w-2xl mx-auto space-y-10 animate-in pb-20">
-            <header class="text-left">
-                <p class="text-primary text-[10px] font-black uppercase tracking-[0.3em] mb-2">Конфигурация</p>
-                <h2 class="font-headline text-3xl sm:text-4xl font-bold text-text-main tracking-tight">Бизнес-настройка</h2>
+        <div class="w-full space-y-10 animate-in pb-20">
+            <header class="relative flex flex-col items-center justify-center text-center">
+                <p class="text-primary text-[10px] font-black uppercase tracking-[0.3em] mb-2">Управление</p>
+                <h2 class="font-headline text-3xl sm:text-4xl font-bold text-text-main tracking-tight">Магазины</h2>
+                
+                <button onclick="showAddShopModal()" class="absolute right-0 top-1/2 -translate-y-1/2 text-[10px] font-black uppercase tracking-widest text-primary hover:text-white transition-all flex items-center gap-2">
+                    <span class="material-symbols-outlined text-sm">add</span>
+                    Добавить
+                </button>
             </header>
 
-            ${isTokenMissing ? `
-                <div class="bg-primary/10 border-2 border-primary/40 rounded-2xl p-6 sm:p-8 text-center space-y-4 shadow-lg shadow-primary/5 animate-pulse-slow">
-                    <div class="w-16 h-16 mx-auto bg-primary/20 rounded-full flex items-center justify-center mb-4">
-                        <span class="material-symbols-outlined text-primary text-3xl font-black">key</span>
-                    </div>
-                    <div>
-                        <div class="flex items-center justify-center gap-2 mb-2">
-                            <h3 class="text-text-main font-headline text-xl sm:text-2xl font-bold">Для работы установите токен</h3>
-                            <button onclick="showTokenInfoModal()" class="text-primary hover:bg-primary/10 w-8 h-8 rounded-full flex items-center justify-center transition-colors">
-                                <span class="material-symbols-outlined text-xl">info</span>
-                            </button>
-                        </div>
-                        <p class="text-on-surface-variant text-sm leading-relaxed max-w-md mx-auto">
-                            Нейросеть не может работать без доступа к отзывам. Пожалуйста, добавьте ваш <strong class="text-text-main">Standard API ключ Wildberries</strong> ниже.
-                        </p>
-                    </div>
+            <!-- Search & Actions -->
+            <div class="flex flex-col sm:flex-row items-center gap-6 max-w-2xl mx-auto w-full">
+                <div class="relative flex-1 w-full group">
+                    <span class="material-symbols-outlined absolute left-0 top-1/2 -translate-y-1/2 text-on-surface-variant/40 group-focus-within:text-primary transition-colors">search</span>
+                    <input type="text" placeholder="Поиск магазина..." value="${state.shopSearch}" oninput="handleShopSearch(this.value)" 
+                        class="w-full bg-transparent border-b border-outline-variant/30 outline-none pl-8 pr-4 py-3 text-text-main text-sm focus:border-primary transition-all">
                 </div>
-            ` : ''}
+                
+                ${state.selectedShops.length > 0 ? `
+                    <div class="flex items-center gap-4 animate-in fade-in">
+                        <button onclick="bulkPause(true)" class="text-[10px] font-black uppercase tracking-widest text-on-surface-variant hover:text-primary transition-all">Вкл</button>
+                        <button onclick="bulkPause(false)" class="text-[10px] font-black uppercase tracking-widest text-on-surface-variant hover:text-primary transition-all">Пауза</button>
+                        <button onclick="bulkPrompt()" class="text-[10px] font-black uppercase tracking-widest text-on-surface-variant hover:text-primary transition-all">Промпт</button>
+                    </div>
+                ` : ''}
+            </div>
 
-            <div class="space-y-5">
-                <section class="premium-card p-5 sm:p-8 space-y-5">
-                    <div class="space-y-4">
-                        <div class="flex flex-col gap-1.5">
-                            <label class="text-xs font-bold uppercase tracking-widest text-on-surface-variant">API Токен Wildberries</label>
-                            <p class="text-[13px] font-bold text-green-600 dark:text-green-500">Нам нужен токен с правами «Вопросы и отзывы» + «Контент»</p>
-                            <p class="text-[11px] text-on-surface-variant font-medium">Мы физически не имеем доступа к вашим ценам, заказам и финансам. Право «Контент» нужно только для чтения описания товара, чтобы ИИ отвечал экспертно.</p>
-                        </div>
+            <!-- Registry Content (Unified Grid/List) -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
+                ${filteredShops.map(shop => {
+                    const hasPending = state.reviews.some(r => r.shop_id === shop.id && r.status === 'pending');
+                    const isBotActive = shop.is_auto_reply_enabled;
+                    const answersCount = state.reviews.filter(r => 
+                        r.shop_id === shop.id && 
+                        (r.status === 'auto_posted' || r.status === 'approved') && 
+                        (new Date() - new Date(r.created_at)) < 24 * 60 * 60 * 1000
+                    ).length;
 
-                        <div class="relative">
-                            <input id="wb-token-input" class="w-full bg-bg-main border border-outline-variant outline-none py-4 px-5 pr-12 text-text-main text-sm font-mono focus:border-primary transition-colors rounded-lg" 
-                                type="password" value="${state.settings.wb_token || ''}" placeholder="Вставьте ваш API ключ">
-                            <button class="absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-primary transition-colors" onclick="toggleTokenVisibility()">
-                                <span id="token-visibility-icon" class="material-symbols-outlined text-lg">visibility</span>
-                            </button>
-                        </div>
-
-                        ${isTokenMissing ? `
-                            <div class="bg-primary/5 border border-primary/20 rounded-xl p-4 sm:p-5 space-y-3">
-                                <a href="https://seller.wildberries.ru/supplier-settings/access-to-api" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-2 text-primary font-bold hover:underline transition-all">
-                                    <span class="material-symbols-outlined text-sm">open_in_new</span>
-                                    Перейти в кабинет ВБ для создания токена
-                                </a>
-                                <ol class="list-decimal pl-4 sm:pl-5 text-[11px] sm:text-xs text-text-main space-y-2 opacity-90 leading-relaxed">
-                                    <li>Перейдите по ссылке в настройки API Wildberries.</li>
-                                    <li>Нажмите «Создать новый токен».</li>
-                                    <li>Введите любое имя (например, «WBReply»).</li>
-                                    <li>Выберите <b>две галочки: «Вопросы и отзывы»</b> и <b>«Контент»</b> (остальные не нужны — мы не трогаем цены, заказы и финансы!).</li>
-                                    <li>Нажмите «Создать», скопируйте токен и вставьте его сюда.</li>
-                                </ol>
+                    return `
+                        <div class="group bg-[#161616] border border-white/5 rounded-xl p-5 cursor-pointer transition-all duration-300 hover:-translate-y-1 hover:border-[#E2B67B]/50 hover:shadow-[0_4px_20px_rgba(226,182,123,0.05)] relative overflow-hidden" onclick="editShop('${shop.id}')">
+                            
+                            <!-- Header: Name & Status -->
+                            <div class="flex justify-between items-start">
+                                <h3 class="text-white font-medium text-[15px] tracking-wide truncate pr-4">${shop.name}</h3>
+                                
+                                <!-- Pulsing Status -->
+                                <div class="relative flex items-center justify-center w-4 h-4 shrink-0">
+                                    ${isBotActive ? `
+                                        <span class="absolute inline-flex w-full h-full rounded-full opacity-20 bg-green-500 animate-ping"></span>
+                                        <span class="relative inline-flex w-2 h-2 rounded-full bg-green-500"></span>
+                                    ` : `
+                                        <span class="relative inline-flex w-2 h-2 rounded-full bg-neutral-600"></span>
+                                    `}
+                                </div>
                             </div>
-                        ` : ''}
-                    </div>
 
-                    <div class="space-y-2">
-                        <label class="text-xs font-bold uppercase tracking-widest text-on-surface-variant">Инструкции для ИИ</label>
-                        <textarea id="ai-instructions-input" class="w-full bg-bg-main border border-outline-variant outline-none p-5 text-text-main text-sm leading-relaxed h-40 sm:h-48 focus:border-primary transition-colors resize-none rounded-lg" 
-                            placeholder="Пример: Будь профессионален, обращайся на Вы, упоминай наш бренд...">${state.settings.custom_instructions || ''}</textarea>
-                        <div class="flex gap-2 flex-wrap">
-                            <span class="text-[9px] font-black text-primary uppercase border border-primary/20 px-2 py-0.5 rounded">Tone of Voice</span>
-                            <span class="text-[9px] font-black text-on-surface-variant uppercase border border-outline-variant px-2 py-0.5 rounded">Умная логика</span>
+                            <!-- Spacer -->
+                            <div class="h-8"></div>
+
+                            <!-- Footer: Stats & Settings -->
+                            <div class="flex justify-between items-end">
+                                <p class="text-[11px] text-neutral-500 uppercase tracking-wider font-semibold">
+                                    24h: ${answersCount} отв.
+                                </p>
+                                
+                                <!-- Settings Icon (Visible on hover) -->
+                                <div class="opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                                    <span class="material-symbols-outlined text-[18px] text-neutral-400 hover:text-[#E2B67B] transition-colors">settings</span>
+                                </div>
+                            </div>
+
+                            ${hasPending ? `
+                                <div class="absolute top-0 left-0 w-1 h-full bg-primary/40"></div>
+                            ` : ''}
                         </div>
-                    </div>
-                </section>
+                    `;
+                }).join('')}
 
-                <button id="save-settings-btn" onclick="handleSaveSettings()" class="primary-btn w-full py-4 sm:py-5 text-xs uppercase tracking-[0.2em] shadow-lg active:scale-[0.99] transition-all">
-                    Применить настройки
-                </button>
+                ${filteredShops.length === 0 && state.shopSearch ? `
+                    <div class="col-span-full py-12 text-center">
+                        <p class="text-sm text-on-surface-variant">Ничего не найдено</p>
+                    </div>
+                ` : ''}
             </div>
         </div>
     `;
 }
 
-function renderReviews() {
-    if (!state.reviews || state.reviews.length === 0) {
-        return `
-            <div class="flex flex-col items-center justify-center py-24 text-center animate-in opacity-40">
-                <span class="material-symbols-outlined text-5xl mb-4 font-light">inventory_2</span>
-                <p class="text-xs font-bold uppercase tracking-widest">Нет данных об активности</p>
-            </div>
-        `;
-    }
+function renderShopEdit(shopId) {
+    const activeShop = state.shops.find(s => s.id === shopId);
+    if (!activeShop) return '';
+    const isTokenMissing = !activeShop.wb_token;
 
     return `
-        <div class="w-full space-y-8 animate-in pb-20">
-            <header>
-                <p class="text-primary text-[10px] font-black uppercase tracking-[0.3em] mb-2">Активность</p>
-                <h2 class="font-headline text-2xl sm:text-3xl font-bold text-text-main tracking-tight">Лента ответов</h2>
+        <div class="max-w-2xl mx-auto space-y-10 animate-in pb-20">
+            <header class="relative flex flex-col items-center justify-center pt-2 pb-6">
+                <button onclick="closeShopEdit()" class="absolute left-0 top-0 p-2 text-on-surface-variant hover:text-text-main transition-all">
+                    <span class="material-symbols-outlined">arrow_back</span>
+                </button>
+                
+                <div class="text-center space-y-1">
+                    <p class="text-primary text-[10px] font-black uppercase tracking-[0.3em]">Настройки магазина</p>
+                    <input id="shop-name-input" class="bg-transparent border-none outline-none focus:ring-0 focus:border-none font-headline text-3xl font-bold text-text-main tracking-tight w-full max-w-md focus:text-primary transition-colors p-0 text-center" 
+                        type="text" value="${activeShop.name}" placeholder="Название магазина">
+                </div>
+
+                <button onclick="handleDeleteShop('${activeShop.id}')" class="absolute right-0 top-0 p-2 text-red-500 hover:bg-red-500/10 rounded-lg transition-all" title="Удалить магазин">
+                    <span class="material-symbols-outlined">delete</span>
+                </button>
             </header>
 
-            <!-- Mobile card layout -->
+            <div class="space-y-12">
+                <div class="space-y-4">
+                    <div class="flex flex-col gap-1.5">
+                        <label class="text-xs font-bold uppercase tracking-widest text-on-surface-variant">API Токен Wildberries</label>
+                        <p class="text-[11px] text-on-surface-variant font-medium">Нужны права «Вопросы и отзывы» + «Контент».</p>
+                    </div>
+
+                    <div class="relative">
+                        <input id="wb-token-input" class="w-full bg-bg-main border border-outline-variant outline-none py-4 px-5 pr-12 text-text-main text-sm font-mono focus:border-primary transition-colors rounded-lg" 
+                            type="password" value="${activeShop.wb_token || ''}" placeholder="Вставьте ваш API ключ">
+                        <button class="absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-primary transition-colors" onclick="toggleTokenVisibility()">
+                            <span id="token-visibility-icon" class="material-symbols-outlined text-lg">visibility</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="space-y-4">
+                    <label class="text-xs font-bold uppercase tracking-widest text-on-surface-variant">Инструкции для ИИ (Tone of Voice)</label>
+                    <textarea id="ai-instructions-input" class="w-full bg-bg-main border border-outline-variant outline-none p-5 text-text-main text-sm leading-relaxed h-48 focus:border-primary transition-colors resize-none rounded-lg" 
+                        placeholder="Пример: Будь профессионален, обращайся на Вы, упоминай наш бренд...">${activeShop.custom_instructions || ''}</textarea>
+
+            </div>
+
+            <button id="save-settings-btn" onclick="handleSaveSettings()" class="primary-btn w-full py-4 sm:py-5 text-xs uppercase tracking-[0.2em] shadow-lg active:scale-[0.99] transition-all">
+                Сохранить изменения
+            </button>
+        </div>
+    `;
+}
+
+function renderReviews() {
+    return `
+        <div class="w-full space-y-8 animate-in pb-20">
+            <header class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                    <p class="text-primary text-[10px] font-black uppercase tracking-[0.3em] mb-2">Активность</p>
+                    <h2 class="font-headline text-2xl sm:text-3xl font-bold text-text-main tracking-tight">Лента ответов</h2>
+                </div>
+                
+                <!-- Shop Search & Filter -->
+                <div class="flex items-center gap-4 bg-surface-container-low/50 backdrop-blur-sm rounded-xl border border-outline-variant/30 p-1 group focus-within:border-primary/50 transition-all shadow-sm">
+                    <!-- Search -->
+                    <div class="flex items-center gap-2 px-3 border-r border-outline-variant/10">
+                        <span class="material-symbols-outlined text-[18px] opacity-30 group-focus-within:opacity-100 group-focus-within:text-primary transition-all">search</span>
+                        <input type="text" 
+                            id="review-search-input"
+                            placeholder="Поиск..." 
+                            oninput="state.reviewsSearch = this.value; renderReviewsList()"
+                            value="${state.reviewsSearch || ''}"
+                            class="bg-transparent border-none outline-none text-[10px] font-black uppercase tracking-widest text-on-surface-variant w-28 placeholder:text-[9px] placeholder:opacity-20">
+                    </div>
+                    
+                    <!-- Rating Filters -->
+                    <div class="flex items-center gap-1 px-2 border-r border-outline-variant/10">
+                        ${[5, 4, 3, 2, 1].map(r => `
+                            <button onclick="toggleRatingFilter(${r})" 
+                                class="w-7 h-7 rounded-lg flex items-center justify-center text-[10px] font-black transition-all ${state.reviewsRatingFilter === r ? 'bg-primary text-bg' : 'text-on-surface-variant/40 hover:bg-primary/10 hover:text-primary'}">
+                                ${r}
+                            </button>
+                        `).join('')}
+                    </div>
+
+                    <!-- Shop Dropdown -->
+                    <div class="flex items-center px-1 gap-1">
+                        <button onclick="setReviewsFilter(null)" 
+                            class="px-4 py-2 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${state.reviewsFilterShopId === null ? 'bg-primary text-bg shadow-lg shadow-primary/20' : 'text-on-surface-variant/60 hover:text-primary hover:bg-primary/5'}">
+                            Все сети
+                        </button>
+                        <div class="relative flex items-center h-8 bg-black/10 rounded-lg px-2 group/select">
+                            <select onchange="setReviewsFilter(this.value)" 
+                                class="appearance-none bg-transparent border-none outline-none text-[9px] font-black uppercase tracking-widest text-on-surface-variant pr-6 cursor-pointer hover:text-primary transition-colors z-10">
+                                <option value="" ${state.reviewsFilterShopId === null ? 'selected' : ''} disabled>Сеть...</option>
+                                ${state.shops
+                                    .filter(s => !state.reviewsSearch || s.name.toLowerCase().includes(state.reviewsSearch.toLowerCase()))
+                                    .map(s => `<option value="${s.id}" ${state.reviewsFilterShopId === s.id ? 'selected' : ''}>${s.name}</option>`).join('')}
+                            </select>
+                            <span class="material-symbols-outlined absolute right-2 text-sm opacity-30 pointer-events-none group-hover/select:text-primary group-hover/select:opacity-100 transition-all">expand_more</span>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <div id="reviews-list-container">
+                ${renderReviewsList()}
+            </div>
+        </div>
+    `;
+}
+
+function renderReviewsList() {
+    const search = (state.reviewsSearch || '').toLowerCase();
+    const filtered = state.reviews.filter(r => {
+        if (state.reviewsFilterShopId && r.shop_id !== state.reviewsFilterShopId) return false;
+        if (state.reviewsRatingFilter && r.rating !== state.reviewsRatingFilter) return false;
+        if (!search) return true;
+        const shop = state.shops.find(s => s.id === r.shop_id);
+        return r.review_text.toLowerCase().includes(search) || 
+               r.product_name.toLowerCase().includes(search) ||
+               (shop && shop.name.toLowerCase().includes(search));
+    });
+
+    const html = `
+            ${(!filtered || filtered.length === 0) ? `
+                <div class="flex flex-col items-center justify-center py-24 text-center animate-in opacity-40">
+                    <span class="material-symbols-outlined text-5xl mb-4 font-light">inventory_2</span>
+                    <p class="text-xs font-bold uppercase tracking-widest">Ничего не найдено</p>
+                </div>
+            ` : `
+                <!-- Mobile card layout -->
             <div class="sm:hidden flex flex-col rounded-xl border border-outline-variant/30 bg-bg-main shadow-sm mb-6 custom-h-70vh">
                 <div class="custom-flex-scroll p-2 space-y-3">
-                ${state.reviews.map(review => {
+                ${filtered.map(review => {
                     const isAuto = review.status === 'auto_posted';
                     return `
-                        <div class="premium-card p-4 space-y-3 relative overflow-hidden shrink-0">
+                        <div onclick="showReviewDetail('${review.id}')" class="premium-card p-4 space-y-3 relative overflow-hidden shrink-0 cursor-pointer">
                             ${isAuto ? '<div class="absolute left-0 top-0 bottom-0 w-1 bg-wb-purple"></div>' : ''}
                             <div class="flex items-center justify-between">
                                 <div class="flex items-center gap-2 min-w-0">
@@ -821,90 +959,200 @@ function renderReviews() {
             </div>
 
             <!-- Desktop table layout -->
-            <div class="hidden sm:flex flex-col border border-outline-variant rounded-lg bg-bg-main shadow-sm custom-h-70vh">
-                <div class="grid grid-cols-12 gap-4 px-6 py-4 border-b border-outline-variant text-[10px] font-black uppercase tracking-widest text-on-surface-variant shrink-0 bg-surface z-10">
-                    <div class="col-span-1">Рейтинг</div>
-                    <div class="col-span-3">Товар</div>
-                    <div class="col-span-3">Отзыв</div>
+            <div class="hidden sm:flex flex-col border border-outline-variant/20 rounded-lg bg-bg-main shadow-sm overflow-hidden">
+                <div class="grid grid-cols-12 gap-3 px-4 py-2 border-b border-outline-variant/10 text-[9px] font-black uppercase tracking-widest text-on-surface-variant shrink-0 bg-surface/50">
+                    <div class="col-span-1">Оценка</div>
+                    <div class="col-span-2">Магазин/Товар</div>
+                    <div class="col-span-5">Текст отзыва</div>
                     <div class="col-span-4">Ответ ИИ</div>
-                    <div class="col-span-1 text-right">Статус</div>
                 </div>
-                <div class="divide-y divide-outline-variant custom-flex-scroll relative">
-                    ${state.reviews.map(review => {
-                        const isAuto = review.status === 'auto_posted';
+                <div class="divide-y divide-outline-variant/10 custom-flex-scroll">
+                    ${filtered.map(review => {
+                        const shop = state.shops.find(s => s.id === review.shop_id);
+                        
+                        // Semantic colors for ratings
+                        let ratingClass = 'text-primary';
+                        if (review.rating >= 5) ratingClass = 'text-emerald-400';
+                        if (review.rating <= 2) ratingClass = 'text-rose-400/80';
+
                         return `
-                            <div class="grid grid-cols-12 gap-4 px-6 py-5 items-center hover:bg-bg-main transition-colors relative overflow-hidden">
-                                ${isAuto ? '<div class="absolute left-0 top-0 bottom-0 w-1 bg-wb-purple"></div>' : ''}
-                                <div class="col-span-1 flex items-center gap-1 text-primary font-bold text-xs">
-                                    ${review.rating}
-                                    <svg class="w-3 h-3 fill-current" viewBox="0 0 24 24">
-                                        <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/>
-                                    </svg>
+                            <div onclick="showReviewDetail('${review.id}')" class="grid grid-cols-12 gap-3 px-4 py-1.5 items-center hover:bg-surface/30 transition-colors group relative cursor-pointer">
+                                <div class="col-span-1 flex items-center gap-1">
+                                    <span class="text-[10px] font-bold ${ratingClass}">${review.rating}</span>
+                                    <span class="material-symbols-outlined text-[10px] ${ratingClass}">star</span>
                                 </div>
-                                <div class="col-span-3 min-w-0">
-                                    <div class="text-text-main font-bold text-[11px] truncate uppercase tracking-tight">${review.product_name || 'WB Product'}</div>
-                                    <div class="text-[9px] text-on-surface-variant font-mono">SKU: ${review.nm_id}</div>
+                                <div class="col-span-2 min-w-0">
+                                    <div class="text-[9px] font-black text-primary truncate uppercase tracking-tighter mb-0.5">${shop?.name || 'Shop'}</div>
+                                    <div class="text-[8px] text-on-surface-variant truncate uppercase font-medium opacity-60">${review.product_name}</div>
                                 </div>
-                                <div class="col-span-3 text-[11px] text-on-surface-variant line-clamp-2 italic font-light leading-relaxed">
+                                <div class="col-span-5 text-[10px] text-on-surface-variant truncate font-light italic pr-4">
                                     "${review.review_text}"
                                 </div>
-                                <div class="col-span-4 text-[11px] text-text-main line-clamp-2 leading-relaxed">
+                                <div class="col-span-4 text-[10px] text-text-main truncate font-medium">
                                     ${review.ai_response_draft}
-                                </div>
-                                <div class="col-span-1 flex justify-end">
-                                    <span class="w-2 h-2 rounded-full ${isAuto ? 'bg-wb-purple' : 'bg-outline-variant'} shadow-[0_0_8px_rgba(124,58,237,0.5)]"></span>
                                 </div>
                             </div>
                         `;
                     }).join('')}
                 </div>
             </div>
+            `}
+    `;
+    
+    const container = document.getElementById('reviews-list-container');
+    if (container) {
+        container.innerHTML = html;
+        return '';
+    }
+    return html;
+}
+
+function showReviewDetail(id) {
+    const review = state.reviews.find(r => r.id === id);
+    if (!review) return;
+    const shop = state.shops.find(s => s.id === review.shop_id);
+
+    const modal = document.createElement('div');
+    modal.id = 'review-detail-modal';
+    modal.className = 'fixed inset-0 z-[100] flex items-center justify-center p-4 animate-in';
+    modal.innerHTML = `
+        <div class="absolute inset-0 bg-bg/80 backdrop-blur-md" onclick="this.parentElement.remove()"></div>
+        <div class="relative w-full max-w-xl bg-surface border border-outline-variant/30 rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
+            <div class="p-6 border-b border-outline-variant/20 flex items-center justify-between bg-surface-container-low">
+                <div>
+                    <p class="text-primary text-[10px] font-black uppercase tracking-[0.2em] mb-1">${shop?.name || 'Магазин'}</p>
+                    <h3 class="text-lg font-bold text-text-main">${review.product_name}</h3>
+                </div>
+                <button onclick="this.closest('#review-detail-modal').remove()" class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-surface-container transition-colors">
+                    <span class="material-symbols-outlined text-xl">close</span>
+                </button>
+            </div>
+            <div class="p-8 space-y-8 max-h-[70vh] overflow-y-auto">
+                <section class="space-y-4">
+                    <div class="flex items-center justify-between">
+                        <h4 class="text-[10px] font-black uppercase tracking-widest text-on-surface-variant">Отзыв покупателя</h4>
+                        <div class="flex items-center gap-1">
+                            <span class="text-xs font-bold text-primary">${review.rating}</span>
+                            <span class="material-symbols-outlined text-xs text-primary">star</span>
+                        </div>
+                    </div>
+                    <div class="premium-card p-5 bg-surface-container-low border-outline-variant/10 italic text-sm leading-relaxed text-on-surface-variant">
+                        "${review.review_text}"
+                    </div>
+                </section>
+
+                <section class="space-y-4">
+                    <h4 class="text-[10px] font-black uppercase tracking-widest text-primary">Ответ системы</h4>
+                    <div class="premium-card p-6 bg-primary/5 border-primary/20 text-sm leading-relaxed text-text-main font-medium">
+                        ${review.ai_response_draft}
+                    </div>
+                    <div class="flex items-center gap-2 text-[9px] font-black uppercase tracking-widest ${review.status === 'auto_posted' ? 'text-wb-purple' : 'text-on-surface-variant'}">
+                        <span class="w-1.5 h-1.5 rounded-full ${review.status === 'auto_posted' ? 'bg-wb-purple shadow-[0_0_5px_rgba(124,58,237,0.4)]' : 'bg-outline-variant'}"></span>
+                        Статус: ${review.status === 'auto_posted' ? 'Опубликовано авто-ботом' : review.status === 'approved' ? 'Одобрено менеджером' : 'В очереди'}
+                    </div>
+                </section>
+            </div>
         </div>
     `;
+    document.body.appendChild(modal);
 }
 
 function renderSubscription() {
+    // Subscription lives on seller level (state.settings), not per-shop
     const expiresAt = state.settings.subscription_expires_at;
     const diff = expiresAt ? new Date(expiresAt) - new Date() : 0;
     const daysLeft = Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
     const expiredDateStr = expiresAt ? new Date(expiresAt).toLocaleDateString() : '—';
-    // Premium block is at the bottom ONLY for active (paid) subscriptions with time left
     const hasPremium = state.settings.subscription_status === 'active' && daysLeft > 0;
     
-    const premiumBlockHtml = `
-            <section class="premium-card p-6 sm:p-10 space-y-6 ${!hasPremium ? 'border-primary/50 shadow-[0_0_40px_rgba(var(--primary-rgb),0.15)] bg-gradient-to-br from-primary/5 to-transparent' : ''}">
-                <div class="space-y-3">
-                    <h2 class="font-headline text-2xl sm:text-3xl font-bold text-text-main tracking-tighter">Premium Доступ</h2>
-                    <div class="flex items-baseline gap-2">
-                        <span class="text-3xl sm:text-4xl font-bold text-primary">₽749</span>
-                        <span class="text-sm font-medium text-on-surface-variant">/ месяц</span>
-                    </div>
+    const pricingTiersHtml = `
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <!-- Tier 1 -->
+            <div class="premium-card p-6 flex flex-col justify-between border-primary/20 bg-gradient-to-br from-primary/5 to-transparent relative overflow-hidden group">
+                <div class="relative z-10">
+                    <p class="text-primary text-[10px] font-black uppercase tracking-widest mb-2">Начинающий</p>
+                    <h3 class="text-xl font-bold text-white mb-4">До 5 магазинов</h3>
+                    <ul class="space-y-3 mb-8">
+                        <li class="flex items-center gap-2 text-xs text-on-surface-variant">
+                            <span class="material-symbols-outlined text-primary text-sm">check_circle</span>
+                            Все функции ИИ
+                        </li>
+                        <li class="flex items-center gap-2 text-xs text-on-surface-variant">
+                            <span class="material-symbols-outlined text-primary text-sm">check_circle</span>
+                            Безлимитные ответы
+                        </li>
+                    </ul>
                 </div>
-                
-                <button id="payment-btn" onclick="handlePayment()" class="primary-btn w-full py-4 sm:py-5 text-xs uppercase tracking-[0.2em] shadow-lg active:scale-[0.99] transition-all">
-                    Активировать безлимит
-                </button>
-                
-                ${state.settings.auth_provider === 'guest' ? `
-                    <div class="text-center mt-2 animate-pulse">
-                        <p class="text-[10px] text-primary uppercase font-bold tracking-widest">⚠️ Для оплаты привяжите аккаунт ниже</p>
+                <div class="relative z-10">
+                    <div class="flex items-baseline gap-1 mb-4">
+                        <span class="text-3xl font-bold text-white">3 000</span>
+                        <span class="text-xs text-on-surface-variant font-bold uppercase">₽ / мес</span>
                     </div>
-                ` : ''}
-                
-                <p class="text-[10px] text-center text-on-surface-variant uppercase font-bold tracking-widest">
-                    Безопасная оплата • Мгновенная активация
-                </p>
-            </section>
+                    <button onclick="handlePayment(3000)" class="primary-btn w-full py-3 text-[10px] uppercase tracking-widest">Выбрать</button>
+                </div>
+            </div>
+
+            <!-- Tier 2 -->
+            <div class="premium-card p-6 flex flex-col justify-between border-primary/20 bg-gradient-to-br from-primary/5 to-transparent relative overflow-hidden group">
+                <div class="absolute top-0 right-0 bg-primary text-bg text-[8px] font-black uppercase px-3 py-1 rounded-bl-lg z-20">Популярный</div>
+                <div class="relative z-10">
+                    <p class="text-primary text-[10px] font-black uppercase tracking-widest mb-2">Агентство</p>
+                    <h3 class="text-xl font-bold text-white mb-4">До 20 магазинов</h3>
+                    <ul class="space-y-3 mb-8">
+                        <li class="flex items-center gap-2 text-xs text-on-surface-variant">
+                            <span class="material-symbols-outlined text-primary text-sm">check_circle</span>
+                            Управление ToV брендов
+                        </li>
+                        <li class="flex items-center gap-2 text-xs text-on-surface-variant">
+                            <span class="material-symbols-outlined text-primary text-sm">check_circle</span>
+                            Все функции ИИ
+                        </li>
+                    </ul>
+                </div>
+                <div class="relative z-10">
+                    <div class="flex items-baseline gap-1 mb-4">
+                        <span class="text-3xl font-bold text-white">5 000</span>
+                        <span class="text-xs text-on-surface-variant font-bold uppercase">₽ / мес</span>
+                    </div>
+                    <button onclick="handlePayment(5000)" class="primary-btn w-full py-3 text-[10px] uppercase tracking-widest">Выбрать</button>
+                </div>
+            </div>
+
+            <!-- Tier 3 -->
+            <div class="premium-card p-6 flex flex-col justify-between border-primary/20 bg-gradient-to-br from-primary/5 to-transparent relative overflow-hidden group">
+                <div class="relative z-10">
+                    <p class="text-primary text-[10px] font-black uppercase tracking-widest mb-2">Корпорация</p>
+                    <h3 class="text-xl font-bold text-white mb-4">От 20 магазинов</h3>
+                    <ul class="space-y-3 mb-8">
+                        <li class="flex items-center gap-2 text-xs text-on-surface-variant">
+                            <span class="material-symbols-outlined text-primary text-sm">check_circle</span>
+                            Персональный менеджер
+                        </li>
+                        <li class="flex items-center gap-2 text-xs text-on-surface-variant">
+                            <span class="material-symbols-outlined text-primary text-sm">check_circle</span>
+                            Любое кол-во магазинов
+                        </li>
+                    </ul>
+                </div>
+                <div class="relative z-10">
+                    <div class="flex items-baseline gap-1 mb-4">
+                        <span class="text-3xl font-bold text-white">10 000</span>
+                        <span class="text-xs text-on-surface-variant font-bold uppercase">₽ / мес</span>
+                    </div>
+                    <button onclick="handlePayment(10000)" class="primary-btn w-full py-3 text-[10px] uppercase tracking-widest">Выбрать</button>
+                </div>
+            </div>
+        </div>
     `;
 
     return `
-        <div class="max-w-2xl mx-auto space-y-8 animate-in pb-20">
-            <header>
+        <div class="max-w-5xl mx-auto space-y-8 animate-in pb-20 px-4 sm:px-0">
+            <header class="text-center sm:text-left">
                 <p class="text-primary text-[10px] font-black uppercase tracking-[0.3em] mb-2">Финансы и показатели</p>
                 <h2 class="font-headline text-2xl sm:text-3xl font-bold text-text-main tracking-tight">Обзор аккаунта</h2>
             </header>
 
-            ${!hasPremium ? premiumBlockHtml : ''}
+            ${!hasPremium ? pricingTiersHtml : ''}
 
             <!-- User Profile Card -->
             <section class="premium-card p-5 sm:p-8 flex items-center justify-between gap-5">
@@ -987,42 +1235,155 @@ function renderSubscription() {
                 </div>
             </section>
 
-            ${hasPremium ? premiumBlockHtml : ''}
+            ${hasPremium ? `
+                <section class="premium-card p-5 sm:p-8 flex items-center justify-between gap-4 border-primary/50 bg-primary/5">
+                    <div class="space-y-1 min-w-0">
+                        <h3 class="text-text-main font-bold text-xs sm:text-sm uppercase tracking-widest">Активный тариф: ${{ starter: 'Начинающий', agency: 'Агентство', corporation: 'Корпорация' }[state.settings.subscription_plan] || 'Стандарт'}</h3>
+                        <p class="text-xs text-on-surface-variant">Доступно магазинов: <span class="text-primary font-bold">${state.settings.max_shops || 1}</span> | Используется: <span class="text-text-main font-bold">${state.shops.length}</span></p>
+                    </div>
+                </section>
+            ` : ''}
         </div>
     `;
 }
 
 // Actions
 async function handleSaveSettings() {
-    if (typeof gtag === 'function') gtag('event', 'save_settings');
-    state.settings.wb_token = document.getElementById('wb-token-input').value;
-    state.settings.custom_instructions = document.getElementById('ai-instructions-input').value;
+    if (!state.activeShopId) return;
     
     const btn = document.getElementById('save-settings-btn');
-    const originalContent = btn ? btn.innerHTML : 'Применить настройки';
+    const originalContent = btn ? btn.innerHTML : 'Сохранить';
     if (btn) {
         btn.disabled = true;
         btn.innerHTML = '<span class="flex items-center justify-center gap-2"><span class="animate-spin material-symbols-outlined text-sm">sync</span> Сохранение...</span>';
     }
-    
+
     try {
-        const res = await apiFetch('/api/settings', {
-            method: 'POST',
+        const activeShop = state.shops.find(s => s.id === state.activeShopId);
+        const payload = {
+            name: document.getElementById('shop-name-input').value,
+            wb_token: document.getElementById('wb-token-input').value,
+            custom_instructions: document.getElementById('ai-instructions-input').value,
+            // Preserve hidden fields from current state
+            brand_name: activeShop?.brand_name || '',
+            stop_words: activeShop?.stop_words || '',
+            is_auto_reply_enabled: true
+        };
+
+        const res = await apiFetch(`/api/shops/${state.activeShopId}`, {
+            method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(state.settings)
+            body: JSON.stringify(payload)
         });
+
         if (res.ok) {
-            showToast('Конфигурация сохранена');
+            showToast('Настройки сохранены');
+            state.editingShopId = null;
             await refreshData();
         } else {
-            const errData = await res.json().catch(() => ({}));
-            showToast(errData.error || 'Ошибка сохранения', true);
+            const data = await res.json();
+            showToast(data.error || 'Ошибка сохранения', true);
         }
-    } catch (e) { showToast('Ошибка сети', true); }
-    finally {
+    } catch (e) {
+        showToast('Ошибка сети', true);
+    } finally {
         if (btn) {
             btn.disabled = false;
             btn.innerHTML = originalContent;
+        }
+    }
+}
+
+function showAddShopModal() {
+    const modal = document.createElement('div');
+    modal.id = 'add-shop-modal';
+    modal.className = 'fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in';
+    modal.innerHTML = `
+        <div class="bg-[#1E1E1E] border border-border w-full max-w-md rounded-2xl p-8 shadow-2xl">
+            <h3 class="text-xl font-bold mb-6">Добавить новый магазин</h3>
+            <div class="space-y-4 mb-8">
+                <div>
+                    <label class="text-[10px] font-bold uppercase tracking-widest text-dim mb-2 block">Название магазина</label>
+                    <input id="new-shop-name" type="text" class="w-full bg-[#111111] border border-border p-4 rounded-xl outline-none focus:border-primary transition-all" placeholder="Например: Модный стиль">
+                </div>
+            </div>
+            <div class="flex gap-3">
+                <button onclick="document.getElementById('add-shop-modal').remove()" class="flex-1 py-4 text-xs font-bold uppercase tracking-widest hover:bg-white/5 rounded-xl transition-all">Отмена</button>
+                <button onclick="handleCreateShop(this)" class="flex-1 primary-btn py-4 text-xs font-bold uppercase tracking-widest">Создать</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+}
+
+async function handleCreateShop(btn) {
+    const name = document.getElementById('new-shop-name').value;
+    if (!name) return showToast('Введите название магазина', true);
+
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="flex items-center justify-center gap-2"><span class="animate-spin material-symbols-outlined text-sm">sync</span> Создание...</span>';
+    }
+
+    try {
+        const res = await apiFetch('/api/shops', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name })
+        });
+
+        if (res.ok) {
+            const newShop = await res.json();
+            document.getElementById('add-shop-modal').remove();
+            showToast('Магазин успешно создан');
+            state.activeShopId = newShop.id;
+            await refreshData();
+            showView('settings');
+        } else {
+            showToast('Ошибка при создании магазина', true);
+        }
+    } catch (e) {
+        showToast('Ошибка сети', true);
+    } finally {
+        if (btn && !document.getElementById('add-shop-modal')) {
+            // Modal already removed, do nothing
+        } else if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = 'Создать';
+        }
+    }
+}
+
+async function handleDeleteShop(id) {
+    if (!confirm('Вы уверены, что хотите удалить этот магазин? Все настройки и логи будут удалены безвозвратно.')) return;
+
+    const btn = event?.currentTarget;
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="animate-spin material-symbols-outlined text-sm">sync</span>';
+    }
+
+    try {
+        const res = await apiFetch(`/api/shops/${id}`, { method: 'DELETE' });
+        if (res.ok) {
+            showToast('Магазин удален');
+            state.activeShopId = null;
+            state.editingShopId = null;
+            await refreshData();
+            showView('settings');
+        } else {
+            const err = await res.json();
+            showToast(err.error || 'Ошибка при удалении', true);
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = '<span class="material-symbols-outlined">delete</span>';
+            }
+        }
+    } catch (e) {
+        showToast('Ошибка сети', true);
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<span class="material-symbols-outlined">delete</span>';
         }
     }
 }
@@ -1072,10 +1433,10 @@ function renderInterface() {
                             </div>
                             <div>
                                 <h4 class="text-text-main font-bold text-xs sm:text-sm uppercase tracking-widest">Поддержка</h4>
-                                <p class="text-[10px] sm:text-[11px] text-on-surface-variant mt-0.5 leading-tight">Помощь и вопросы</p>
+                                <p class="text-[10px] sm:text-[11px] text-on-surface-variant mt-0.5 leading-tight">alexandertsyhanov@gmail.com</p>
                             </div>
                         </div>
-                        <button onclick="openSupportModal('support')" class="shrink-0 bg-bg-main border border-outline-variant hover:border-primary text-text-main px-5 h-10 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 whitespace-nowrap shadow-sm flex items-center justify-center">
+                        <button onclick="handleContact(event, 'support')" class="shrink-0 bg-bg-main border border-outline-variant hover:border-primary text-text-main px-5 h-10 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 whitespace-nowrap shadow-sm flex items-center justify-center">
                             Написать
                         </button>
                     </div>
@@ -1087,10 +1448,10 @@ function renderInterface() {
                             </div>
                             <div>
                                 <h4 class="text-text-main font-bold text-xs sm:text-sm uppercase tracking-widest">Отзыв</h4>
-                                <p class="text-[10px] sm:text-[11px] text-on-surface-variant mt-0.5 leading-tight">Оценить сервис</p>
+                                <p class="text-[10px] sm:text-[11px] text-on-surface-variant mt-0.5 leading-tight">alexandertsyhanov@gmail.com</p>
                             </div>
                         </div>
-                        <button onclick="openSupportModal('feedback')" class="shrink-0 bg-primary text-white dark:text-black px-6 h-10 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all hover:brightness-110 active:scale-95 shadow-lg shadow-primary/20 whitespace-nowrap flex items-center justify-center">
+                        <button onclick="handleContact(event, 'feedback')" class="shrink-0 bg-primary text-white dark:text-black px-6 h-10 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all hover:brightness-110 active:scale-95 shadow-lg shadow-primary/20 whitespace-nowrap flex items-center justify-center">
                             Оценить
                         </button>
                     </div>
@@ -1141,8 +1502,8 @@ async function handleSync(btnEl) {
 
 
 
-async function handlePayment() {
-    if (typeof gtag === 'function') gtag('event', 'click_payment');
+async function handlePayment(amount) {
+    if (typeof gtag === 'function') gtag('event', 'click_payment', { value: amount });
     
     // Block guests on frontend too
     if (state.settings.auth_provider === 'guest') {
@@ -1151,22 +1512,22 @@ async function handlePayment() {
         return;
     }
 
-    const btn = document.getElementById('payment-btn');
-    const originalContent = btn ? btn.innerHTML : 'Активировать безлимит';
-    if (btn) {
-        btn.disabled = true;
-        btn.innerHTML = 'Обработка...';
-    }
+    // Find the clicked button and disable it
+    const allBtns = document.querySelectorAll('[onclick*="handlePayment"]');
+    allBtns.forEach(b => { b.disabled = true; b.dataset.orig = b.innerHTML; b.innerHTML = 'Обработка...'; });
 
-    showToast('Обработка...');
+    showToast('Перенаправление на оплату...');
     try {
-        const res = await apiFetch('/api/payments/create', { method: 'POST' });
+        const res = await apiFetch('/api/payments/create', { 
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ amount })
+        });
         const data = await res.json();
         
         if (res.status === 403) {
-            // Guest account — need to link first
             showToast(data.error || 'Привяжите аккаунт перед оплатой', true);
-            if (btn) { btn.disabled = false; btn.innerHTML = originalContent; }
+            allBtns.forEach(b => { b.disabled = false; b.innerHTML = b.dataset.orig; });
             setTimeout(() => showView('subscription'), 1500);
             return;
         }
@@ -1174,19 +1535,59 @@ async function handlePayment() {
         if (data.url) {
             window.location.href = data.url;
         } else { 
-            showToast('Ошибка платежа', true); 
-            if (btn) {
-                btn.disabled = false;
-                btn.innerHTML = originalContent;
-            }
+            showToast(data.error || 'Ошибка платежа', true); 
+            allBtns.forEach(b => { b.disabled = false; b.innerHTML = b.dataset.orig; });
         }
     } catch (e) { 
         showToast('Ошибка сети', true); 
-        if (btn) {
-            btn.disabled = false;
-            btn.innerHTML = originalContent;
-        }
+        allBtns.forEach(b => { b.disabled = false; b.innerHTML = b.dataset.orig; });
     }
+}
+
+function handleContact(e, type = 'support') {
+    if (e) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
+    const email = 'alexandertsyhanov@gmail.com';
+    
+    const existing = document.getElementById('contact-modal');
+    if (existing) existing.remove();
+
+    const modal = document.createElement('div');
+    modal.id = 'contact-modal';
+    modal.className = 'fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in';
+    modal.onclick = () => modal.remove();
+
+    const title = type === 'support' ? 'Связаться с нами' : 'Оставить отзыв';
+    const description = type === 'support' 
+        ? 'Пожалуйста, напишите ваш вопрос на электронную почту:' 
+        : 'Мы будем рады вашим предложениям и отзывам. Пишите на почту:';
+
+    modal.innerHTML = `
+        <div class="premium-card w-full max-w-sm p-8 space-y-6 text-center relative" onclick="event.stopPropagation()">
+            <div class="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto border border-primary/20 mb-2">
+                <span class="material-symbols-outlined text-primary text-3xl">${type === 'support' ? 'mail' : 'rate_review'}</span>
+            </div>
+            <div class="space-y-2">
+                <h3 class="text-white font-bold text-lg uppercase tracking-widest">${title}</h3>
+                <p class="text-xs text-on-surface-variant leading-relaxed">${description}</p>
+            </div>
+            
+            <div class="bg-bg-main border border-outline-variant rounded-xl p-4 flex flex-col gap-3 group">
+                <p class="text-sm font-black text-primary break-all select-all">${email}</p>
+                <button onclick="navigator.clipboard.writeText('${email}'); showToast('Почта скопирована'); this.innerHTML='Скопировано!'" class="w-full py-2 bg-primary/10 text-primary rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-primary/20 transition-all">
+                    Скопировать адрес
+                </button>
+            </div>
+
+            <button onclick="document.getElementById('contact-modal').remove()" class="text-[10px] font-black uppercase tracking-widest text-on-surface-variant hover:text-white transition-all pt-2">
+                Закрыть
+            </button>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
 }
 
 // Support Modal Logic
@@ -1210,8 +1611,8 @@ function openSupportModal(type) {
             messagesHtml = `
                 <div class="flex flex-col items-center justify-center h-full text-center opacity-50 space-y-2 pb-10">
                     <span class="material-symbols-outlined text-5xl mb-2">support_agent</span>
-                    <p class="text-xs font-bold uppercase tracking-widest">Напишите нам</p>
-                    <p class="text-[10px]">Мы ответим в ближайшее время</p>
+                    <p class="text-xs font-bold uppercase tracking-widest">alexandertsyhanov@gmail.com</p>
+                    <p class="text-[10px]">Напишите нам в чат или на почту</p>
                 </div>
             `;
         } else {
@@ -1264,8 +1665,8 @@ function openSupportModal(type) {
                         <span class="material-symbols-outlined text-primary text-3xl">support_agent</span>
                         <div>
                             <h3 class="font-headline text-sm font-bold tracking-tight text-text-main uppercase tracking-widest">Чат с поддержкой</h3>
-                            <p class="text-[9px] text-green-500 font-bold uppercase tracking-widest flex items-center gap-1 mt-0.5">
-                                <span class="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span> Online
+                            <p class="text-[9px] text-on-surface-variant font-bold uppercase tracking-widest flex items-center gap-1 mt-0.5">
+                                alexandertsyhanov@gmail.com
                             </p>
                         </div>
                     </div>
@@ -1321,6 +1722,129 @@ function openSupportModal(type) {
             if (input) input.focus();
             if (chatArea) chatArea.scrollTop = chatArea.scrollHeight;
         }, 100);
+    }
+}
+
+function setRegistryView(view) {
+    state.registryView = view;
+    showView('settings');
+}
+
+async function toggleShopAutoReply(id, enabled) {
+    try {
+        const res = await apiFetch(`/api/shops/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ is_auto_reply_enabled: enabled })
+        });
+        
+        if (res.ok) {
+            const shop = state.shops.find(s => s.id === id);
+            if (shop) shop.is_auto_reply_enabled = enabled;
+            showToast(`${enabled ? 'Бот включен' : 'Бот на паузе'}`);
+            showView('settings');
+        }
+    } catch (e) {
+        showToast('Ошибка при переключении', true);
+    }
+}
+
+function toggleRatingFilter(rating) {
+    if (state.reviewsRatingFilter === rating) {
+        state.reviewsRatingFilter = null;
+    } else {
+        state.reviewsRatingFilter = rating;
+    }
+    renderReviewsList();
+}
+
+async function setReviewsFilter(id) {
+    state.reviewsFilterShopId = id || null;
+    await refreshData();
+    showView('reviews');
+}
+
+// Registry Helpers
+function handleShopSearch(val) {
+    state.shopSearch = val;
+    showView('settings');
+}
+
+function toggleShopSelection(id) {
+    if (state.selectedShops.includes(id)) {
+        state.selectedShops = state.selectedShops.filter(sid => sid !== id);
+    } else {
+        state.selectedShops.push(id);
+    }
+    showView('settings');
+}
+
+function toggleAllShops(checked) {
+    if (checked) {
+        state.selectedShops = state.shops.map(s => s.id);
+    } else {
+        state.selectedShops = [];
+    }
+    showView('settings');
+}
+
+function editShop(id) {
+    state.editingShopId = id;
+    state.activeShopId = id;
+    showView('settings');
+}
+
+function closeShopEdit() {
+    state.editingShopId = null;
+    showView('settings');
+}
+
+async function bulkPause(enabled) {
+    if (state.selectedShops.length === 0) return;
+    
+    const count = state.selectedShops.length;
+    if (!confirm(`Вы уверены, что хотите ${enabled ? 'включить' : 'поставить на паузу'} ${count} магазинов?`)) return;
+
+    showToast(`Обновление ${count} магазинов...`);
+    
+    try {
+        await Promise.all(state.selectedShops.map(id => 
+            apiFetch(`/api/shops/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ is_auto_reply_enabled: enabled })
+            })
+        ));
+        
+        await refreshData();
+        state.selectedShops = [];
+        showToast('Готово!');
+    } catch (e) {
+        showToast('Ошибка при массовом обновлении', true);
+    }
+}
+
+async function bulkPrompt() {
+    const prompt = prompt('Введите новый промпт (инструкции ИИ) для всех выбранных магазинов:');
+    if (!prompt) return;
+
+    const count = state.selectedShops.length;
+    showToast(`Обновление промптов для ${count} магазинов...`);
+    
+    try {
+        await Promise.all(state.selectedShops.map(id => 
+            apiFetch(`/api/shops/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ custom_instructions: prompt })
+            })
+        ));
+        
+        await refreshData();
+        state.selectedShops = [];
+        showToast('Промпты обновлены!');
+    } catch (e) {
+        showToast('Ошибка при обновлении промптов', true);
     }
 }
 
@@ -1442,7 +1966,6 @@ function renderAdmin() {
                     ${users.length === 0 ? '<div class="p-8 text-center text-on-surface-variant text-sm">Нет пользователей</div>' : 
                     users.map(u => {
                         const hasOpenTicket = usersWithOpenTickets.has(u.id);
-                        const hasToken = u.wb_token && u.wb_token.trim() !== '';
                         const hasSub = u.subscription_status !== 'free' && u.subscription_status !== 'trial';
                         
                         return `
@@ -1456,9 +1979,6 @@ function renderAdmin() {
                                     <p class="text-[11px] text-on-surface-variant">${u.email || u.id}</p>
                                     
                                     <div class="flex flex-wrap items-center gap-2 mt-3">
-                                        <span class="text-[9px] px-2 py-1 rounded-md border ${hasToken ? 'border-primary/30 text-primary bg-primary/5' : 'border-outline-variant text-on-surface-variant'} font-black uppercase tracking-widest">
-                                            ${hasToken ? 'Токен вставлен' : 'Нет токена'}
-                                        </span>
                                         <span class="text-[9px] px-2 py-1 rounded-md border ${hasSub ? 'border-green-500/30 text-green-500 bg-green-500/5' : 'border-outline-variant text-on-surface-variant'} font-black uppercase tracking-widest">
                                             ${hasSub ? 'Подписка' : 'Free/Trial'}
                                         </span>

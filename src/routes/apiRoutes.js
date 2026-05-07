@@ -3,7 +3,6 @@ const router = express.Router();
 const config = require('../config');
 const supabase = require('../db/supabase');
 const wbService = require('../services/wbService');
-const telegramService = require('../services/telegramService');
 const authMiddleware = require('../middleware/authMiddleware');
 const aiService = require('../services/aiService');
 
@@ -60,9 +59,8 @@ router.post('/ai/test', authMiddleware, async (req, res) => {
     };
 
     const customSettings = {
-      ...seller,
-      brand_name: brandName || seller.brand_name || 'Наш Магазин',
-      custom_instructions: toneOfVoice || seller.custom_instructions
+      brand_name: brandName || 'Наш Магазин',
+      custom_instructions: toneOfVoice || ''
     };
 
     const reviewInput = { 
@@ -140,21 +138,81 @@ router.get('/debug-db', async (req, res) => {
   }
 });
 
-// Get all reviews for a specific seller
+// Global Stats (Command Center)
+router.get('/stats/global', authMiddleware, async (req, res) => {
+  try {
+    const sellerId = req.user.sellerId;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    // 1. Fetch all shops for this seller
+    const { data: shops, error: shopsError } = await supabase
+      .from('shops')
+      .select('*')
+      .eq('seller_id', sellerId);
+    
+    if (shopsError) throw shopsError;
+
+    // 2. Fetch all review logs for these shops
+    const shopIds = (shops || []).map(s => s.id);
+    
+    let totalProcessed = 0;
+    let todayProcessed = 0;
+
+    if (shopIds.length > 0) {
+      const { data: logs, error: logsError } = await supabase
+        .from('review_logs')
+        .select('created_at, status')
+        .in('shop_id', shopIds)
+        .in('status', ['auto_posted', 'approved']);
+      
+      if (logsError) throw logsError;
+
+      totalProcessed = logs.length;
+      todayProcessed = logs.filter(l => new Date(l.created_at) >= today).length;
+    }
+
+    // 3. Analyze shop health
+    const redZone = (shops || []).filter(s => 
+      !s.wb_token_valid || 
+      (s.subscription_expires_at && new Date(s.subscription_expires_at) < new Date())
+    );
+    
+    const greenZoneCount = (shops || []).length - redZone.length;
+
+    // Calculate time saved (assume 2 mins per review)
+    const totalMinutesSaved = totalProcessed * 2;
+    const hoursSaved = Math.floor(totalMinutesSaved / 60);
+
+    res.json({
+      todayProcessed,
+      totalProcessed,
+      hoursSaved,
+      greenZoneCount,
+      redZone: redZone.map(s => ({
+        id: s.id,
+        name: s.name,
+        issue: !s.wb_token_valid ? 'API Key Invalid' : 'Subscription Expired'
+      }))
+    });
+  } catch (error) {
+    console.error('[GlobalStats] Error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get all reviews for a specific shop
 router.get('/reviews', authMiddleware, async (req, res) => {
   try {
     const sellerId = req.user.sellerId;
-    const { status } = req.query;
-    
-    const seller = await getSeller(sellerId);
-    if (!seller) return res.json([]); 
-
+    const { status, shopId } = req.query;
     let query = supabase
       .from('review_logs')
       .select('*')
-      .eq('seller_id', seller.id)
+      .eq('seller_id', sellerId)
       .order('created_at', { ascending: false });
     
+    if (shopId) query = query.eq('shop_id', shopId);
     if (status) query = query.eq('status', status);
 
     const { data, error } = await query;
@@ -173,13 +231,16 @@ router.post('/reviews/:id/approve', authMiddleware, async (req, res) => {
 
     const { data: log, error: logError } = await supabase
       .from('review_logs')
-      .select('*, sellers(wb_token)')
+      .select('*, shops(wb_token)')
       .eq('id', id)
       .single();
 
     if (logError) throw logError;
 
-    const success = await wbService.sendAnswer(log.review_id, text);
+    const token = log.shops?.wb_token;
+    if (!token) throw new Error('WB Token not found for this shop');
+
+    const success = await wbService.sendAnswer(log.review_id, text, token);
     
     if (success) {
       const { error: updateError } = await supabase
@@ -197,7 +258,7 @@ router.post('/reviews/:id/approve', authMiddleware, async (req, res) => {
   }
 });
 
-// GET seller settings
+// GET seller settings (auth + subscription only, no shop fields)
 router.get('/settings', authMiddleware, async (req, res) => {
   try {
     const sellerId = req.user.sellerId;
@@ -212,50 +273,26 @@ router.get('/settings', authMiddleware, async (req, res) => {
   }
 });
 
-// UPDATE seller settings
+// UPDATE seller settings (account-level only: display_name, etc.)
 router.post('/settings', authMiddleware, async (req, res) => {
   try {
     const sellerId = req.user.sellerId;
-    const { 
-      is_auto_reply_enabled, 
-      custom_instructions,
-      respond_to_bad_reviews,
-      brand_name,
-      wb_token
-    } = req.body;
+    const { display_name } = req.body;
     
     const seller = await getSeller(sellerId);
     if (!seller) throw new Error('Could not find seller profile');
 
-    const isFirstToken = !seller.wb_token && wb_token;
-    
-    // Check token validity if it's provided and new/changed
-    if (wb_token && wb_token !== seller.wb_token) {
-      const isValid = await wbService.validateToken(wb_token);
-      if (!isValid) {
-        return res.status(400).json({ error: 'Неверный API ключ Wildberries. Проверьте правильность или создайте новый.' });
-      }
-    }
+    const updateData = {};
+    if (display_name !== undefined) updateData.display_name = display_name;
 
     const { data, error } = await supabase
       .from('sellers')
-      .update({ 
-        is_auto_reply_enabled, 
-        custom_instructions,
-        respond_to_bad_reviews,
-        brand_name,
-        wb_token
-      })
+      .update(updateData)
       .eq('id', seller.id)
       .select()
       .single();
 
     if (error) throw error;
-
-    if (isFirstToken && config.adminId) {
-      // Optional: Admin notification
-      await telegramService.sendMessage(config.adminId, `🔑 <b>Токен добавлен!</b>\nЮзер: <code>${seller.display_name || seller.id}</code>\nМагазин готов к работе.`);
-    }
 
     res.json({ success: true, settings: data });
   } catch (error) {
@@ -263,12 +300,13 @@ router.post('/settings', authMiddleware, async (req, res) => {
   }
 });
 
-// Get dashboard stats for a specific seller
+// Get dashboard stats for a specific shop
 router.get('/stats', authMiddleware, async (req, res) => {
   try {
     const sellerId = req.user.sellerId;
-    const seller = await getSeller(sellerId);
-    if (!seller) return res.status(404).json({ error: 'Seller not found' });
+    const { shopId } = req.query;
+
+    if (!shopId) return res.status(400).json({ error: 'shopId is required' });
 
     const todayStart = new Date();
     todayStart.setHours(0,0,0,0);
@@ -277,24 +315,28 @@ router.get('/stats', authMiddleware, async (req, res) => {
     const { count: total } = await supabase
       .from('review_logs')
       .select('id', { count: 'exact', head: true })
-      .eq('seller_id', seller.id);
+      .eq('seller_id', sellerId)
+      .eq('shop_id', shopId);
 
     const { count: pending } = await supabase
       .from('review_logs')
       .select('id', { count: 'exact', head: true })
-      .eq('seller_id', seller.id)
+      .eq('seller_id', sellerId)
+      .eq('shop_id', shopId)
       .eq('status', 'pending');
 
     const { count: approved } = await supabase
       .from('review_logs')
       .select('id', { count: 'exact', head: true })
-      .eq('seller_id', seller.id)
+      .eq('seller_id', sellerId)
+      .eq('shop_id', shopId)
       .in('status', ['approved', 'auto_posted']);
 
     const { count: approvedToday } = await supabase
       .from('review_logs')
       .select('id', { count: 'exact', head: true })
-      .eq('seller_id', seller.id)
+      .eq('seller_id', sellerId)
+      .eq('shop_id', shopId)
       .in('status', ['approved', 'auto_posted'])
       .gte('created_at', todayISO);
 
@@ -309,188 +351,19 @@ router.get('/stats', authMiddleware, async (req, res) => {
   }
 });
 
-// Admin Global Stats
-router.get('/admin/stats', authMiddleware, async (req, res) => {
-  try {
-    const sellerId = req.user.sellerId;
-    // VERY BASIC ADMIN CHECK (should use roles in DB ideally)
-    if (sellerId !== process.env.ADMIN_SELLER_ID && sellerId !== config.adminId) {
-      return res.status(403).json({ error: 'Access denied' });
-    }
-
-    const todayStart = new Date();
-    todayStart.setHours(0,0,0,0);
-    const todayISO = todayStart.toISOString();
-
-    let totalSellers = 0;
-    let newToday = 0;
-    let activeToday = 0;
-    let withoutToken = 0;
-    let totalApproved = 0;
-
-    try {
-      const { count: tsCount } = await supabase.from('sellers').select('id', { count: 'exact', head: true });
-      totalSellers = tsCount || 0;
-      
-      const { count: subCount } = await supabase.from('sellers')
-        .select('id', { count: 'exact', head: true })
-        .not('subscription_status', 'in', '("free","trial")');
-      const totalSubscribed = subCount || 0;
-
-      const { count: ntCount } = await supabase.from('sellers')
-        .select('id', { count: 'exact', head: true })
-        .gte('joined_at', todayISO);
-      newToday = ntCount || 0;
-
-      const { count: atCount } = await supabase.from('sellers')
-        .select('id', { count: 'exact', head: true })
-        .gte('last_active_at', todayISO);
-      activeToday = atCount || 0;
-
-      // Note: check for NULL or empty string
-      const { count: wtCount } = await supabase.from('sellers')
-        .select('id', { count: 'exact', head: true })
-        .or('wb_token.eq."",wb_token.is.null');
-      withoutToken = wtCount || 0;
-
-      const { count: taCount } = await supabase.from('review_logs')
-        .select('id', { count: 'exact', head: true })
-        .in('status', ['approved', 'auto_posted']);
-      totalApproved = taCount || 0;
-
-      // Count AI Tests from our analytics logs
-      const { count: testCount } = await supabase.from('support_tickets')
-        .select('id', { count: 'exact', head: true })
-        .eq('type', 'analytics')
-        .eq('message', 'ai_test_success');
-      totalTests = testCount || 0;
-
-      const { count: testTodayCount } = await supabase.from('support_tickets')
-        .select('id', { count: 'exact', head: true })
-        .eq('type', 'analytics')
-        .eq('message', 'ai_test_success')
-        .gte('created_at', todayISO);
-      testsToday = testTodayCount || 0;
-
-    } catch (dbError) {
-      console.error('[AdminStats] Database query error:', dbError);
-    }
-
-    res.json({
-      totalSellers,
-      newToday,
-      activeToday,
-      withoutToken,
-      totalApproved,
-      totalSubscribed,
-      totalTests,
-      testsToday
-    });
-  } catch (error) {
-    res.status(500).json({ error: error.message || 'Internal Server Error' });
-  }
-});
-
-// Admin: Get all users
-router.get('/admin/users', authMiddleware, async (req, res) => {
-  try {
-    const sellerId = req.user.sellerId;
-    if (sellerId !== process.env.ADMIN_SELLER_ID && sellerId !== config.adminId) {
-      return res.status(403).json({ error: 'Access denied' });
-    }
-    const { data, error } = await supabase
-      .from('sellers')
-      .select('id, email, display_name, auth_provider, subscription_status, wb_token, joined_at, last_active_at')
-      .order('last_active_at', { ascending: false });
-      
-    if (error) throw error;
-    res.json(data || []);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Admin: Get user's reviews
-router.get('/admin/users/:id/reviews', authMiddleware, async (req, res) => {
-  try {
-    const adminId = req.user.sellerId;
-    if (adminId !== process.env.ADMIN_SELLER_ID && adminId !== config.adminId) {
-      return res.status(403).json({ error: 'Access denied' });
-    }
-    
-    const targetUserId = req.params.id;
-    const { data, error } = await supabase
-      .from('review_logs')
-      .select('*')
-      .eq('seller_id', targetUserId)
-      .order('created_at', { ascending: false })
-      .limit(100); // Limit to last 100 for performance
-      
-    if (error) throw error;
-    res.json(data || []);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Admin: Reply to support ticket
-router.post('/admin/support/:id/reply', authMiddleware, async (req, res) => {
-  try {
-    const adminId = req.user.sellerId;
-    if (adminId !== process.env.ADMIN_SELLER_ID && adminId !== config.adminId) {
-      return res.status(403).json({ error: 'Access denied' });
-    }
-    
-    const { reply } = req.body;
-    if (!reply) return res.status(400).json({ error: 'Reply text required' });
-    
-    const ticketId = req.params.id;
-    
-    // Update ticket with admin reply and mark as closed/resolved
-    const { data, error } = await supabase
-      .from('support_tickets')
-      .update({ 
-        admin_reply: reply,
-        status: 'closed',
-        updated_at: new Date()
-      })
-      .eq('id', ticketId)
-      .select();
-      
-    if (error) throw error;
-    
-    // Notify user via Telegram if possible
-    const ticket = data?.[0];
-    if (ticket && ticket.seller_id) {
-      const { data: user } = await supabase.from('sellers').select('telegram_chat_id').eq('id', ticket.seller_id).maybeSingle();
-      if (user && user.telegram_chat_id) {
-        try {
-          const telegramService = require('../services/telegramService');
-          await telegramService.sendMessage(user.telegram_chat_id, `✅ <b>Ответ поддержки:</b>\n\n"${reply}"\n\n<i>На ваш запрос был получен ответ.</i>`);
-        } catch (tgErr) {
-          console.error('[AdminSupportReply] Telegram notify error:', tgErr.message);
-        }
-      }
-    }
-    
-    res.json({ success: true });
-  } catch (error) {
-    console.error('[AdminSupportReply] Error:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// GET Analytics data
+// GET Analytics data for a specific shop
 router.get('/analytics', authMiddleware, async (req, res) => {
   try {
     const sellerId = req.user.sellerId;
-    const seller = await getSeller(sellerId);
-    if (!seller) return res.status(404).json({ error: 'Seller not found' });
+    const { shopId } = req.query;
+
+    if (!shopId) return res.status(400).json({ error: 'shopId is required' });
 
     const { data: reviews, error } = await supabase
       .from('review_logs')
       .select('rating, category, sentiment')
-      .eq('seller_id', seller.id)
+      .eq('seller_id', sellerId)
+      .eq('shop_id', shopId)
       .not('category', 'is', null);
 
     if (error) throw error;
@@ -513,22 +386,201 @@ router.get('/analytics', authMiddleware, async (req, res) => {
   }
 });
 
-// Manual sync trigger
-const reviewService = require('../services/reviewService');
+// --- PRODUCT MATRIX ---
+
+router.get('/matrix', authMiddleware, async (req, res) => {
+  try {
+    const sellerId = req.user.sellerId;
+    const { shopId } = req.query;
+    
+    if (!shopId) return res.status(400).json({ error: 'shopId is required' });
+
+    const { data, error } = await supabase
+      .from('product_matrix')
+      .select('*')
+      .eq('seller_id', sellerId)
+      .eq('shop_id', shopId)
+      .order('created_at', { ascending: false });
+    
+    if (error) throw error;
+    res.json(data || []);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.post('/matrix', authMiddleware, async (req, res) => {
+  try {
+    const sellerId = req.user.sellerId;
+    const { shopId, nm_id, product_name, custom_instructions, cross_sell_article } = req.body;
+    
+    if (!shopId || !nm_id) return res.status(400).json({ error: 'shopId and nm_id are required' });
+
+    const { data, error } = await supabase
+      .from('product_matrix')
+      .upsert({ 
+        seller_id: sellerId, 
+        shop_id: shopId, 
+        nm_id, 
+        product_name, 
+        custom_instructions, 
+        cross_sell_article 
+      })
+      .select()
+      .single();
+      
+    if (error) throw error;
+    res.json(data);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Manual sync trigger for a specific shop
 router.post('/sync', authMiddleware, async (req, res) => {
   try {
     const sellerId = req.user.sellerId;
-    const seller = await getSeller(sellerId);
+    const { shopId } = req.body;
     
-    if (!seller || !seller.wb_token) {
-      return res.status(400).json({ error: 'Добавьте WB Токен в настройках' });
+    if (!shopId) return res.status(400).json({ error: 'shopId is required' });
+
+    const { data: shop, error: shopError } = await supabase
+      .from('shops')
+      .select('*')
+      .eq('id', shopId)
+      .eq('seller_id', sellerId)
+      .single();
+
+    if (shopError || !shop || !shop.wb_token) {
+      return res.status(400).json({ error: 'Магазин не найден или отсутствует WB Токен' });
     }
 
-    console.log(`[Manual Sync] Triggering for seller ${seller.id}`);
-    await reviewService.processSellerReviews(seller);
+    console.log(`[Manual Sync] Triggering for shop ${shop.name} (${shop.id})`);
+    await reviewService.processShopReviews(shop);
     
     res.json({ success: true, message: 'Синхронизация запущена!' });
   } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// --- SHOP MANAGEMENT ROUTES ---
+
+router.get('/shops', authMiddleware, async (req, res) => {
+  try {
+    const sellerId = req.user.sellerId;
+    const { data, error } = await supabase
+      .from('shops')
+      .select('*')
+      .eq('seller_id', sellerId)
+      .order('created_at', { ascending: true });
+    
+    if (error) throw error;
+    res.json(data || []);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.post('/shops', authMiddleware, async (req, res) => {
+  try {
+    const sellerId = req.user.sellerId;
+    const { name, wb_token, brand_name, custom_instructions } = req.body;
+    
+    if (!name) return res.status(400).json({ error: 'Название магазина обязательно' });
+
+    // Check shop limit
+    const { data: seller } = await supabase
+      .from('sellers')
+      .select('max_shops')
+      .eq('id', sellerId)
+      .single();
+      
+    const { count: shopCount } = await supabase
+      .from('shops')
+      .select('id', { count: 'exact', head: true })
+      .eq('seller_id', sellerId);
+      
+    const limit = seller?.max_shops || 1;
+    if (shopCount >= limit) {
+      return res.status(403).json({ error: `Достигнут лимит магазинов для вашего тарифа (${limit}). Перейдите на тариф выше.` });
+    }
+
+    const { data, error } = await supabase
+      .from('shops')
+      .insert({ 
+        seller_id: sellerId, 
+        name, 
+        wb_token: wb_token || '', 
+        brand_name: brand_name || '', 
+        custom_instructions: custom_instructions || '' 
+      })
+      .select()
+      .single();
+      
+    if (error) throw error;
+    res.json(data);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.put('/shops/:id', authMiddleware, async (req, res) => {
+  try {
+    const sellerId = req.user.sellerId;
+    const { id } = req.params;
+    const updateData = req.body;
+
+    const { data: shop, error: fetchError } = await supabase
+      .from('shops')
+      .select('id')
+      .eq('id', id)
+      .eq('seller_id', sellerId)
+      .single();
+
+    if (fetchError || !shop) return res.status(403).json({ error: 'Доступ запрещен' });
+
+    const { data, error } = await supabase
+      .from('shops')
+      .update(updateData)
+      .eq('id', id)
+      .select()
+      .single();
+      
+    if (error) throw error;
+    res.json(data);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.delete('/shops/:id', authMiddleware, async (req, res) => {
+  try {
+    const sellerId = req.user.sellerId;
+    const { id } = req.params;
+
+    console.log(`[Shop] Attempting to delete shop ${id} for seller ${sellerId}`);
+
+    // 1. Manually delete related logs and matrix to avoid FK constraints issues if ON DELETE CASCADE is missing
+    await supabase.from('review_logs').delete().eq('shop_id', id).eq('seller_id', sellerId);
+    await supabase.from('product_matrix').delete().eq('shop_id', id).eq('seller_id', sellerId);
+
+    // 2. Delete the shop
+    const { error } = await supabase
+      .from('shops')
+      .delete()
+      .eq('id', id)
+      .eq('seller_id', sellerId);
+      
+    if (error) {
+      console.error('[Shop] Deletion error:', error);
+      throw error;
+    }
+
+    console.log(`[Shop] Successfully deleted shop ${id}`);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('[Shop] Delete catch error:', error.message);
     res.status(500).json({ error: error.message });
   }
 });
@@ -572,45 +624,5 @@ router.post('/support', authMiddleware, async (req, res) => {
   }
 });
 
-// Admin: Get all tickets
-router.get('/admin/support', authMiddleware, async (req, res) => {
-  try {
-    const sellerId = req.user.sellerId;
-    if (sellerId !== process.env.ADMIN_SELLER_ID && sellerId !== config.adminId) {
-      return res.status(403).json({ error: 'Access denied' });
-    }
-    const { data, error } = await supabase
-      .from('support_tickets')
-      .select('*, sellers(email, display_name)')
-      .order('created_at', { ascending: false });
-    if (error) throw error;
-    res.json(data || []);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Admin: Reply to a ticket
-router.post('/admin/support/:id/reply', authMiddleware, async (req, res) => {
-  try {
-    const sellerId = req.user.sellerId;
-    if (sellerId !== process.env.ADMIN_SELLER_ID && sellerId !== config.adminId) {
-      return res.status(403).json({ error: 'Access denied' });
-    }
-    const { reply } = req.body;
-    
-    const { data, error } = await supabase
-      .from('support_tickets')
-      .update({ admin_reply: reply, status: 'replied', updated_at: new Date().toISOString() })
-      .eq('id', req.params.id)
-      .select()
-      .single();
-      
-    if (error) throw error;
-    res.json({ success: true, ticket: data });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
 
 module.exports = router;

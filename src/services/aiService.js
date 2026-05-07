@@ -99,13 +99,17 @@ class AIService {
 
     prompt += `\n\nОГРАНИЧЕНИЕ: Твой ответ должен быть не длиннее 280 символов.`;
 
+    if (seller?.stop_words) {
+      prompt += `\n\nСТРОГОЕ ОГРАНИЧЕНИЕ: Никогда не используй следующие слова и их производные: ${seller.stop_words}. Если отзыв негативный, старайся смягчить углы, не употребляя эти термины.`;
+    }
+
     return prompt;
   }
 
   async generateConsultation(query, history = []) {
     try {
       const systemPrompt = `Ты — экспертный ИИ-ассистент сервиса WBReply AI. Консультируй продавцов кратко (1-2 предложения).
-Направляй к @edh4hhr по сложным вопросам.`;
+Направляй к alexandertsyhanov@gmail.com по сложным вопросам.`;
 
       const response = await this.client.post('/chat/completions', {
         model: 'nex-agi/deepseek-v3.1-nex-n1',

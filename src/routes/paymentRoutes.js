@@ -4,15 +4,26 @@ const axios = require('axios');
 const crypto = require('crypto');
 const config = require('../config');
 const supabase = require('../db/supabase');
-const telegramService = require('../services/telegramService');
 const authMiddleware = require('../middleware/authMiddleware');
 
-const SUBSCRIPTION_PRICE = 749; // Фиксированная цена
+// Тарифные планы
+const PRICING_TIERS = {
+  3000: { name: 'Начинающий', plan: 'starter', maxShops: 5 },
+  5000: { name: 'Агентство', plan: 'agency', maxShops: 20 },
+  10000: { name: 'Корпорация', plan: 'corporation', maxShops: 999 },
+};
 
 // 1. Создание платежа (YooKassa)
 router.post('/create', authMiddleware, async (req, res) => {
   try {
     const sellerId = req.user.sellerId;
+    const { amount } = req.body;
+
+    // Validate tier
+    const tier = PRICING_TIERS[amount];
+    if (!tier) {
+      return res.status(400).json({ error: 'Неверная сумма тарифа' });
+    }
 
     // PROTECTION: Guest accounts must link a real identity before paying
     const { data: seller } = await supabase
@@ -36,7 +47,7 @@ router.post('/create', authMiddleware, async (req, res) => {
 
     const paymentData = {
       amount: {
-        value: SUBSCRIPTION_PRICE.toFixed(2),
+        value: amount.toFixed(2),
         currency: 'RUB'
       },
       capture: true,
@@ -44,13 +55,16 @@ router.post('/create', authMiddleware, async (req, res) => {
         type: 'redirect',
         return_url: 'https://wbreplyai.ru/app#success'
       },
-      description: `Подписка WBREPLY AI - 30 дней`,
+      description: `WBReply AI — тариф «${tier.name}» (30 дней)`,
       metadata: {
-        sellerId: sellerId.toString()
+        sellerId: sellerId.toString(),
+        plan: tier.plan,
+        maxShops: tier.maxShops.toString(),
+        amount: amount.toString()
       }
     };
 
-    console.log(`[YooKassa] Creating payment for seller: ${sellerId}`);
+    console.log(`[YooKassa] Creating payment: seller=${sellerId}, tier=${tier.name}, amount=${amount}₽`);
 
     const response = await axios.post('https://api.yookassa.ru/v3/payments', paymentData, {
       headers: {
@@ -79,6 +93,8 @@ router.post('/yookassa/webhook', async (req, res) => {
 
     const payment = event.object;
     const sellerId = payment.metadata?.sellerId;
+    const plan = payment.metadata?.plan || 'starter';
+    const maxShops = parseInt(payment.metadata?.maxShops || '5', 10);
     const amount = payment.amount?.value;
 
     if (!sellerId) {
@@ -86,7 +102,7 @@ router.post('/yookassa/webhook', async (req, res) => {
         return res.sendStatus(200);
     }
 
-    console.log(`[YooKassa Webhook] Payment succeeded for seller ${sellerId}. Amount: ${amount}`);
+    console.log(`[YooKassa Webhook] Payment succeeded: seller=${sellerId}, plan=${plan}, amount=${amount}₽`);
 
     // Продлеваем подписку в БД
     const { data: seller, error: sellerError } = await supabase
@@ -107,7 +123,9 @@ router.post('/yookassa/webhook', async (req, res) => {
     const { error: updateError } = await supabase
       .from('sellers')
       .update({ 
-        subscription_status: 'premium', 
+        subscription_status: 'active', 
+        subscription_plan: plan,
+        max_shops: maxShops,
         subscription_expires_at: newExpiry 
       })
       .eq('id', sellerId);
@@ -117,11 +135,7 @@ router.post('/yookassa/webhook', async (req, res) => {
         return res.sendStatus(500);
     }
 
-    // Уведомляем админа
-    if (config.adminId) {
-      await telegramService.sendMessage(config.adminId, `💰 <b>Оплата ЮKassa!</b>\nЮзер: <code>${sellerId}</code>\nСумма: ${amount} руб.`);
-    }
-
+    console.log(`[YooKassa Webhook] Subscription updated: plan=${plan}, maxShops=${maxShops}, expires=${newExpiry}`);
     res.sendStatus(200);
   } catch (error) {
     console.error('[YooKassa Webhook] Error:', error.message);

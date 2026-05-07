@@ -196,6 +196,101 @@
             from { opacity: 0; }
             to { opacity: 1; }
         }
+
+        /* =============================================
+           ULTRA-MINIMAL GLASS SHOP CARDS
+           ============================================= */
+        .shop-card {
+            background: #111111 !important;
+            border: 1px solid rgba(255, 255, 255, 0.05) !important;
+            border-radius: 12px !important;
+            transition: all 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            min-height: 140px;
+        }
+        .shop-card:hover {
+            border-color: rgba(226, 182, 123, 0.2) !important;
+            background: #161616 !important;
+            transform: translateY(-2px);
+            box-shadow: 0 20px 40px -15px rgba(0,0,0,0.5);
+        }
+        
+        /* Micro Dot Status */
+        .status-dot-micro {
+            width: 2px;
+            height: 2px;
+            border-radius: 50%;
+            transition: all 0.3s ease;
+        }
+        .status-dot-micro.active {
+            background-color: #E2B67B;
+            box-shadow: 0 0 4px #E2B67B;
+        }
+        .status-dot-micro.off {
+            background-color: rgba(255,255,255,0.1);
+        }
+
+        /* Stats Typography */
+        .stats-text {
+            font-size: 11px;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
+            color: rgba(255, 255, 255, 0.3);
+        }
+
+        /* Phantom Controls */
+        .phantom-control {
+            opacity: 0;
+            transition: all 0.3s cubic-bezier(0.23, 1, 0.32, 1);
+            transform: translateY(4px);
+        }
+        .shop-card:hover .phantom-control {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* Minimal Switch */
+        .minimal-switch {
+            width: 24px;
+            height: 12px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 10px;
+            position: relative;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .minimal-switch.active {
+            background: #E2B67B;
+        }
+        .minimal-switch-dot {
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 8px;
+            height: 8px;
+            background: white;
+            border-radius: 50%;
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        .minimal-switch.active .minimal-switch-dot {
+            transform: translateX(12px);
+        }
+
+        /* Empty State */
+        .empty-card-glass {
+            border: 1px dashed rgba(255,255,255,0.05) !important;
+            background: transparent !important;
+            border-radius: 12px;
+            transition: all 0.3s ease;
+        }
+        .empty-card-glass:hover {
+            border-color: rgba(255,255,255,0.1) !important;
+            background: rgba(255,255,255,0.02) !important;
+        }
     </style>
     <script>
         // Init Theme — default dark
@@ -207,23 +302,24 @@
     <div class="app-container">
         <!-- Desktop Sidebar -->
         <aside id="desktop-sidebar" style="display: none;" class="fixed lg:sticky top-0 h-[100dvh] flex flex-col p-8 z-50 overflow-y-auto" style="background: var(--c-sidebar-bg); border-right: 1px solid var(--c-border)">
-            <div class="flex items-center font-black tracking-tighter mb-12 px-2 text-2xl cursor-default select-none">
+            <div class="flex items-center font-black tracking-tighter mb-8 px-2 text-2xl cursor-default select-none">
                 <span class="text-white">WR</span>
                 <svg class="w-6 h-6 text-primary mx-1 animate-pulse-slow" viewBox="0 0 24 24" fill="currentColor">
                     <path d="M12 0C12 6.627 6.627 12 0 12C6.627 12 12 17.373 12 24C12 17.373 17.373 12 24 12C17.373 12 12 6.627 12 0Z"/>
                 </svg>
                 <span class="text-primary">AI</span>
             </div>
+
             
-            <nav class="flex flex-col gap-3">
+            <nav class="space-y-2">
                 <a onclick="showView('settings')" class="tab-item flex items-center gap-4 cursor-pointer">
-                    <span class="material-symbols-outlined text-xl">tune</span>
-                    <span class="nav-text">Бизнес</span>
+                    <span class="material-symbols-outlined text-xl">storefront</span>
+                    <span class="nav-text">Магазины</span>
                 </a>
-                <a onclick="showView('reviews')" class="tab-item flex items-center gap-4 cursor-pointer">
+                <!-- <a onclick="showView('reviews')" class="tab-item flex items-center gap-4 cursor-pointer">
                     <span class="material-symbols-outlined text-xl">forum</span>
                     <span class="nav-text">Отзывы</span>
-                </a>
+                </a> -->
                 <a onclick="showView('ai')" class="tab-item flex items-center gap-4 cursor-pointer">
                     <span class="material-symbols-outlined text-xl">psychology</span>
                     <span class="nav-text">ИИ Тест</span>
@@ -235,10 +331,6 @@
                 <a onclick="showView('interface')" class="tab-item flex items-center gap-4 cursor-pointer">
                     <span class="material-symbols-outlined text-xl">settings</span>
                     <span class="nav-text">Система</span>
-                </a>
-                <a onclick="showView('admin')" class="tab-item items-center gap-4 cursor-pointer admin-only" style="display: none;">
-                    <span class="material-symbols-outlined text-xl">shield</span>
-                    <span class="nav-text">Админ</span>
                 </a>
             </nav>
             
@@ -272,13 +364,13 @@
     <!-- Mobile Navigation -->
     <nav id="main-nav" class="fixed bottom-0 w-full flex justify-between items-center px-2 py-3 z-40 lg:hidden shadow-lg" style="display: none; background: var(--c-bg); border-top: 1px solid var(--c-border); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); padding-bottom: calc(0.75rem + env(safe-area-inset-bottom));">
         <a id="nav-settings" class="tab-item flex-1 flex flex-col items-center justify-center transition-all active:scale-95" onclick="showView('settings')">
-            <span class="material-symbols-outlined text-xl">tune</span>
-            <span class="text-[10px] font-black uppercase tracking-[0.2em] mt-1.5">Бизнес</span>
+            <span class="material-symbols-outlined text-xl">storefront</span>
+            <span class="text-[10px] font-black uppercase tracking-[0.2em] mt-1.5">Магазины</span>
         </a>
-        <a id="nav-reviews" class="tab-item flex-1 flex flex-col items-center justify-center transition-all active:scale-95" onclick="showView('reviews')">
+        <!-- <a id="nav-reviews" class="tab-item flex-1 flex flex-col items-center justify-center transition-all active:scale-95" onclick="showView('reviews')">
             <span class="material-symbols-outlined text-xl">forum</span>
             <span class="nav-text mt-1.5" style="font-size: 8px;">Отзывы</span>
-        </a>
+        </a> -->
         <a id="nav-ai" class="tab-item flex-1 flex flex-col items-center justify-center transition-all active:scale-95" onclick="showView('ai')">
             <span class="material-symbols-outlined text-xl">psychology</span>
             <span class="nav-text mt-1.5" style="font-size: 8px;">ИИ Тест</span>
@@ -290,10 +382,6 @@
         <a id="nav-interface" class="tab-item flex-1 flex flex-col items-center justify-center transition-all active:scale-95" onclick="showView('interface')">
             <span class="material-symbols-outlined text-xl">settings</span>
             <span class="text-[10px] font-black uppercase tracking-[0.2em] mt-1.5">Система</span>
-        </a>
-        <a id="nav-admin" class="tab-item flex-1 flex-col items-center justify-center transition-all active:scale-95 admin-only" style="display: none;" onclick="showView('admin')">
-            <span class="material-symbols-outlined text-xl">shield</span>
-            <span class="text-[10px] font-black uppercase tracking-[0.2em] mt-1.5">Админ</span>
         </a>
     </nav>
 

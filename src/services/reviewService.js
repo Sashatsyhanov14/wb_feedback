@@ -1,48 +1,38 @@
 const wbService = require('./wbService');
 const aiService = require('./aiService');
-const telegramService = require('./telegramService');
 const supabase = require('../db/supabase');
 
 class ReviewService {
   /**
-   * Main synchronization loop
+   * Main synchronization loop for a specific shop
    */
-  async processSellerReviews(seller) {
-    if (!seller || !seller.wb_token) return;
+  async processShopReviews(shop) {
+    if (!shop || !shop.wb_token) return;
 
-    // --- Subscription Check ---
+    // --- Subscription Check (from seller, not shop) ---
+    const seller = shop.sellers || {};
     const now = new Date();
     const expiresAt = seller.subscription_expires_at ? new Date(seller.subscription_expires_at) : null;
     
     if (expiresAt && now > expiresAt) {
-      console.log(`[ReviewService] Subscription EXPIRED for ${seller.telegram_chat_id}`);
-      
-      // Update status in DB if not already expired
-      if (seller.subscription_status !== 'expired') {
-        await supabase.from('sellers').update({ subscription_status: 'expired' }).eq('id', seller.id);
-        
-        // Notify user
-        const message = `⚠️ <b>Ваша подписка на WBReply AI истекла!</b>\n\n` +
-          `Авто-ответы на отзывы приостановлены. Для возобновления работы, пожалуйста, оплатите тариф (749 руб/мес) в разделе <b>«Аккаунт»</b> внутри Mini App.\n\n` +
-          `Если возникли вопросы: @edh4hhr 🚀`;
-        await telegramService.sendMessage(seller.telegram_chat_id, message);
-      }
+      console.log(`[ReviewService] Subscription EXPIRED for shop ${shop.name} (Seller: ${shop.seller_id})`);
       return;
     }
 
     try {
-      console.log(`[ReviewService] Starting Sync for seller: ${seller.display_name || seller.email || seller.id}`);
+      console.log(`[ReviewService] Starting Sync for shop: ${shop.name} (${shop.id})`);
       
-      const response = await wbService.getReviews(false, 30, 0, { token: seller.wb_token });
+      const response = await wbService.getReviews(false, 30, 0, { token: shop.wb_token });
       const reviews = response?.data?.feedbacks || [];
       
       console.log(`[ReviewService] Found ${reviews.length} unanswered reviews`);
 
       for (const review of reviews) {
-        // Skip if already processed in this state (no update needed if auto_posted)
+        // Skip if already processed
         const { data: existing } = await supabase
           .from('review_logs')
           .select('id, status')
+          .eq('shop_id', shop.id)
           .eq('review_id', review.id)
           .maybeSingle();
 
@@ -50,82 +40,67 @@ class ReviewService {
           continue;
         }
 
-        await this.processSingleReview(seller, review, existing?.id);
+        await this.processSingleReview(shop, review, existing?.id);
         
-        // Rate limit: delay between processing reviews (WB allows 3 req/s)
+        // Rate limit
         await this._delay(400);
       }
     } catch (error) {
-      console.error(`[ReviewService] Sync error for ${seller.telegram_chat_id}:`, error.message);
+      console.error(`[ReviewService] Sync error for shop ${shop.id}:`, error.message);
     }
   }
 
   /**
    * Logic for a single review
    */
-  async processSingleReview(seller, feedback, existingLogId = null) {
+  async processSingleReview(shop, feedback, existingLogId = null) {
     try {
-      // 1. Get Product Data from WB Content API (real metadata: name, description, characteristics)
       let productMetadata = null;
       try {
-        productMetadata = await wbService.getProductMetadata(feedback.nmId, seller.wb_token);
+        productMetadata = await wbService.getProductMetadata(feedback.nmId, shop.wb_token);
       } catch (metaErr) {
         console.warn(`[ReviewService] Could not fetch product metadata for nmId ${feedback.nmId}:`, metaErr.message);
       }
 
-      // 2. Get product matrix (seller's custom config for this product)
+      // Matrix is still seller-level or shop-level? 
+      // Let's assume product_matrix should now be shop-level for better granularity.
+      // For now, we'll check by shop_id if column exists, otherwise fallback to seller_id.
       const { data: productMatrix } = await supabase
         .from('product_matrix')
         .select('*')
-        .eq('seller_id', seller.id)
+        .eq('shop_id', shop.id)
         .eq('nm_id', feedback.nmId)
         .maybeSingle();
 
       let crossSellName = null;
       if (productMatrix?.cross_sell_article) {
-        console.log(`[ReviewService] Fetching metadata for cross-sell article: ${productMatrix.cross_sell_article}`);
-        const crossMetadata = await wbService.getProductMetadata(productMatrix.cross_sell_article, seller.wb_token);
+        const crossMetadata = await wbService.getProductMetadata(productMatrix.cross_sell_article, shop.wb_token);
         crossSellName = crossMetadata?.name || null;
-        // Rate limit: small delay after Content API call
         await this._delay(350);
       }
 
-      // Extract product name from WB API response (productDetails.productName)
       const wbProductName = feedback.productDetails?.productName || '';
 
-      console.log(`[ReviewService] Processing feedback ${feedback.id} | Product: "${wbProductName}" | Matrix: ${productMatrix ? 'YES' : 'NO'} | Metadata: ${productMetadata ? 'YES' : 'NO'}`);
-
-      // 3. Generate AI Response (pass pros, cons, and full review context)
       const reviewContext = {
         text: feedback.text,
         pros: feedback.pros || '',
         cons: feedback.cons || '',
         rating: feedback.productValuation
       };
-      const aiData = await aiService.generateResponse(reviewContext, productMetadata, productMatrix, seller, { crossSellName });
+      
+      // Use shop as the 'seller' object for aiService (it has brand_name, custom_instructions)
+      const aiData = await aiService.generateResponse(reviewContext, productMetadata, productMatrix, shop, { crossSellName });
       if (!aiData || !aiData.text) return;
 
       const aiResponse = aiData.text;
 
-      // 4. AUTO-POST ALWAYS
-      console.log(`[ReviewService] Auto-posting to ${feedback.id}`);
-      const posted = await wbService.sendAnswer(feedback.id, aiResponse, seller.wb_token);
+      console.log(`[ReviewService] Auto-posting to ${feedback.id} in shop ${shop.name}`);
+      const posted = await wbService.sendAnswer(feedback.id, aiResponse, shop.wb_token);
       
-      // Rate limit: delay after posting answer
       await this._delay(350);
       
       if (posted) {
-        await this.saveReviewLog(seller.id, feedback, aiResponse, 'auto_posted', aiData, existingLogId);
-        
-        // 5. Notify User in requested format
-        const productLabel = productMatrix?.product_name || productMetadata?.name || wbProductName || feedback.nmId;
-        const notification = `Отзыв (${feedback.productValuation}⭐️):\n` +
-          `"${this._escapeHtml(feedback.text)}"\n` +
-          `Товар: ${this._escapeHtml(String(productLabel))}\n\n` +
-          `Ответ ИИ:\n` +
-          `"${this._escapeHtml(aiResponse)}"`;
-
-        await telegramService.sendMessage(seller.telegram_chat_id, notification);
+        await this.saveReviewLog(shop, feedback, aiResponse, 'auto_posted', aiData, existingLogId);
       }
     } catch (error) {
       console.error(`[ReviewService] Error in single review ${feedback.id}:`, error.message);
@@ -146,9 +121,10 @@ class ReviewService {
       .replace(/'/g, "&#039;");
   }
 
-  async saveReviewLog(sellerId, feedback, response, status, aiData, existingId = null) {
+  async saveReviewLog(shop, feedback, response, status, aiData, existingId = null) {
     const logData = {
-      seller_id: sellerId,
+      seller_id: shop.seller_id,
+      shop_id: shop.id,
       review_id: feedback.id,
       review_text: feedback.text,
       product_name: feedback.productDetails?.productName || '',
@@ -156,7 +132,7 @@ class ReviewService {
       rating: feedback.productValuation,
       ai_response_draft: response,
       status: status,
-      sentiment: aiData?.sentiment || 'netural',
+      sentiment: aiData?.sentiment || 'neutral',
       category: aiData?.category || 'Другое'
     };
 
@@ -171,13 +147,19 @@ class ReviewService {
 
   async processAllSellers() {
     try {
-      const { data: sellers } = await supabase.from('sellers').select('*');
-      if (!sellers) return;
-      for (const seller of sellers) {
-        // Skip guests and accounts without real WB token
-        if (seller.auth_provider === 'guest') continue;
-        if (seller.wb_token && seller.wb_token !== 'pending') {
-          await this.processSellerReviews(seller);
+      const { data: shops, error } = await supabase
+        .from('shops')
+        .select('*, sellers(id, auth_provider, subscription_status, subscription_expires_at)');
+      
+      if (error) throw error;
+      if (!shops) return;
+
+      for (const shop of shops) {
+        // Skip shops belonging to guest accounts
+        if (shop.sellers?.auth_provider === 'guest') continue;
+        
+        if (shop.wb_token && shop.wb_token !== 'pending') {
+          await this.processShopReviews(shop);
         }
       }
     } catch (error) {

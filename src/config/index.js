@@ -6,7 +6,6 @@ module.exports = {
   supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY,
   geminiApiKey: process.env.GEMINI_API_KEY,
   polzaAiApiKey: process.env.POLZA_AI_API_KEY,
-  telegramBotToken: process.env.TELEGRAM_BOT_TOKEN,
   wbToken: process.env.WB_TOKEN,
   port: process.env.PORT || 3000,
   nodeEnv: process.env.NODE_ENV || 'development',
@@ -18,7 +17,6 @@ module.exports = {
   vkClientSecret: process.env.VK_CLIENT_SECRET,
   vkRedirectUri: process.env.VK_REDIRECT_URI || 'https://wbreplyai.ru/api/auth/vk/callback',
   adminId: '68cfdf5a-25fb-43f5-8672-c03d1bddc29b',
-  adminIdUsername: process.env.TELEGRAM_ADMIN_USERNAME || '@edh4hhr',
   
   // Robokassa
   robokassaMerchantLogin: process.env.ROBOKASSA_MERCHANT_LOGIN,
