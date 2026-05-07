@@ -284,16 +284,16 @@ async function refreshData() {
             if (!banner) {
                 banner = document.createElement('div');
                 banner.id = 'expiration-banner';
-                banner.className = 'w-full bg-red-500/10 border-b border-red-500/20 px-6 py-4 flex items-center justify-between z-50 animate-in';
+                banner.className = 'w-full bg-red-500/10 border-b border-red-500/20 px-4 sm:px-6 py-3 sm:py-4 flex flex-col sm:flex-row items-center justify-between gap-3 z-50 animate-in text-center sm:text-left';
                 const mainContent = document.querySelector('main');
                 if (mainContent) mainContent.prepend(banner);
             }
             banner.innerHTML = `
-                <div class="flex items-center gap-3">
-                    <span class="material-symbols-outlined text-red-500">warning</span>
-                    <span class="text-[11px] font-bold text-red-500 tracking-wide uppercase">Срок действия подписки истек. Бот приостановлен.</span>
+                <div class="flex items-center justify-center gap-2 sm:gap-3">
+                    <span class="material-symbols-outlined text-red-500 text-lg sm:text-xl">warning</span>
+                    <span class="text-[10px] sm:text-[11px] font-bold text-red-500 tracking-wide uppercase leading-tight">Срок действия подписки истек. Бот приостановлен.</span>
                 </div>
-                <button onclick="showView('subscription')" class="bg-red-500 hover:bg-red-600 text-white text-[10px] font-black uppercase tracking-widest px-4 py-2 rounded-lg transition-colors shadow-lg">
+                <button onclick="showView('subscription')" class="bg-red-500 hover:bg-red-600 text-white text-[9px] sm:text-[10px] font-black uppercase tracking-widest px-4 py-2 rounded-lg transition-colors shadow-lg w-full sm:w-auto">
                     Продлить
                 </button>
             `;
