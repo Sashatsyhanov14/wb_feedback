@@ -8,6 +8,7 @@ const authMiddleware = require('../middleware/authMiddleware');
 
 // Тарифные планы
 const PRICING_TIERS = {
+  1: { name: 'Тестовый', plan: 'starter', maxShops: 5 }, // Тестовый за 1 рубль
   3000: { name: 'Начинающий', plan: 'starter', maxShops: 5 },
   5000: { name: 'Агентство', plan: 'agency', maxShops: 20 },
   10000: { name: 'Корпорация', plan: 'corporation', maxShops: 999 },

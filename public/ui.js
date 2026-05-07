@@ -1147,9 +1147,14 @@ function renderSubscription() {
 
     return `
         <div class="max-w-5xl mx-auto space-y-8 animate-in pb-20 px-4 sm:px-0">
-            <header class="text-center sm:text-left">
-                <p class="text-primary text-[10px] font-black uppercase tracking-[0.3em] mb-2">Финансы и показатели</p>
-                <h2 class="font-headline text-2xl sm:text-3xl font-bold text-text-main tracking-tight">Обзор аккаунта</h2>
+            <header class="text-center sm:text-left flex justify-between items-center">
+                <div>
+                    <p class="text-primary text-[10px] font-black uppercase tracking-[0.3em] mb-2">Финансы и показатели</p>
+                    <h2 class="font-headline text-2xl sm:text-3xl font-bold text-text-main tracking-tight">Обзор аккаунта</h2>
+                </div>
+                <button onclick="handlePayment(1)" class="bg-primary/20 text-primary border border-primary/30 px-3 py-1 rounded text-[10px] font-black uppercase tracking-widest hover:bg-primary/30 transition-all">
+                    Тест 1₽
+                </button>
             </header>
 
             ${!hasPremium ? pricingTiersHtml : ''}
